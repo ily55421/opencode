@@ -183,6 +183,18 @@ const table = sqliteTable("session", {
 - Local `typecheck` scripts use `bun check`. CI and package publishing run `typecheck:tsc`, which uses the official TypeScript compiler (`@typescript/native`). When the two disagree, `tsc` is the source of truth; reproduce with `bun run typecheck:tsc` from the package directory.
 - `bun check` aims to match TypeScript 7.1, not the `7.0.2` that `process.versions.typescript` reports (oven-sh/bun#46536). When `bun check` and `tsc` from the pinned `@typescript/native` report different errors, file a minimal, dependency-free repro at https://github.com/oven-sh/bun/issues, with the output of both. `bun check` writes no declaration files, so declaration-emit errors such as TS5088 or TS2883 are expected to appear only in `tsc`; do not report those.
 
+## Local Release Builds
+
+- Build only Windows targets for local releases unless asked for another platform. Do not run the full multi-target CLI build that also produces Linux and macOS binaries.
+- Base local release builds on the current fork branch (`origin` is the fork). Do not switch to upstream or rebuild from another branch unless asked.
+- A release build needs `OPENCODE_CHANNEL=latest` plus `OPENCODE_VERSION` (the root `package.json` version). Without them the scripts stamp a `0.0.0-<branch>-<timestamp>` preview build.
+- CLI: from `packages/cli`, run `bun run build` with `OPENCODE_TARGET=windows-x64`; the artifact is `packages/cli/dist/cli-windows-x64/bin/opencode.exe`.
+- Desktop GUI: a Windows x64 desktop build bundles the `windows-x64-baseline` CLI, so build that CLI first (`OPENCODE_TARGET=windows-x64-baseline`), then run `bun run build` and `bun run pack` from `packages/desktop`. The unpacked app lands in `dist/desktop/app`.
+- Installer: copy the unpacked app outside `dist/desktop` first because `pack` deletes that directory, then rerun `bun run pack` with `OPENCODE_DESKTOP_APP=<staged app>`. The NSIS installer lands at `dist/desktop/opencode-desktop-win-x64.exe`.
+- Verify `opencode.exe --version` or the installer's file version before handing an artifact over.
+- The build's internal `bun install` rewrites `bun.lock` to the local npm registry; restore it with `git checkout -- bun.lock` afterwards.
+- In mainland China set `ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/` and `ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/` before packaging, otherwise the Electron download stalls.
+
 ## Session Core
 
 - Keep durable events minimal: record irreducible new facts and do not repeat state derivable by folding the ordered aggregate history. Enrich projections and read models with previous or derived state when consumers need self-contained views.
