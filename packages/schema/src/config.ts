@@ -114,7 +114,10 @@ export class Info extends Schema.Class<Info>("Config.Info")({
 }) {}
 
 export const Patch = Schema.Struct({
-  shell: Schema.NullOr(Schema.String),
+  shell: Schema.optional(Schema.NullOr(Schema.String)),
+  // Provider documents are validated as ConfigProvider.Info where they are written; a null value
+  // removes the provider from the global document.
+  providers: Schema.optional(Schema.Record(Schema.String, Schema.NullOr(Schema.Record(Schema.String, Schema.Any)))),
 }).annotate({ identifier: "Config.Patch" })
 export interface Patch extends Schema.Schema.Type<typeof Patch> {}
 

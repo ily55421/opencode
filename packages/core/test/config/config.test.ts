@@ -2160,3 +2160,43 @@ describe("Config", () => {
     ),
   )
 })
+
+describe("Config.update", () => {
+  it.live("writes and removes a provider document", () =>
+    Effect.acquireDisposable(Effect.promise(() => tmpdir())).pipe(
+      Effect.flatMap((tmp) => {
+        const global = path.join(tmp.path, "global")
+        const project = path.join(tmp.path, "project")
+        return Effect.promise(() => fs.mkdir(project, { recursive: true })).pipe(
+          Effect.andThen(
+            Effect.gen(function* () {
+              const config = yield* Config.Service
+              yield* config.update!({
+                providers: {
+                  "my-llm": {
+                    name: "My LLM",
+                    package: "@opencode/ai/providers/openai-compatible",
+                    settings: { baseURL: "https://api.example.com/v1" },
+                    models: { "my-model": { name: "My Model", limit: { context: 128000, output: 8192 } } },
+                  },
+                },
+              })
+              const filepath = path.join(global, "opencode.jsonc")
+              const written = JSON.parse(yield* Effect.promise(() => fs.readFile(filepath, "utf8")))
+              expect(written.providers["my-llm"]).toMatchObject({
+                name: "My LLM",
+                package: "@opencode/ai/providers/openai-compatible",
+                settings: { baseURL: "https://api.example.com/v1" },
+                models: { "my-model": { name: "My Model", limit: { context: 128000, output: 8192 } } },
+              })
+
+              yield* config.update!({ providers: { "my-llm": null } })
+              const removed = JSON.parse(yield* Effect.promise(() => fs.readFile(filepath, "utf8")))
+              expect(removed.providers?.["my-llm"]).toBeUndefined()
+            }).pipe(Effect.provide(testLayer(project, global))),
+          ),
+        )
+      }),
+    ),
+  )
+})

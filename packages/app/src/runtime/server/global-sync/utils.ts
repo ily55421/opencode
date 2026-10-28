@@ -110,7 +110,9 @@ export function normalizeProviderList(
       status: model.status,
       options: model.settings ?? {},
       headers: model.headers ?? {},
-      release_date: new Date(model.time.released).toISOString().slice(0, 10),
+      // A configured model without a release date reports epoch zero; keep it out of "latest"
+      // while treating it as always visible, like any other undated model.
+      release_date: model.time.released ? new Date(model.time.released).toISOString().slice(0, 10) : "",
       variants: Object.fromEntries(model.variants.map((variant) => [variant.id, variant.settings ?? {}])),
     }
   }

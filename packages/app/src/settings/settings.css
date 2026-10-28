@@ -1183,6 +1183,17 @@
   }
 }
 
+.settings-providers-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.settings-providers-footer .settings-providers-view-all {
+  margin-top: 0;
+}
+
 .settings-providers-view-all {
   margin-top: 20px;
   padding: 0;
@@ -2095,6 +2106,99 @@
   flex: none;
   margin-block: 2px;
   color: var(--v2-icon-icon-muted);
+}
+
+[data-component="dialog-v2"] [data-slot="dialog-container"].settings-form-dialog {
+  width: 560px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+  height: auto;
+  border-radius: 8px;
+  align-items: stretch;
+}
+
+[data-component="dialog-v2"] [data-slot="dialog-container"].settings-form-dialog [data-slot="dialog-content"] {
+  align-items: stretch;
+  width: 100%;
+}
+
+[data-component="dialog-v2"] [data-slot="dialog-container"].settings-form-dialog [data-slot="dialog-header"] {
+  align-items: flex-start;
+  padding: 24px 24px 16px;
+}
+
+[data-component="dialog-v2"] [data-slot="dialog-container"].settings-form-dialog [data-slot="dialog-body"] {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  padding: 0 24px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+[data-component="dialog-v2"] [data-slot="dialog-container"].settings-form-dialog [data-slot="dialog-body"]::-webkit-scrollbar {
+  display: none;
+}
+
+[data-component="dialog-v2"] [data-slot="dialog-container"].settings-form-dialog [data-slot="dialog-footer"] {
+  padding: 16px 24px 24px;
+}
+
+.settings-form-dialog [data-slot="field-v2-control"] > :is([data-component="text-input-v2"], [data-component="textarea-v2"]) {
+  width: 100%;
+}
+
+.settings-form-dialog-models {
+  min-height: 96px;
+}
+
+.settings-form-dialog-section {
+  display: flex;
+  flex-direction: column;
+  padding-inline: 16px;
+  border: 1px solid var(--v2-border-border-base);
+  border-radius: 8px;
+}
+
+.settings-form-dialog-section-title {
+  padding: 14px 0 10px;
+  font-size: 13px;
+  font-weight: 530;
+  line-height: var(--line-height-compact);
+  color: var(--v2-text-text-base);
+}
+
+.settings-form-dialog-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+}
+
+.settings-form-dialog-row + .settings-form-dialog-row {
+  border-top: 1px solid var(--v2-border-border-base);
+}
+
+.settings-form-dialog-row-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-form-dialog-row-title {
+  font-size: 13px;
+  font-weight: 530;
+  line-height: var(--line-height-compact);
+  color: var(--v2-text-text-base);
+}
+
+.settings-form-dialog-row-description {
+  font-size: 11px;
+  line-height: var(--line-height-compact);
+  color: var(--v2-text-text-muted);
 }
 
 .settings-extensions-tabs[data-component="tabs-v2"][data-variant="pill"] > [data-slot="tabs-v2-list"] {

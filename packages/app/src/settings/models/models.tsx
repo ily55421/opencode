@@ -1,4 +1,9 @@
 import { useFilteredList } from "@opencode/ui/hooks"
+import { Button } from "@opencode/ui/button"
+import { useDialog } from "@opencode/ui/context/dialog"
+import { Icon } from "@opencode/ui/icon"
+import { IconButton } from "@opencode/ui/icon-button"
+import { Menu } from "@opencode/ui/menu"
 import { Switch } from "@opencode/ui/switch"
 import { type Component, createEffect, createMemo, For, type JSX, Show } from "solid-js"
 
@@ -14,6 +19,8 @@ import { SettingsRow } from "@/settings/row"
 import { CONSOLE_GROUP_KEY, consoleModelGroup, ProviderModelSections } from "@/providers/models/provider-group"
 import { SettingsSearchEmpty } from "@/settings/search-empty"
 import { SettingsSearchField } from "@/settings/search-field"
+import { useConfiguredProviders } from "@/settings/providers/configured"
+import { DialogCustomModel } from "./custom-model-dialog"
 
 import "@/settings/settings.css"
 
@@ -69,6 +76,42 @@ export const SettingsModels: Component<{
   const managed = createMemo(() => consoleModelGroup(models.list()))
   const searching = () => list.filter().length > 0
   const expanded = (key: string) => searching() || !store.collapsed[key]
+  const dialog = useDialog()
+  const configured = useConfiguredProviders(() => undefined)
+
+  const configuredModel = (providerID: string, modelID: string) =>
+    configured.providers().get(providerID)?.models?.[modelID]
+
+  const addModel = (group: { category: string; items: ModelItem[] }) => {
+    const provider = group.items[0]?.provider
+
+    if (!provider) return
+
+    void dialog.show(() => (
+      <DialogCustomModel
+        providerID={provider.id}
+        providerName={provider.name}
+        onSaved={() => configured.refresh()}
+      />
+    ))
+  }
+
+  const editModel = (item: ModelItem) =>
+    dialog.show(() => (
+      <DialogCustomModel
+        providerID={item.provider.id}
+        providerName={item.provider.name}
+        model={{
+          id: item.id,
+          name: item.name,
+          context: item.limit?.context,
+          output: item.limit?.output,
+          tools: item.capabilities.toolcall,
+          image: item.capabilities.input.image,
+        }}
+        onSaved={() => configured.refresh()}
+      />
+    ))
 
   const setProviderVisibility = (providerID: string, visible: boolean) =>
     models
@@ -85,7 +128,25 @@ export const SettingsModels: Component<{
 
             return (
               <SettingsRow title={item.name} description="">
-                <div>
+                <div class="flex items-center gap-1">
+                  <Show when={configuredModel(item.provider.id, item.id)}>
+                    <Menu placement="bottom-end" gutter={4}>
+                      <Menu.Trigger
+                        as={IconButton}
+                        variant="ghost-muted"
+                        size="small"
+                        icon={<Icon name="outline-dots" />}
+                        aria-label={language.t("settings.models.custom.options", { model: item.name })}
+                      />
+                      <Menu.Portal>
+                        <Menu.Content>
+                          <Menu.Item onSelect={() => void editModel(item)}>
+                            {language.t("common.edit")}
+                          </Menu.Item>
+                        </Menu.Content>
+                      </Menu.Portal>
+                    </Menu>
+                  </Show>
                   <Switch
                     checked={models.visible(key)}
                     onChange={(checked) => models.setVisibility(key, checked)}
@@ -188,6 +249,11 @@ export const SettingsModels: Component<{
               onExpandedChange={(key, value) => setStore("collapsed", key, !value)}
               onSetVisibility={setProviderVisibility}
               ref={(providerID, element) => sections.set(providerID, element)}
+              action={(group) => (
+                <Button size="small" variant="ghost-muted" onClick={() => addModel(group)}>
+                  {language.t("settings.models.custom.add")}
+                </Button>
+              )}
               rows={(items) => <ModelRows items={items} />}
             />
           </Show>

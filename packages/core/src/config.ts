@@ -6,6 +6,7 @@ import { isDeepStrictEqual } from "node:util"
 import { applyEdits, modify, type ParseError, parse } from "jsonc-parser"
 import { Context, Effect, FiberMap, Layer, Option, PubSub, Ref, Schema, Semaphore, Stream } from "effect"
 import { Directory, Document, Info, type Patch, type Entry, Event } from "@opencode/schema/config"
+import { ConfigProvider } from "@opencode/schema/config/provider"
 import { Credential } from "./credential.js"
 import { Bus } from "./bus.js"
 import { Watcher } from "./filesystem/watcher.js"
@@ -412,14 +413,26 @@ export const layer = (options?: Options) =>
           const filepath =
             (yield* Effect.filter(candidates, fs.isFile)).at(-1) ?? path.join(directory, "opencode.jsonc")
           const text = (yield* fs.readFileStringSafe(filepath)) ?? "{}\n"
+          const providers = Object.entries(patch.providers ?? {}).map(([id, input]) => {
+            if (input === null) return [id, undefined] as const
+            const decoded = Schema.decodeUnknownOption(ConfigProvider.Info, {
+              errors: "all",
+              onExcessProperty: "ignore",
+            })(input)
+            if (Option.isNone(decoded)) throw new Error(`Invalid provider configuration: ${id}`)
+            return [id, Schema.encodeSync(ConfigProvider.Info)(decoded.value)] as const
+          })
           const updated = yield* Effect.try({
-            try: () =>
-              applyEdits(
-                text,
-                modify(text, ["shell"], patch.shell ?? undefined, {
-                  formattingOptions: { tabSize: 2, insertSpaces: true },
-                }),
-              ),
+            try: () => {
+              const formattingOptions = { tabSize: 2, insertSpaces: true }
+              let next = text
+              if (patch.shell !== undefined)
+                next = applyEdits(next, modify(next, ["shell"], patch.shell ?? undefined, { formattingOptions }))
+              providers.forEach(([id, provider]) => {
+                next = applyEdits(next, modify(next, ["providers", id], provider, { formattingOptions }))
+              })
+              return next
+            },
             catch: (cause) => new FSUtil.FileSystemError({ method: "config.update", cause }),
           })
           yield* fs.writeWithDirs(filepath, updated.endsWith("\n") ? updated : `${updated}\n`)

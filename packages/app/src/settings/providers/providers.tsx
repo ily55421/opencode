@@ -21,6 +21,8 @@ import { SettingsList } from "@/settings/list"
 import { activeProviderAccount, providerAccounts, type ProviderAccount } from "./accounts"
 import { AccountNameInput } from "./account-name"
 import { useProviderAccountActions } from "./account-actions"
+import { DialogCustomProvider } from "./custom-provider-dialog"
+import { useConfiguredProviders } from "./configured"
 import "@/settings/settings.css"
 
 type ProviderSource = "env" | "api" | "account" | "config" | "custom"
@@ -50,6 +52,7 @@ export const SettingsProviders: Component<{
   const integrations = useIntegrations(() => props.directory)
   const providerConnect = useProviderConnectController()
   const accountActions = useProviderAccountActions(() => props.directory)
+  const configured = useConfiguredProviders(() => props.directory)
 
   const [state, setState] = createStore<{
     disconnecting: Record<string, "removing" | "removed" | "absent" | undefined>
@@ -195,7 +198,13 @@ export const SettingsProviders: Component<{
     return
   }
 
+  // Local config providers keep `integrationID` unset; connection-managed providers (Console) do not.
+  const isCustom = (item: ProviderItem) =>
+    item.integrationID === undefined && configured.providers().has(item.id)
+
   const type = (item: ProviderItem) => {
+    if (isCustom(item)) return language.t("settings.providers.tag.custom")
+
     const current = source(item)
 
     if (current === "env") return language.t("settings.providers.tag.environment")
@@ -281,6 +290,46 @@ export const SettingsProviders: Component<{
       final: providerAccounts(integration(provider)).length === 1,
     })
     setState({ credentialID: undefined, held: undefined })
+  }
+
+  const addCustom = () => {
+    void dialog.show(() => <DialogCustomProvider onSaved={() => configured.refresh()} />)
+  }
+
+  const editCustom = (providerID: string) => {
+    void dialog.show(() => <DialogCustomProvider providerID={providerID} onSaved={() => configured.refresh()} />)
+  }
+
+  const removeCustom = async (item: ProviderItem) => {
+    const location = props.directory ? { directory: props.directory } : undefined
+
+    const credentials = await serverSdk.api.integration
+      .get({ integrationID: item.integrationID ?? item.id, location })
+      .then((result) => result.data.connections.filter((connection) => connection.type === "credential"))
+      .catch(() => [])
+
+    await Promise.all(
+      credentials.map((credential) =>
+        serverSdk.api.credential.remove({ credentialID: credential.id }).catch(() => undefined),
+      ),
+    )
+    await serverSdk.api.config
+      .update({ providers: { [item.id]: null } })
+      .then(() => {
+        configured.refresh()
+        showToast({
+          variant: "success",
+          icon: "circle-check",
+          title: language.t("settings.providers.custom.removed.title"),
+          description: language.t("settings.providers.custom.removed.description", { provider: item.name }),
+        })
+      })
+      .catch((error) => {
+        showToast({
+          title: language.t("common.requestFailed"),
+          description: formatServerError(error, language.t),
+        })
+      })
   }
 
   function AccountMenu(menuProps: { provider: ProviderItem; name?: string }) {
@@ -431,27 +480,60 @@ export const SettingsProviders: Component<{
                             </div>
                           </div>
                           <Show
-                            when={canManageAccounts(item)}
+                            when={isCustom(item)}
                             fallback={
                               <Show
-                                when={canDisconnect(item)}
+                                when={canManageAccounts(item)}
                                 fallback={
-                                  <span class="settings-provider-env-hint">
-                                    {language.t("settings.providers.connected.environmentDescription")}
-                                  </span>
+                                  <Show
+                                    when={canDisconnect(item)}
+                                    fallback={
+                                      <span class="settings-provider-env-hint">
+                                        {language.t("settings.providers.connected.environmentDescription")}
+                                      </span>
+                                    }
+                                  >
+                                    <Button
+                                      size="normal"
+                                      variant="ghost-muted"
+                                      onClick={() => void disconnect(item, item.name)}
+                                    >
+                                      {language.t("common.disconnect")}
+                                    </Button>
+                                  </Show>
                                 }
                               >
-                                <Button
-                                  size="normal"
-                                  variant="ghost-muted"
-                                  onClick={() => void disconnect(item, item.name)}
-                                >
-                                  {language.t("common.disconnect")}
-                                </Button>
+                                <AccountMenu provider={item} />
                               </Show>
                             }
                           >
-                            <AccountMenu provider={item} />
+                            <div class="settings-provider-account-actions">
+                              <Show when={canManageAccounts(item)}>
+                                <AccountMenu provider={item} />
+                              </Show>
+                              <Menu placement="bottom-end" gutter={6}>
+                                <Menu.Trigger
+                                  as={IconButton}
+                                  variant="ghost-muted"
+                                  size="large"
+                                  icon={<Icon name="outline-dots" />}
+                                  aria-label={language.t("settings.providers.custom.options", { provider: item.name })}
+                                />
+                                <Menu.Portal>
+                                  <Menu.Content>
+                                    <Menu.Item onSelect={() => connect(item.id)}>
+                                      {language.t("settings.providers.custom.connect")}
+                                    </Menu.Item>
+                                    <Menu.Item onSelect={() => editCustom(item.id)}>
+                                      {language.t("common.edit")}
+                                    </Menu.Item>
+                                    <Menu.Item onSelect={() => void removeCustom(item)}>
+                                      {language.t("common.delete")}
+                                    </Menu.Item>
+                                  </Menu.Content>
+                                </Menu.Portal>
+                              </Menu>
+                            </div>
                           </Show>
                         </div>
                       }
@@ -571,9 +653,14 @@ export const SettingsProviders: Component<{
             </For>
           </SettingsList>
 
-          <button type="button" class="settings-providers-view-all" onClick={() => connect()}>
-            {language.t("dialog.provider.viewAll")}
-          </button>
+          <div class="settings-providers-footer">
+            <button type="button" class="settings-providers-view-all" onClick={() => connect()}>
+              {language.t("dialog.provider.viewAll")}
+            </button>
+            <button type="button" class="settings-providers-view-all" onClick={addCustom}>
+              {language.t("settings.providers.custom.add")}
+            </button>
+          </div>
         </div>
       </div>
     </>
