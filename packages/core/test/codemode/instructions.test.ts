@@ -48,6 +48,8 @@ describe("CodeModeInstructions", () => {
       const initialized = yield* readInitial(CodeModeInstructions.make({ tools: [echo] }))
       expect(initialized.text).toContain("Use the `execute` tool to call the tools listed below.")
       expect(initialized.text).toContain("The catalog is complete.")
+      // Batching and the no-temporary-file rule live in the system prompt, which Code Mode also renders.
+      expect(initialized.text).not.toContain("temporary file")
       expect(initialized.text).toContain("## Available tools")
       expect(initialized.text).toContain(`  - ${echo.signature} // Echo text`)
 
