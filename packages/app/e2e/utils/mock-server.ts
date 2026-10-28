@@ -883,6 +883,27 @@ function mockHandlers(
           }),
         config: () => Effect.succeed(configEntries),
         reference: () => Effect.succeed({ location: location(config), data: [] }),
+        // A deterministic four-week history so the activity card has cells to place without a per-test fixture.
+        sessionStats: () =>
+          Effect.succeed({
+            data: {
+              range: { from: 0, to: Date.now() },
+              sessions: 3,
+              subagents: 0,
+              prompts: 12,
+              steps: 48,
+              tokens: { input: 1200, output: 600, reasoning: 100, cache: { read: 900, write: 0 } },
+              cost: 0.42,
+              tools: { mode: "none" },
+              activeDays: 6,
+              streak: 3,
+              activity: Array.from({ length: 28 }, (_, index) => ({
+                date: new Date(Date.UTC(2024, 0, 1 + index)).toISOString().slice(0, 10),
+                steps: (index % 7 === 0 ? 0 : (index % 5) * 3) + 1,
+              })),
+              models: [],
+            },
+          }),
         agent: (ctx) =>
           Effect.succeed({
             location: location(config, requestDirectory(config, ctx.request)),

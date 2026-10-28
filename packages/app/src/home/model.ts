@@ -27,41 +27,6 @@ export function createHomeController() {
 
   const newSessionProject = createMemo(() => selectedProject() ?? focusedServerCtx()?.projects.last() ?? projects()[0])
 
-  createEffect(() => {
-    const list = servers.visible
-
-    if (list.some((conn) => ServerConnection.key(conn) === selection().server)) return
-    const conn = list[0]
-
-    if (conn) setSelection({ server: ServerConnection.key(conn) })
-  })
-  createEffect(() => {
-    const ctx = focusedServerCtx()
-    const id = selectedProject()?.id
-
-    if (!ctx || !id || ctx.sdk.connection.status() !== "connected") return
-    // Selecting a project is the demand for its worktree inventory: the session filter spans its worktrees.
-    void ctx.sync.worktrees.list(id).then(() => ctx.sync.worktrees.refresh(id))
-  })
-  createEffect(() => {
-    // The project list is empty until the server store hydrates and the server answers; clearing the restored
-    // selection against it would persist the loss.
-    if (!servers.hydrated()) return
-    const current = selection()
-    const directory = current.directory
-
-    if (!directory) return
-    const conn = servers.visible.find((conn) => ServerConnection.key(conn) === current.server)
-
-    if (!conn) return
-    const ctx = global.ensureServerCtx(conn)
-
-    if (!ctx.sync.project.ready()) return
-
-    if (ctx.projects.used().some((project) => pathKey(project.worktree) === pathKey(directory))) return
-    setSelection({ server: current.server })
-  })
-
   function setSelection(next: HomeProjectSelection) {
     layout.home.setSelection(next)
   }
@@ -93,6 +58,7 @@ export function createHomeController() {
       health: (conn: ServerConnection.Any) => global.servers.health[ServerConnection.key(conn)],
       label: servers.label,
       context: (conn: ServerConnection.Any) => global.ensureServerCtx(conn),
+      hydrated: servers.hydrated,
       focused: focusedServer,
       focusedContext: focusedServerCtx,
       focusedSync,
@@ -136,3 +102,45 @@ export function createHomeController() {
 }
 
 export type HomeController = ReturnType<typeof createHomeController>
+
+/**
+ * Reconciles the persisted home selection and demands the selected project's worktree inventory. Home owns this: the
+ * workspaces rail shares the controller's read surface, and a second copy of these effects would send the server two
+ * worktree refreshes per selection change.
+ */
+export function createHomeSelectionSync(home: HomeController) {
+  createEffect(() => {
+    const list = home.server.list()
+
+    if (list.some((conn) => ServerConnection.key(conn) === home.selection.value().server)) return
+    const conn = list[0]
+
+    if (conn) home.selection.set({ server: ServerConnection.key(conn) })
+  })
+  createEffect(() => {
+    const ctx = home.server.focusedContext()
+    const id = home.project.selected()?.id
+
+    if (!ctx || !id || ctx.sdk.connection.status() !== "connected") return
+    // Selecting a project is the demand for its worktree inventory: the session filter spans its worktrees.
+    void ctx.sync.worktrees.list(id).then(() => ctx.sync.worktrees.refresh(id))
+  })
+  createEffect(() => {
+    // The project list is empty until the server store hydrates and the server answers; clearing the restored
+    // selection against it would persist the loss.
+    if (!home.server.hydrated()) return
+    const current = home.selection.value()
+    const directory = current.directory
+
+    if (!directory) return
+    const conn = home.server.list().find((conn) => ServerConnection.key(conn) === current.server)
+
+    if (!conn) return
+    const ctx = home.server.context(conn)
+
+    if (!ctx.sync.project.ready()) return
+
+    if (home.project.forServer(conn).some((project) => pathKey(project.worktree) === pathKey(directory))) return
+    home.selection.set({ server: current.server })
+  })
+}

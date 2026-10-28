@@ -13,8 +13,9 @@ import { setCursorPosition } from "@/composer/editor/dom"
 import { promptLength } from "@/composer/prompt-parts"
 import { useCommand } from "@/shell/commands/command"
 import { useLanguage } from "@/runtime/i18n/language"
-import { useData } from "@/runtime/server/current"
+import { useData, useServer } from "@/runtime/server/current"
 import { useServerSDK } from "@/runtime/server/client"
+import { useServers } from "@/runtime/server/registry"
 import { showToast } from "@/shell/notifications/toast"
 import { errorMessage } from "@/shell/layout/helpers"
 import { useLocal } from "@/providers/models/selection"
@@ -37,6 +38,7 @@ import { createSessionComposerController, type SessionComposerController } from 
 import { SessionQueuePanel } from "./queue-panel"
 import { SessionActivityChips, type SessionActivityItem } from "./activity-chips"
 import { SessionComposerLane, useComposerLaneAlignment } from "./composer-lane"
+import { SessionComposerStats } from "./stats-panel"
 import { SessionTodoPill } from "./todo-pill"
 import { sessionTodos, todoFinished } from "./todos"
 import { useOpenSessionRoute } from "../session-identity-header"
@@ -398,6 +400,8 @@ export function ActiveSessionComposerRegion(props: {
   const server = useServerSDK()
   const language = useLanguage()
   const openRoute = useOpenSessionRoute()
+  const routed = useServer()
+  const registry = useServers()
 
   // Only the server's LocationNotFoundError for the session's own Location replaces the composer.
   const missing = createMemo(() => {
@@ -469,6 +473,25 @@ export function ActiveSessionComposerRegion(props: {
 
   const providers = useProviders(() => props.session.data.info()?.location.directory)
 
+  const contextLimit = (model: { providerID: string; id: string }) =>
+    providers.all().get(model.providerID)?.models[model.id]?.limit.context
+
+  const composerStatus = {
+    server: () => (routed.isLocal ? language.t("composer.status.local") : registry.label(routed.conn)),
+    project: () => {
+      const directory = props.session.data.info()?.location.directory
+
+      return directory ? getFilename(directory) || undefined : undefined
+    },
+    branch: () => {
+      const current = props.session.data.info()
+
+      if (!current) return
+
+      return data.location.vcs.info({ directory: current.location.directory })?.branch.current
+    },
+  }
+
   const subagentModel = () => {
     const ref =
       props.session.data.info()?.model ??
@@ -535,6 +558,13 @@ export function ActiveSessionComposerRegion(props: {
                   suggestionBoundary={props.suggestionBoundary}
                 />
               </VoiceComposer>
+              <SessionComposerStats
+                messages={props.session.history.messages}
+                working={props.session.data.working}
+                boundary={props.session.data.revertMessageID}
+                contextLimit={contextLimit}
+                status={composerStatus}
+              />
             </div>
           }
         >

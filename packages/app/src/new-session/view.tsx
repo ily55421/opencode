@@ -1,12 +1,14 @@
 import { useDialog } from "@opencode/ui/context/dialog"
 import { Tooltip } from "@opencode/ui/tooltip"
 import { Icon } from "@opencode/ui/icon"
+import { IconButton } from "@opencode/ui/icon-button"
 import { Slash } from "@opencode/ui/slash"
 import { Keybind } from "@opencode/ui/keybind"
 import { useCommand } from "@/shell/commands/command"
 import { Show, createMemo, createSignal, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { createResizeObserver } from "@solid-primitives/resize-observer"
+import { createMediaQuery } from "@solid-primitives/media"
 import { getFilename } from "@opencode/util/path"
 import {
   displayName,
@@ -17,6 +19,8 @@ import {
 } from "@opencode/ui/project-avatar"
 import { Schema } from "effect"
 import { createPresence } from "@/runtime/presence"
+import { ActivityCard } from "@/activity/heatmap"
+import { createActivity } from "@/activity/activity"
 import { Composer } from "@/composer/composer"
 import { ComposerDropzone } from "@/composer/dropzone"
 import type { ComposerModel } from "@/composer/model"
@@ -27,6 +31,8 @@ import {
 } from "@/new-session/project/selector"
 import type { useNewSessionLocationDialog } from "@/new-session/location/dialog"
 import { useLanguage } from "@/runtime/i18n/language"
+import { useServerSDK } from "@/runtime/server/client"
+import { useSettingsDialog } from "@/settings/command"
 import { useWorkspaceLocation } from "@/workspaces/location"
 import { useProviders } from "@/providers/catalog/providers"
 import { NEW_SESSION_CONTENT_WIDTH } from "@/new-session/layout"
@@ -73,6 +79,23 @@ export function NewSessionView(props: {
   )
 
   const settings = useSettings()
+  const sdk = useServerSDK()
+  const command = useCommand()
+  const openSettings = useSettingsDialog()
+  const language = useLanguage()
+  const mobile = createMediaQuery("(max-width: 767px)")
+  // Mirrors the shell's rail condition: when the workspaces rail is on screen it already carries search and settings.
+  const railVisible = () => !mobile() && settings.appearance.tabLayout() === "horizontal"
+  const project = () => props.project.selected()
+
+  const projectName = () => {
+    const current = project()
+
+    return current ? (current.name ?? displayName(current)) : undefined
+  }
+
+  const serverName = () => project()?.server?.name
+  const activity = createActivity({ api: () => sdk.api, project: () => project()?.id })
 
   const [wordmark, setWordmark] = createStore<WordmarkState>({ mode: "flat", game: false })
 
@@ -91,7 +114,45 @@ export function NewSessionView(props: {
           active={props.composer.state.drag === "active"}
           input={props.composer.model.selection.current()?.capabilities.input}
         />
-        <div class="absolute inset-x-0 top-[25.375%] flex justify-center px-6">
+        <div class="pointer-events-none absolute inset-x-0 top-0 z-20 flex h-12 items-center px-3">
+          <div class="flex-1" />
+          <Show when={projectName()}>
+            {(name) => (
+              <div class="pointer-events-auto flex h-7 min-w-0 items-center gap-2 rounded-full border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 text-[12px] text-v2-text-text-muted">
+                <Icon name="monitor" size="small" class="shrink-0 text-v2-icon-icon-muted" />
+                <span class="max-w-[220px] truncate">{name()}</span>
+                <span class="shrink-0 text-v2-text-text-faint">·</span>
+                <span class="shrink-0">{serverName() ?? language.t("composer.status.local")}</span>
+              </div>
+            )}
+          </Show>
+          <div class="pointer-events-auto flex flex-1 items-center justify-end gap-1">
+            <Show when={!railVisible()}>
+              <Tooltip value={language.t("command.palette")} placement="bottom">
+                <IconButton
+                  type="button"
+                  variant="ghost-muted"
+                  size="small"
+                  icon={<Icon name="magnifying-glass" size="small" />}
+                  aria-label={language.t("command.palette")}
+                  onClick={() => command.trigger("command.palette")}
+                />
+              </Tooltip>
+              <Tooltip value={language.t("sidebar.settings")} placement="bottom">
+                <IconButton
+                  type="button"
+                  variant="ghost-muted"
+                  size="small"
+                  icon={<Icon name="settings-gear" size="small" />}
+                  aria-label={language.t("sidebar.settings")}
+                  onClick={() => openSettings()}
+                />
+              </Tooltip>
+            </Show>
+          </div>
+        </div>
+        {/* Scrolls instead of clipping: the activity card pushes the composer past a short panel's bottom edge. */}
+        <div class="absolute inset-x-0 top-[max(10%,56px)] bottom-0 flex justify-center overflow-y-auto px-6 pb-6">
           <div class={NEW_SESSION_CONTENT_WIDTH}>
             <NewSessionWordmark
               ref={(box) => setWordmark("box", box)}
@@ -104,7 +165,17 @@ export function NewSessionView(props: {
                 setWordmark("game", true)
               }}
             />
-            <div class="mt-8 flex flex-col gap-3">
+            <Show when={projectName()}>
+              {(name) => (
+                <div class="mt-3 text-center text-[13px] text-v2-text-text-muted">
+                  {language.t("newSession.welcome", { project: name() })}
+                </div>
+              )}
+            </Show>
+            <Show when={project()}>
+              <ActivityCard activity={activity} class="mx-auto mt-6 w-full max-w-[720px]" />
+            </Show>
+            <div class="mt-4 flex flex-col gap-3">
               <div data-slot="new-session-composer" class="flex flex-col gap-1">
                 <div class="relative z-10">
                   <Composer model={props.composer} />

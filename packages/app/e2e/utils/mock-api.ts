@@ -298,6 +298,7 @@ const Group = HttpApiGroup.make("mock")
       error: MockBadRequest.pipe(HttpApiSchema.status(400)),
     }),
   )
+  .add(HttpApiEndpoint.get("sessionStats", "/api/experimental/session/stats", { query: Query, success: Json }))
   .add(HttpApiEndpoint.post("sessionCreate", "/api/session", { payload: JsonPayload, success: Json }))
   .add(HttpApiEndpoint.get("sessionActive", "/api/session/active", { success: Json }))
   .add(

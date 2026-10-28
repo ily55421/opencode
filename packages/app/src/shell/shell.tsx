@@ -25,6 +25,7 @@ import {
 } from "@/shell/sidebar-toggle"
 import { createPanelMotion, guardClosingFocus, panelOpacity } from "@/shell/panel-motion"
 import { createSidebarPeek } from "@/shell/sidebar-peek"
+import { WorkspaceSidebar } from "@/shell/workspace-sidebar"
 import { windowDragEnabled } from "@/session/header/drag-area"
 
 // How far Home steps along a peek's header to clear the collapsed toggle: to the toggle's end, from the sidebar's 18px
@@ -285,6 +286,10 @@ export default function Layout(props: ParentProps) {
               />
             </Show>
           </aside>
+        </Show>
+        {/* The desktop workspaces rail replaces the horizontal tab strip's project browsing. */}
+        <Show when={!mobile() && !verticalTabs()}>
+          <WorkspaceSidebar />
         </Show>
         {/* Size containment collapses percentage-height descendants in WebKit. */}
         <main
