@@ -3800,9 +3800,15 @@ describe("SessionRunnerLLM", () => {
     ])
   })
 
-  scenario("reloads a model switch before a tool-driven continuation step", function* (s) {
+  scenario("keeps the instruction baseline stable across a tool-driven continuation step", function* (s) {
     yield* s.admit("Echo this")
 
+    const instructionEvents: Event.Payload[] = []
+    const unsubscribe = yield* s.bus.listen((event) =>
+      Effect.sync(() => {
+        if (event.type === "session.instructions.updated") instructionEvents.push(event)
+      }),
+    )
     yield* s.llm.push(TestLLM.tool("call-echo", "echo", { text: "hello" }), TestLLM.stop())
     const tools = yield* s.blockTools()
     const run = yield* Effect.forkChild(s.resume)
@@ -3820,7 +3826,14 @@ describe("SessionRunnerLLM", () => {
       [defaultSystem, fakeIdentity, "Initial context"],
       [defaultSystem, replacementIdentity, "Initial context"],
     ])
-    expect(systemTexts(s.requests[1])).toContain("Replacement context")
+    expect(systemTexts(s.requests[1]!)).not.toContain("Replacement context")
+    expect(instructionEvents).toHaveLength(1)
+
+    yield* s.llm.push(TestLLM.text("Done", "next"))
+    yield* s.runPrompt("Next")
+    expect(systemTexts(s.requests[2]!)).toContain("Replacement context")
+    expect(instructionEvents).toHaveLength(2)
+    yield* unsubscribe
   })
 
   scenario("consumes the full provider stream before recording its boundary and settling local tools", function* (s) {

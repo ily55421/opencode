@@ -37,6 +37,12 @@ const CONTINUE_AFTER_INCOMPLETE_STREAM =
 const CONTINUE_AFTER_OUTPUT_LIMIT =
   "Your last response hit the output token limit (stop reason: length). Do not apologize, recap, or repeat yourself. Break the remaining work into smaller pieces."
 
+/**
+ * The instruction prefix one drain has committed to. Clearing it is the only way to let a later
+ * preparation adopt new instructions, so every rebuild path resets the same field.
+ */
+type InstructionBaseline = { instructions: SessionContext.Selection["instructions"] | undefined }
+
 const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
@@ -60,6 +66,10 @@ const layer = Layer.effect(
       let step = input.continuation?.step ?? 1
       let entering = true
       const promotable = input.promotable ?? "input"
+      // One drain freezes the instruction prefix for every Step it runs, including a Step that opens
+      // a new turn by promoting queued input. Reloading AGENTS.md or a skill mid-drain would rewrite
+      // the system prompt and invalidate the provider's prompt cache, so edits land on the next drain.
+      const baseline: InstructionBaseline = { instructions: undefined }
       if (!force && !continuing) {
         const pending = yield* SessionInbox.nextPromotable(db, sessionID, "input")
         if (!pending) return DrainResult.Complete()
@@ -153,6 +163,8 @@ const layer = Layer.effect(
                   })
                   return yield* Effect.failCause(compacted.cause)
                 }
+                // Compaction rebuilt the prompt, so the next preparation may adopt new instructions.
+                baseline.instructions = undefined
                 force = false
                 continue
               }
@@ -160,7 +172,7 @@ const layer = Layer.effect(
                 return DrainResult.Complete()
               const ready = yield* restore(
                 Effect.gen(function* () {
-                  const selected = yield* prepareContext(sessionID)
+                  const selected = yield* prepareDrainContext(sessionID, baseline)
                   const promoted = yield* SessionInbox.promote(
                     db,
                     bus,
@@ -186,24 +198,47 @@ const layer = Layer.effect(
       while (true) {
         const next = yield* advanceToStep()
         if (next._tag !== "Ready") return next
-        continuing = yield* runStep(next.context, step)
+        continuing = yield* runStep(next.context, step, baseline)
         step++
         force = false
         entering = false
       }
     })
 
-    const prepareContext = Effect.fn("SessionRunner.prepareContext")(function* (sessionID: SessionSchema.ID) {
+    const prepareContext = Effect.fn("SessionRunner.prepareContext")(function* (
+      sessionID: SessionSchema.ID,
+      frozen?: SessionContext.Selection["instructions"],
+    ) {
       // Plugins can reload mid-turn; each step and retry must read the settled agents, models and skills.
       yield* plugins.awaitActivation
       const selected = yield* context.select(sessionID)
+      if (frozen) {
+        // Observation still runs so preparation hooks and cancellation points keep their timing, but the
+        // committed instruction prefix stays fixed for the rest of the drain.
+        yield* InstructionState.observe(db, selected.instructions, sessionID)
+        return { ...selected, instructions: frozen }
+      }
       // A blocked initial instruction baseline must leave admitted input pending.
       yield* InstructionState.prepare(db, bus, selected.instructions, sessionID)
       return selected
     })
 
+    /** Prepares against the drain's frozen prefix, committing it on the first call of that drain. */
+    const prepareDrainContext = Effect.fn("SessionRunner.prepareDrainContext")(function* (
+      sessionID: SessionSchema.ID,
+      baseline: InstructionBaseline,
+    ) {
+      const selected = yield* prepareContext(sessionID, baseline.instructions)
+      baseline.instructions ??= selected.instructions
+      return selected
+    })
+
     /** Owns logical Step policy; each attempt owns its streaming, tools, and durable settlement. */
-    const runStep = Effect.fn("SessionRunner.runStep")(function* (first: SessionContext.Loaded, step: number) {
+    const runStep = Effect.fn("SessionRunner.runStep")(function* (
+      first: SessionContext.Loaded,
+      step: number,
+      baseline: InstructionBaseline,
+    ) {
       const sessionID = first.session.id
       let assistantMessageID = SessionMessage.ID.create()
       const retry = yield* SessionRunnerRetry.make(bus, sessionID)
@@ -212,13 +247,16 @@ const layer = Layer.effect(
       let recoverContinuation = true
       while (true) {
         // Reuse boundary preparation once; retries refresh context without delivering more input.
-        const loaded = initial ?? (yield* prepareContext(sessionID).pipe(Effect.flatMap(context.load)))
+        const loaded =
+          initial ?? (yield* prepareDrainContext(sessionID, baseline).pipe(Effect.flatMap(context.load)))
         initial = undefined
         const estimate = SessionCompaction.estimatePrompt(loaded)
         const compacted = yield* compaction.compact({ reason: "auto", context: loaded, estimate })
         if (compacted.status === "failed") return yield* new StepFailedError({ error: compacted.error })
         if (compacted.status === "completed") {
           assistantMessageID = SessionMessage.ID.create()
+          // Compaction rebuilds the prompt, so the next preparation may adopt new instructions.
+          baseline.instructions = undefined
           continue
         }
         yield* compaction.precompute(Effect.succeed(loaded), estimate)
@@ -343,6 +381,8 @@ const layer = Layer.effect(
           Compacted: Effect.fnUntraced(function* () {
             recoverOverflow = false
             assistantMessageID = SessionMessage.ID.create()
+            // Overflow compaction rebuilt the prompt too, so release the frozen prefix the same way.
+            baseline.instructions = undefined
           }),
           RecoverFull: Effect.fnUntraced(function* () {
             recoverContinuation = false
