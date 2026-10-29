@@ -15,6 +15,9 @@
 - When attaching Playwright to a running desktop app, use `chromium.connectOverCDP(endpoint, { noDefaults: true })`.
 - Without `noDefaults`, Playwright applies light-mode media emulation during attachment. An app following the system theme then flashes light until the connection closes. The option also preserves the existing focus and other media preferences.
 - Do not emulate a color scheme or reduced-motion preference on the user's live window unless explicitly requested; use an isolated test context for those scenarios.
+- An agent shell inherits `ELECTRON_RUN_AS_NODE=1`, which makes any Electron app started from it run as plain Node: it exits immediately, writes no app log, and reports `bad option: --remote-debugging-port` if given one. Clear it for the child process before launching the app, for example `powershell -Command "[Environment]::SetEnvironmentVariable('ELECTRON_RUN_AS_NODE',[string]::empty,'Process'); Start-Process ...`. A silently missing window means this, not a broken build.
+- Packaged prod builds never open a remote debugging port (`debugBuild()` in `packages/gui-plugins/src/debug/options.ts` is `!packaged || channel === "beta"`), so a real-window check needs a beta-channel build of the same commit: pack with `OPENCODE_CHANNEL=beta`, set `OPENCODE_DESKTOP_REMOTE_DEBUGGING_PORT=<port>`, and launch `win-unpacked\OpenCode Beta.exe`. The beta appId is separate, so it does not collide with the installed prod app, and it still reads the elected background service and the user's real sessions.
+- `Get-Process | Where-Object { $_.Path -like ... }` returns nothing for these processes from this shell; filter by `ProcessName`, or a cleanup silently kills nothing and leaves the debug port listening.
 
 ## TUI Stories
 
