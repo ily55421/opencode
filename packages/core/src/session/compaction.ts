@@ -19,6 +19,7 @@ import type { SessionCompactionResult } from "@opencode/plugin/effect/session"
 import type { SessionError } from "@opencode/schema/session-error"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { Clock, Context, DateTime, Effect, Exit, Fiber, Layer, Result, Scope, Stream } from "effect"
+import { and, desc, eq, gt, sql } from "drizzle-orm"
 import { Agent } from "../agent.js"
 import { Bus } from "../bus.js"
 import { Database } from "../database/database.js"
@@ -32,6 +33,8 @@ import { SessionEvent } from "./event.js"
 import { SessionHistory } from "./history.js"
 import type { SessionMessage } from "./message.js"
 import { SessionModelRequest } from "./model-request.js"
+import { SessionSchema } from "./schema.js"
+import { SessionMessageTable } from "./sql.js"
 import { SessionRunnerModel } from "./runner/model.js"
 import { SessionRunnerRetry } from "./runner/retry.js"
 import { toLLMMessages } from "./runner/to-llm-message.js"
@@ -169,6 +172,11 @@ const CACHE_MARGIN = 30_000
 const PRECOMPUTED_TAIL_SHARE = 0.4
 /** Failed background summaries after which no new one starts until the next compaction. */
 const PRECOMPUTE_MAX_FAILURES = 2
+/**
+ * Completed summaries one turn may produce before automatic compaction stops. Each step re-estimates, so a second
+ * summary means the first did not leave enough room; this many in one turn is a context that summarizing cannot shrink.
+ */
+const MAX_COMPACTIONS_PER_TURN = 4
 
 const SUMMARY_TEMPLATE = `You MUST use this format for your response (you may omit sections that aren't applicable). Do not include the <template> tags in your response.
 <template>
@@ -308,6 +316,14 @@ export const layer = Layer.effect(
         return { status: "skipped" }
       const held = precomputed.get(context.session.id)
       precomputed.delete(context.session.id)
+      if (trigger.reason !== "manual" && (yield* summarizedThisTurn(context.session.id)) >= MAX_COMPACTIONS_PER_TURN)
+        return {
+          status: "failed",
+          error: {
+            type: "compaction.stalled",
+            message: `Automatic compaction stopped after ${MAX_COMPACTIONS_PER_TURN} summaries in this turn: the context is not getting smaller. Start a new session, or shrink the largest tool output or attachment.`,
+          },
+        }
       const native = context.model.compaction?.type === "native"
       const model = yield* selectModel(context, settings.buffer, native)
       // The provider just rejected this context, so the estimate ran low; the first attempt already aims below it.
@@ -333,6 +349,35 @@ export const layer = Layer.effect(
           onFailure: (failure) => publish(selected, failure),
         }),
       )
+    })
+
+    /**
+     * Summaries completed since the last prompt. The loaded window starts at the newest checkpoint, so a summary the
+     * turn already ran is no longer in `context.messages` and has to be counted from the table.
+     */
+    const summarizedThisTurn = Effect.fnUntraced(function* (sessionID: SessionSchema.ID) {
+      const prompt = yield* db
+        .select({ seq: SessionMessageTable.seq })
+        .from(SessionMessageTable)
+        .where(and(eq(SessionMessageTable.session_id, sessionID), eq(SessionMessageTable.type, "user")))
+        .orderBy(desc(SessionMessageTable.seq))
+        .limit(1)
+        .get()
+        .pipe(Effect.orDie)
+      const summaries = yield* db
+        .select({ id: SessionMessageTable.id })
+        .from(SessionMessageTable)
+        .where(
+          and(
+            eq(SessionMessageTable.session_id, sessionID),
+            eq(SessionMessageTable.type, "compaction"),
+            sql`json_extract(${SessionMessageTable.data}, '$.status') = 'completed'`,
+            prompt ? gt(SessionMessageTable.seq, prompt.seq) : undefined,
+          ),
+        )
+        .all()
+        .pipe(Effect.orDie)
+      return summaries.length
     })
 
     /**
@@ -496,7 +541,7 @@ export const layer = Layer.effect(
           const prompted = fitOutput(
             { ...request, messages: [...request.messages, Message.user(prompt)] },
             context.model.limit,
-            size && { ...size, estimated: size.estimated + Token.estimate(prompt) },
+            size && { ...size, estimated: size.estimated + Token.estimateWide(prompt) },
           )
           const reply = yield* stream(context, prompted, prepared.options, background)
           if (filled(reply.text)) return reply
@@ -504,7 +549,7 @@ export const layer = Layer.effect(
           const nudged = fitOutput(
             { ...prompted, messages: [...prompted.messages, Message.user(NUDGE)] },
             context.model.limit,
-            size && { ...size, estimated: size.estimated + Token.estimate(prompt) + Token.estimate(NUDGE) },
+            size && { ...size, estimated: size.estimated + Token.estimateWide(prompt) + Token.estimateWide(NUDGE) },
           )
           const retry = yield* stream(context, nudged, prepared.options, background)
           if (filled(retry.text)) return retry
@@ -518,7 +563,7 @@ export const layer = Layer.effect(
           })
         })
 
-      const overhead = Token.estimate(prompt) + Token.estimate(NUDGE)
+      const overhead = Token.estimateWide(prompt) + Token.estimateWide(NUDGE)
       // Automatic compaction starts past the ceiling, so the whole conversation is sent unchanged while the window can
       // still fit the summary. Below that, the history before the tail is sent instead, as before: unchanged when it fits,
       // which still reuses the cache for that shorter prefix, and as text otherwise. Dropping exchanges to make room
@@ -755,12 +800,12 @@ export const layer = Layer.effect(
       if (exchanges.length === 0) return undefined
       const note = (omitted: number) =>
         omitted ? `[${omitted} older ${omitted === 1 ? "exchange" : "exchanges"} omitted]\n\n` : ""
-      const size = (text: string) => (text ? Token.estimate(text) + 1 : 0)
+      const size = (text: string) => (text ? Token.estimateWide(text) + 1 : 0)
       // Room for the longest possible note is set aside before choosing what to keep.
       const room =
         target -
         estimateRequest({ system: request.system, tools: [], messages: lead }) -
-        Token.estimate(note(exchanges.length))
+        Token.estimateWide(note(exchanges.length))
 
       const levels = exchanges.map(() => 0)
       let total = exchanges.reduce((sum, renders) => sum + size(renders[0]), 0)
@@ -974,7 +1019,7 @@ const heldIndex = (held: Precomputed, context: SessionContext.Loaded) => {
 
 /** Estimated text a swapped-in summary keeps verbatim: every message from `index` on. */
 const tailTokens = (context: SessionContext.Loaded, index: number) =>
-  Token.estimate(context.messages.slice(index).map(SessionRecentText.messageToText).filter(Boolean).join("\n\n"))
+  Token.estimateWide(context.messages.slice(index).map(SessionRecentText.messageToText).filter(Boolean).join("\n\n"))
 
 const tailLimit = (budget: number) => Math.floor(budget * PRECOMPUTED_TAIL_SHARE)
 
@@ -1035,7 +1080,7 @@ const recentStart = (
 ) => {
   // Drop the oldest entries until the rest fit the allowance, but always keep the newest one.
   const dropped = Math.min(
-    oldestToDrop(entries, (entry) => Token.estimate(entry.text), keep),
+    oldestToDrop(entries, (entry) => Token.estimateWide(entry.text), keep),
     entries.length - 1,
   )
 
@@ -1231,15 +1276,15 @@ const fitOutput = (request: LLMRequest, limit: SessionContext.Loaded["model"]["l
 }
 
 const estimateRequest = (request: Pick<LLMRequest, "system" | "tools" | "messages">) =>
-  request.system.reduce((sum, part) => sum + Token.estimate(part.text), 0) +
+  request.system.reduce((sum, part) => sum + Token.estimateWide(part.text), 0) +
   request.tools.reduce((sum, tool) => sum + estimateTool(tool), 0) +
   request.messages.reduce((sum, message) => sum + estimateMessage(message), 0)
 
 /** Only what providers receive; `metadata` and `native` stay local. */
 const estimateTool = (tool: ToolEntry): number => {
-  if (tool.type === "tool") return Token.estimate(tool.name + tool.description + JSON.stringify(tool.inputSchema))
+  if (tool.type === "tool") return Token.estimateWide(tool.name + tool.description + JSON.stringify(tool.inputSchema))
   return (
-    Token.estimate(tool.name + (tool.description ?? "")) +
+    Token.estimateWide(tool.name + (tool.description ?? "")) +
     tool.tools.reduce((sum, entry) => sum + estimateTool(entry), 0)
   )
 }
@@ -1248,19 +1293,19 @@ const estimateMessage = (message: Message) => message.content.reduce((sum, part)
 
 const estimatePart = (part: ContentPart): number => {
   // An encrypted native compaction has no locally measurable size.
-  if (part.type === "compaction") return Token.estimate(part.text ?? "")
+  if (part.type === "compaction") return Token.estimateWide(part.text ?? "")
   if (part.type === "effort") return 0
-  if (part.type === "text" || part.type === "reasoning") return Token.estimate(part.text)
+  if (part.type === "text" || part.type === "reasoning") return Token.estimateWide(part.text)
   if (part.type === "media") return estimateMedia(part.media.mediaType)
-  if (part.type === "tool-call") return Token.estimate(part.name + (JSON.stringify(part.input) ?? ""))
+  if (part.type === "tool-call") return Token.estimateWide(part.name + (JSON.stringify(part.input) ?? ""))
 
   if (part.result.type === "content")
     return part.result.value.reduce(
-      (sum, content) => sum + (content.type === "text" ? Token.estimate(content.text) : estimateMedia(content.mime)),
+      (sum, content) => sum + (content.type === "text" ? Token.estimateWide(content.text) : estimateMedia(content.mime)),
       0,
     )
   const value = part.result.value
-  return Token.estimate(typeof value === "string" ? value : (JSON.stringify(value) ?? ""))
+  return Token.estimateWide(typeof value === "string" ? value : (JSON.stringify(value) ?? ""))
 }
 
 const estimateMedia = (mime: string) => {

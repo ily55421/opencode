@@ -4,23 +4,29 @@ How the size of a prompt is estimated, what budgets that estimate is used to enf
 burn money or hit a provider rejection. Read this before touching `packages/core/src/session/compaction.ts`,
 `packages/core/src/tool-output.ts`, `packages/core/src/session/model-request.ts`, or `packages/util/src/token.ts`.
 
-## Two estimators, deliberately
+## Two estimators, one rule in core
 
 `packages/util/src/token.ts` exports both rules and they are not interchangeable:
 
-- `estimate` — four characters per token, blind to script. Every server-side compaction threshold is tuned against this
-  number, so it reads Chinese, Japanese and Korean text as roughly a quarter of its real length.
-- `estimateWide` — one token per East Asian wide code point plus four characters per narrow token, which tracks real
-  tokenizers at about 0.7–1 token per CJK character. It iterates code points so a surrogate pair is charged once.
+- `estimate` — four characters per token, blind to script. It reads Chinese, Japanese and Korean text as roughly a
+  quarter of its real length.
+- `estimateWide` — one token per East Asian wide code point, and the **same** four-characters-per-token arithmetic as
+  `estimate` for everything else, which tracks real tokenizers at about 0.7–1 token per CJK character. It iterates
+  code points so a surrogate pair is charged once.
 
-`packages/core/src/util/token.ts` re-exports **only** `estimate`, on purpose: the desktop client cannot depend on core,
-so the shared module has to hold both rules rather than the server picking one. Anything in core that wants the wide
-rule has to add the export and then re-check the budgets below, because the estimate feeds thresholds written for the
-blind rule and they move together.
+The narrow half of `estimateWide` reproduces `estimate` exactly, including its rounding. That parity is what makes the
+wide rule safe to budget against: switching a caller changes only text containing wide characters, so every threshold
+keeps its meaning for English and code, and `packages/core/test/session-compaction.test.ts`'s exact token assertions
+stay green through the swap. `packages/util/src/token.test.ts` pins the parity.
 
-`ESTIMATE_ERROR` in `packages/core/src/session/model-request.ts` adds a 15 percent margin on the *estimated* half of a
+`packages/core/src/session/compaction.ts` uses `Token.estimateWide`, and
+`packages/core/src/util/token.ts` re-exports both names — core chose the wide rule for its budgets, but a caller that
+genuinely wants the script-blind count can still ask for it. The module lives in `@opencode/util` because the desktop
+client cannot depend on core and must estimate with the same code.
+
+`packages/core/src/session/model-request.ts`'s `ESTIMATE_ERROR` adds a 15 percent margin on the *estimated* half of a
 prompt when it sizes the output limit. That margin exists because character counting runs low on dense text such as
-code — it is not a CJK correction, and it will not absorb a script-blind estimate.
+code — it is not a CJK correction, and it would not have absorbed a script-blind estimate.
 
 ## An estimate is measured plus estimated
 
@@ -54,6 +60,7 @@ Consequences worth remembering:
 | `PRECOMPUTE_RATIO` / `PRECOMPUTE_MIN_TOKENS` | When a background summary starts, and below what measured prompt size it is not worth its cost. |
 | `PRECOMPUTED_TAIL_MIN` / `PRECOMPUTED_TAIL_SHARE` | How much verbatim tail a swapped-in summary keeps; a longer tail would leave the context near the threshold, so compaction summarizes from scratch instead. |
 | `PRECOMPUTE_MAX_FAILURES` | Failed background summaries after which no new one starts until the next compaction. |
+| `MAX_COMPACTIONS_PER_TURN` | Completed summaries one turn may produce before automatic compaction gives up with `compaction.stalled`. |
 | `IMAGE_TOKEN_ESTIMATE` / `PDF_TOKEN_ESTIMATE` | Flat charge for media, since a character count means nothing there. |
 
 Settings live at `packages/core/src/config/plugin/compaction.ts` (`compaction.auto`, `compaction.buffer`,
@@ -73,6 +80,12 @@ Settings live at `packages/core/src/config/plugin/compaction.ts` (`compaction.au
 completed compaction. Failure publishes `session.compaction.failed` with `compaction.failed` / `compaction.unavailable`
 / `compaction.interrupted` error types; the runner turns a failed auto compaction into a `StepFailedError`.
 
+`summarizedThisTurn` counts completed summaries written since the last prompt and, for `auto` or `overflow` triggers
+only, `compact` returns the `compaction.stalled` error once that count reaches `MAX_COMPACTIONS_PER_TURN`. A second
+automatic compaction in one turn already means the first did not leave enough room, so the counter is the progress
+signal; the guard stops the turn from paying for a fifth summary of a context that summarizing cannot shrink. Manual
+`/compact` is exempt — the user asked for it.
+
 ## One tool result at a time
 
 `packages/core/src/tool-output.ts` clips a tool result *before* it is published, so the model never receives the full
@@ -87,17 +100,31 @@ outputs are rendered into the summary transcript, and `clip` in `compaction.ts` 
 
 ## Decisions
 
-**Thresholds stay calibrated to one estimator.** Rejected: swapping `estimate` for `estimateWide` inside core without
-touching the budgets. Failure mode: every trigger moves at once — `RESERVE_MIN`, `keep`, `PRECOMPUTED_TAIL_MIN` and the
-shrink steps are absolute token counts chosen against the blind rule, so the same session starts compacting earlier for
-reasons no test would name. If the wide rule is adopted, the budgets are part of the same change.
+**The wide rule is core's estimation rule, and it borrows the blind rule's rounding.** Rejected first: swapping
+`estimate` for `estimateWide` as it stood, charging narrow text `ceil(narrow / 4)` while the budgets were tuned against
+`round(length / 4)`. Failure mode: every trigger moves at once — `RESERVE_MIN`, `keep`, `PRECOMPUTED_TAIL_MIN` and the
+shrink steps are absolute token counts, so an English session would start compacting earlier for reasons no test names.
+What was done instead: make the wide rule's narrow half identical to `estimate`, so the swap moves CJK text and nothing
+else, and prove it with the exact-token assertions already in `session-compaction.test.ts`. Adopting the wide rule
+fixes the real defect — a Chinese session estimated at a quarter of its size reached a provider rejection instead of
+compacting.
+
+**Provider counts are not allowed to lower an estimate.** The anchor's measured value plus an estimated tail is the
+working rule; a correction that only ever moves the number down defeats every budget derived from it. A learned
+scale factor from the anchor gap was considered and not built: the anchor already replaces the estimate for everything
+it covers, so a scale would only sharpen the tail — the part that is short by construction — while adding state that
+survives a restart. The same reasoning keeps `SHRINK_STEPS` a fixed ladder rather than a learned ratio.
 
 **Only the current provider's token counts are trusted.** Rejected: anchoring on any recorded usage. Failure mode: a
 count from another provider describes a window and a tokenizer this model cannot replay, and history holds the original
 messages that window stood for, which the count leaves out — the estimate then reads low and the request is rejected.
 
-**Provider counts are not allowed to lower an estimate.** The anchor's measured value plus an estimated tail is the
-working rule; a correction that only ever moves the number down defeats every budget derived from it.
+**Repeated compaction is stopped by counting checkpoints, not by measuring the shrink.** Rejected: recomputing the
+post-summary prompt size and comparing it to the pre-summary one. Failure mode: the pre-summary size is not retained
+anywhere, and storing it would add a durable field for a number the fold can produce — the loaded window starts at the
+newest checkpoint, so a turn with several completed summaries is exactly the case where each summary failed to buy
+room. `due` runs on every step anyway, so the next step supplies the same information for free and the guard only has
+to refuse the next summary.
 
 **A large tool result is clipped before it is durable, not summarized inside the loop.** Rejected: letting full outputs
 enter history and compacting them later. Failure mode: the raw bytes get re-sent in every later step until some round
@@ -113,6 +140,9 @@ provider rejection rather than as a stated configuration problem.
 ## Tests
 
 `packages/core/test/session-compaction.test.ts` drives the real `SessionCompaction.node` against SQLite and a mock
-`LLMClient`, and asserts on `estimateContext` numbers directly — so a change to an estimator shows up there first.
+`LLMClient`, and asserts on `estimateContext` numbers directly — so a change to an estimator shows up there first. Those
+assertions are exact token counts on ASCII fixtures, which is what proves a rule change touched CJK text only; the file
+also pins a Han conversation crossing the ceiling and the `compaction.stalled` guard.
 `tool-output.test.ts` covers the clip, `session-usage.test.ts` and `usage-limits.test.ts` cover the provider-side
 numbers, and compaction scenarios also run inside `session-runner.test.ts`. Run from `packages/core` with `bun run test`.
+`packages/util/src/token.test.ts` holds the estimator's own rules, including its parity with `estimate`.

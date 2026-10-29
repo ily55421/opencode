@@ -9,9 +9,10 @@ export function estimate(input: string) {
 }
 
 /**
- * One token per East Asian glyph and four characters per token elsewhere, which matches real tokenizers at roughly
- * 0.7-1 token per CJK character. Kept beside `estimate` rather than replacing it because every server-side compaction
- * threshold is tuned against the CJK-blind rule and would move at once.
+ * One token per East Asian glyph, and the same four-characters-per-token rule as `estimate` everywhere else, which
+ * matches real tokenizers at roughly 0.7-1 token per CJK character. The narrow half deliberately reproduces `estimate`
+ * so switching a caller to this rule changes only text that contains wide characters: an English or code session
+ * estimates exactly as before, and every threshold tuned against it keeps its meaning.
  */
 export function estimateWide(input: string) {
   let wide = 0
@@ -23,7 +24,7 @@ export function estimateWide(input: string) {
     else narrow++
   }
 
-  return wide + Math.ceil(narrow / CHARS_PER_TOKEN)
+  return wide + Math.max(0, Math.round(narrow / CHARS_PER_TOKEN))
 }
 
 /** East Asian Width W and F ranges, plus emoji, which tokenizers charge like ideographs. Halfwidth forms stay narrow. */
