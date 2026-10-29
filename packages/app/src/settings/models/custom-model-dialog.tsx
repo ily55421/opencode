@@ -2,6 +2,7 @@ import { Button } from "@opencode/ui/button"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitleGroup } from "@opencode/ui/dialog"
 import { Field } from "@opencode/ui/field"
+import { Select } from "@opencode/ui/select"
 import { Switch } from "@opencode/ui/switch"
 import { TextInput } from "@opencode/ui/text-input"
 import { type Component, createEffect, Show } from "solid-js"
@@ -12,6 +13,85 @@ import { configuredProviders, type ModelConfig, type ProviderConfig } from "@/se
 import { showToast } from "@/shell/notifications/toast"
 
 const MODEL_ID = /^\S+$/
+
+const AUTO = "auto"
+
+const CONTEXT_PRESETS = [
+  { label: "128k", value: "131072" },
+  { label: "256k", value: "262144" },
+  { label: "312k", value: "327680" },
+  { label: "500k", value: "512000" },
+  { label: "1M", value: "1048576" },
+]
+
+const OUTPUT_PRESETS = [
+  { label: "4k", value: "4096" },
+  { label: "8k", value: "8192" },
+  { label: "16k", value: "16384" },
+  { label: "32k", value: "32768" },
+  { label: "128k", value: "131072" },
+]
+
+const LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"]
+
+const LEVEL_OPTIONS = LEVELS.map((level) => ({ label: level, value: level }))
+
+type ProtocolId = "auto" | "effort" | "thinking" | "anthropic" | "gemini" | "toggle"
+
+const PROTOCOLS: readonly ProtocolId[] = ["auto", "effort", "thinking", "anthropic", "gemini", "toggle"]
+
+// Each protocol is labelled by the request field it spells, which reads better than a translated brand name.
+const PROTOCOL_LABELS = new Map<string, string>([
+  ["effort", "reasoning_effort"],
+  ["thinking", "thinking.type"],
+  ["anthropic", "thinking + effort"],
+  ["gemini", "thinkingLevel"],
+  ["toggle", "on/off"],
+])
+
+type LevelParamId =
+  | "auto"
+  | "reasoning_effort"
+  | "thinking.level"
+  | "thinking_config.thinking_level"
+  | "chat_template_kwargs.reasoning_effort"
+  | "enable_thinking"
+  | "chat_template_kwargs.enable_thinking"
+
+const LEVEL_PARAMS: readonly LevelParamId[] = [
+  "auto",
+  "reasoning_effort",
+  "thinking.level",
+  "thinking_config.thinking_level",
+  "chat_template_kwargs.reasoning_effort",
+  "enable_thinking",
+  "chat_template_kwargs.enable_thinking",
+]
+
+// A boolean switch only carries on or off, so it pairs with the toggle protocol and nothing else.
+const BOOLEAN_PARAMS = new Set(["enable_thinking", "chat_template_kwargs.enable_thinking"])
+
+const TOGGLE = "toggle"
+
+type State = {
+  id: string
+  name: string
+  context: string
+  output: string
+  tools: boolean
+  image: boolean
+  pdf: boolean
+  imageOutput: boolean
+  webSearch: boolean
+  autoScheduled: boolean
+  reasoning: boolean
+  protocol: ProtocolId
+  levelParam: LevelParamId
+  defaultLevel: string
+  levels: string[]
+  saving: boolean
+  error: string
+}
 
 type ModelDefaults = {
   id: string
@@ -34,14 +114,22 @@ export const DialogCustomModel: Component<{
   const serverSdk = useServerSDK()
   const editing = () => props.model !== undefined
 
-  const [store, setStore] = createStore({
+  const [store, setStore] = createStore<State>({
     id: props.model?.id ?? "",
     name: props.model?.name ?? "",
     context: props.model?.context?.toString() ?? "",
     output: props.model?.output?.toString() ?? "",
     tools: props.model?.tools ?? true,
     image: props.model?.image ?? false,
+    pdf: false,
+    imageOutput: false,
+    webSearch: false,
+    autoScheduled: false,
     reasoning: false,
+    protocol: AUTO,
+    levelParam: AUTO,
+    defaultLevel: AUTO,
+    levels: [],
     saving: false,
     error: "",
   })
@@ -57,6 +145,8 @@ export const DialogCustomModel: Component<{
         const current = configuredProviders(entries).get(props.providerID)?.models?.[id]
 
         if (!current) return
+        const reasoning = current.capabilities?.reasoning
+        const controls = reasoning?.supported ? reasoning : undefined
 
         setStore({
           name: current.name ?? store.name,
@@ -64,7 +154,15 @@ export const DialogCustomModel: Component<{
           output: current.limit?.output?.toString() ?? "",
           tools: current.capabilities?.tools ?? store.tools,
           image: current.capabilities?.input?.includes("image") ?? store.image,
-          reasoning: current.capabilities?.reasoning?.supported ?? false,
+          pdf: current.capabilities?.input?.includes("pdf") ?? store.pdf,
+          imageOutput: current.capabilities?.output?.includes("image") ?? store.imageOutput,
+          webSearch: current.capabilities?.webSearch ?? store.webSearch,
+          autoScheduled: current.capabilities?.autoScheduled ?? store.autoScheduled,
+          reasoning: reasoning?.supported ?? false,
+          protocol: controls?.protocol ?? AUTO,
+          levelParam: controls?.levelParam ?? AUTO,
+          defaultLevel: controls?.default ?? AUTO,
+          levels: controls?.effort ?? [],
         })
       })
       .catch(() => undefined)
@@ -75,6 +173,21 @@ export const DialogCustomModel: Component<{
 
     return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined
   }
+
+  const toggleLevel = (level: string) =>
+    setStore(
+      "levels",
+      store.levels.includes(level) ? store.levels.filter((item) => item !== level) : [...store.levels, level],
+    )
+
+  const optionLabel = (option: string, labels?: Map<string, string>) =>
+    option === AUTO ? language.t("settings.models.custom.thinking.auto") : (labels?.get(option) ?? option)
+
+  const selectProtocol = (protocol: ProtocolId) =>
+    setStore({
+      protocol,
+      levelParam: BOOLEAN_PARAMS.has(store.levelParam) === (protocol === TOGGLE) ? store.levelParam : AUTO,
+    })
 
   const save = async () => {
     const id = store.id.trim()
@@ -92,25 +205,38 @@ export const DialogCustomModel: Component<{
     const entries = await serverSdk.api.config.get().catch(() => [])
     const current = configuredProviders(entries).get(props.providerID)
     const previous = current?.models?.[id]
-    const reasoning = previous?.capabilities?.reasoning
+    const defaultLevel = store.levels.includes(store.defaultLevel) ? store.defaultLevel : undefined
 
     const model: ModelConfig = {
       ...previous,
       name: store.name.trim() || undefined,
+      type: store.imageOutput ? "image" : previous?.type,
       capabilities: {
         ...previous?.capabilities,
         tools: store.tools,
         input: [
           "text",
           ...(store.image ? ["image"] : []),
-          ...(previous?.capabilities?.input ?? []).filter((item) => item !== "text" && item !== "image"),
+          ...(store.pdf ? ["pdf"] : []),
+          ...(previous?.capabilities?.input ?? []).filter((item) => item !== "text" && item !== "image" && item !== "pdf"),
         ],
-        output: previous?.capabilities?.output ?? ["text"],
+        output: [
+          "text",
+          ...(store.imageOutput ? ["image"] : []),
+          ...(previous?.capabilities?.output ?? []).filter((item) => item !== "text" && item !== "image"),
+        ],
         reasoning: store.reasoning
-          ? reasoning?.supported
-            ? reasoning
-            : { supported: true, effort: ["low", "medium", "high"] }
+          ? {
+              ...previous?.capabilities?.reasoning,
+              supported: true,
+              effort: store.levels,
+              protocol: store.protocol === AUTO ? undefined : store.protocol,
+              levelParam: store.levelParam === AUTO ? undefined : store.levelParam,
+              default: defaultLevel,
+            }
           : { supported: false },
+        webSearch: store.webSearch,
+        autoScheduled: store.autoScheduled,
       },
       ...(context === undefined && output === undefined
         ? { limit: undefined }
@@ -135,9 +261,7 @@ export const DialogCustomModel: Component<{
     showToast({
       variant: "success",
       icon: "circle-check",
-      title: language.t(
-        editing() ? "settings.models.custom.saved.editTitle" : "settings.models.custom.saved.title",
-      ),
+      title: language.t(editing() ? "settings.models.custom.saved.editTitle" : "settings.models.custom.saved.title"),
       description: language.t(
         editing() ? "settings.models.custom.saved.editDescription" : "settings.models.custom.saved.description",
         { model: id, provider: props.providerName },
@@ -184,29 +308,85 @@ export const DialogCustomModel: Component<{
             </Field.Control>
           </Field>
 
-          <div class="grid grid-cols-2 gap-4">
-            <Field>
-              <Field.Label>{language.t("settings.models.custom.context")}</Field.Label>
-              <Field.Control>
+          <Field>
+            <Field.Label>{language.t("settings.models.custom.context")}</Field.Label>
+            <Field.Control>
+              <div class="settings-form-dialog-limit">
+                <Chips
+                  options={CONTEXT_PRESETS}
+                  isSelected={(value) => store.context.trim() === value}
+                  onPick={(value) => setStore("context", value)}
+                />
                 <TextInput
                   numeric
                   appearance="large"
                   value={store.context}
                   onInput={(event) => setStore("context", event.currentTarget.value)}
                 />
-              </Field.Control>
-            </Field>
-            <Field>
-              <Field.Label>{language.t("settings.models.custom.output")}</Field.Label>
-              <Field.Control>
+              </div>
+            </Field.Control>
+          </Field>
+
+          <Field>
+            <Field.Label>{language.t("settings.models.custom.output")}</Field.Label>
+            <Field.Control>
+              <div class="settings-form-dialog-limit">
+                <Chips
+                  options={OUTPUT_PRESETS}
+                  isSelected={(value) => store.output.trim() === value}
+                  onPick={(value) => setStore("output", value)}
+                />
                 <TextInput
                   numeric
                   appearance="large"
                   value={store.output}
                   onInput={(event) => setStore("output", event.currentTarget.value)}
                 />
-              </Field.Control>
-            </Field>
+              </div>
+            </Field.Control>
+          </Field>
+
+          <div class="settings-form-dialog-section">
+            <span class="settings-form-dialog-section-title">{language.t("settings.models.custom.thinking")}</span>
+            <SwitchRow
+              title={language.t("settings.models.custom.reasoning.title")}
+              description={language.t("settings.models.custom.reasoning.description")}
+              checked={store.reasoning}
+              onChange={(checked) => setStore("reasoning", checked)}
+            />
+            <Show when={store.reasoning}>
+              <div class="settings-form-dialog-pickers">
+                <PickerRow
+                  label={language.t("settings.models.custom.thinking.protocol")}
+                  options={PROTOCOLS}
+                  value={store.protocol}
+                  labelFor={(option) => optionLabel(option, PROTOCOL_LABELS)}
+                  onSelect={selectProtocol}
+                />
+                <PickerRow
+                  label={language.t("settings.models.custom.thinking.levelParam")}
+                  options={LEVEL_PARAMS.filter(
+                    (option) => option === AUTO || BOOLEAN_PARAMS.has(option) === (store.protocol === TOGGLE),
+                  )}
+                  value={store.levelParam}
+                  labelFor={optionLabel}
+                  onSelect={(option) => setStore("levelParam", option)}
+                />
+                <PickerRow
+                  label={language.t("settings.models.custom.thinking.default")}
+                  options={[AUTO, ...store.levels]}
+                  value={store.defaultLevel}
+                  labelFor={optionLabel}
+                  onSelect={(option) => setStore("defaultLevel", option)}
+                />
+              </div>
+              <Chips
+                class="settings-form-dialog-levels"
+                options={LEVEL_OPTIONS}
+                isSelected={(level) => store.levels.includes(level)}
+                onPick={toggleLevel}
+              />
+            </Show>
           </div>
 
           <div class="settings-form-dialog-section">
@@ -226,10 +406,28 @@ export const DialogCustomModel: Component<{
               onChange={(checked) => setStore("image", checked)}
             />
             <SwitchRow
-              title={language.t("settings.models.custom.reasoning.title")}
-              description={language.t("settings.models.custom.reasoning.description")}
-              checked={store.reasoning}
-              onChange={(checked) => setStore("reasoning", checked)}
+              title={language.t("settings.models.custom.pdf.title")}
+              description={language.t("settings.models.custom.pdf.description")}
+              checked={store.pdf}
+              onChange={(checked) => setStore("pdf", checked)}
+            />
+            <SwitchRow
+              title={language.t("settings.models.custom.imageOutput.title")}
+              description={language.t("settings.models.custom.imageOutput.description")}
+              checked={store.imageOutput}
+              onChange={(checked) => setStore("imageOutput", checked)}
+            />
+            <SwitchRow
+              title={language.t("settings.models.custom.autoScheduled.title")}
+              description={language.t("settings.models.custom.autoScheduled.description")}
+              checked={store.autoScheduled}
+              onChange={(checked) => setStore("autoScheduled", checked)}
+            />
+            <SwitchRow
+              title={language.t("settings.models.custom.webSearch.title")}
+              description={language.t("settings.models.custom.webSearch.description")}
+              checked={store.webSearch}
+              onChange={(checked) => setStore("webSearch", checked)}
             />
           </div>
 
@@ -251,6 +449,54 @@ export const DialogCustomModel: Component<{
         </Button>
       </DialogFooter>
     </Dialog>
+  )
+}
+
+/** Pill buttons over a fixed value list: single-select for the token presets, multi-select for the levels. */
+function Chips(props: {
+  class?: string
+  options: readonly { label: string; value: string }[]
+  isSelected: (value: string) => boolean
+  onPick: (value: string) => void
+}) {
+  return (
+    <div class={props.class ?? "settings-form-dialog-chips"}>
+      {props.options.map((option) => (
+        <button
+          type="button"
+          class="settings-form-dialog-chip"
+          aria-pressed={props.isSelected(option.value)}
+          data-selected={props.isSelected(option.value) ? "" : undefined}
+          onClick={() => props.onPick(option.value)}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function PickerRow<T extends string>(props: {
+  label: string
+  options: readonly T[]
+  value: string
+  labelFor: (option: T) => string
+  onSelect: (option: T) => void
+}) {
+  return (
+    <div class="settings-form-dialog-picker">
+      <span class="settings-form-dialog-picker-label">{props.label}</span>
+      <Select
+        class="settings-form-dialog-picker-select"
+        options={[...props.options]}
+        current={props.options.find((option) => option === props.value)}
+        value={(option) => option}
+        label={props.labelFor}
+        placement="bottom-end"
+        gutter={6}
+        onSelect={(option) => option && props.onSelect(option)}
+      />
+    </div>
   )
 }
 
