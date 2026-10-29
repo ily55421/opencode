@@ -89,14 +89,23 @@ signal; the guard stops the turn from paying for a fifth summary of a context th
 ## One tool result at a time
 
 `packages/core/src/tool-output.ts` clips a tool result *before* it is published, so the model never receives the full
-text: `MAX_LINES` and `MAX_BYTES` (configurable through the `ToolOutput` editor) keep a head-only slice, write the whole
-output to a file under `data/tool-output` with a 7-day retention, and append a marker naming the path. `metadata.truncated`
-and `metadata.outputPath` record what happened, and the guard at the top of `truncate` makes it idempotent.
+text: `MAX_LINES` and `MAX_BYTES` (configurable through the `ToolOutput` editor and the `tool_output` config keys) keep a
+slice of the output, write the whole text to a file under `data/tool-output` with a 7-day retention, and append a marker
+naming the path and the ranges kept. `metadata.truncated` and `metadata.outputPath` record what happened, and the guard
+at the top of `truncate` makes it idempotent.
 
-Because truncation is head-only, everything past the byte or line bound is invisible to the model *and* to the estimate.
-`packages/core/src/session/recent-text.ts` applies a second, much smaller bound (`TOOL_OUTPUT_MAX_CHARS`) when tool
-outputs are rendered into the summary transcript, and `clip` in `compaction.ts` drops output levels progressively
-(`OUTPUTS_CLIPPED` → `OMITTED`) when a summary request is itself rejected as too long.
+The slice splits head and tail: half the line budget from the start, the rest from the end, with the marker reporting
+both ranges (`lines 1-1000 and 4001-5000 of 5000`). When the byte budget only reaches one line, that line is the last
+one. Multiple text parts collapse into one preview in the first text slot; file parts keep their position.
+
+`Shell.result` in `packages/core/src/shell.ts` bounds its own output independently and reads the **tail** page of the
+PTY buffer, so a shell tool result usually arrives already within the limits and `truncate` marks it untruncated.
+
+Because truncation happens before publication, everything past the bound is invisible to the model *and* to the
+estimate; the raw bytes survive only in the file the marker names. `packages/core/src/session/recent-text.ts` applies a
+second, much smaller bound (`TOOL_OUTPUT_MAX_CHARS`) when tool outputs are rendered into the summary transcript, and
+`clip` in `compaction.ts` drops output levels progressively (`OUTPUTS_CLIPPED` → `OMITTED`) when a summary request is
+itself rejected as too long.
 
 ## Decisions
 
@@ -126,10 +135,19 @@ newest checkpoint, so a turn with several completed summaries is exactly the cas
 room. `due` runs on every step anyway, so the next step supplies the same information for free and the guard only has
 to refuse the next summary.
 
-**A large tool result is clipped before it is durable, not summarized inside the loop.** Rejected: letting full outputs
-enter history and compacting them later. Failure mode: the raw bytes get re-sent in every later step until some round
-of compaction notices, which is the cost the head-only slice exists to avoid. The remainder lives in a file the model
-can read again.
+**A large tool result is clipped before it is durable, and the clip keeps both ends.** Rejected first: letting full
+outputs enter history and compacting them later — the raw bytes then re-send in every later step until some round of
+compaction notices. Rejected second: a head-only slice. Failure mode: a build, test, or install log puts its verdict at
+the end, so the head slice kept the setup and dropped the reason the model needed, and the shell tool's own bound in
+`Shell.result` had already reached the opposite conclusion by reading the tail page of the PTY buffer. Head plus tail
+reconciles the two.
+
+**No model call to summarize the middle of one tool result.** The rejected design keeps the first and last lines
+verbatim, LLM-summarizes everything between them, and falls back to deterministic truncation when the summary fails.
+Turned down for this codebase: the complete output is already on disk and its path is in the marker, so the model can
+re-read the exact bytes it wants instead of trusting a paraphrase of the part that was cut — and the paraphrase would
+cost a request on the critical path of any step that produced a large result. If a future measurement shows models
+re-reading those files constantly, the summary becomes worth its latency.
 
 **An unknown context window does not refuse the session.** `calculateCeiling` returns infinity when the model reports
 no window, and `UNKNOWN_WINDOW` assumes a common size for the compaction request. Rejected: guessing a small window and
