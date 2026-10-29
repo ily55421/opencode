@@ -91,8 +91,14 @@ signal; the guard stops the turn from paying for a fifth summary of a context th
 `packages/core/src/tool-output.ts` clips a tool result *before* it is published, so the model never receives the full
 text: `MAX_LINES` and `MAX_BYTES` (configurable through the `ToolOutput` editor and the `tool_output` config keys) keep a
 slice of the output, write the whole text to a file under `data/tool-output` with a 7-day retention, and append a marker
-naming the path and the ranges kept. `metadata.truncated` and `metadata.outputPath` record what happened, and the guard
-at the top of `truncate` makes it idempotent.
+naming the path and the ranges kept. The service records its own decision under `metadata.toolOutput` —
+`{ truncated, outputPath }` — and its idempotence guard reads that key, **not** a bare `truncated`.
+
+The key is namespaced because `grep` and `read` already publish `metadata.truncated` to mean "this tool stopped paging"
+(`grep` for a match cap, `read` for more pages). Reading that as "the bound was already handled" made every oversized
+search or file read skip the clipper: a real 2 000-match grep entered history at 428 KB, and the bound only ever applied
+to tools that stayed silent about truncation. `doc/records/2026-10-tool-output-metadata-collision.md` keeps the
+diagnosis.
 
 The slice splits head and tail: half the line budget from the start, the rest from the end, with the marker reporting
 both ranges (`lines 1-1000 and 4001-5000 of 5000`). When the byte budget only reaches one line, that line is the last
@@ -148,6 +154,13 @@ Turned down for this codebase: the complete output is already on disk and its pa
 re-read the exact bytes it wants instead of trusting a paraphrase of the part that was cut — and the paraphrase would
 cost a request on the critical path of any step that produced a large result. If a future measurement shows models
 re-reading those files constantly, the summary becomes worth its latency.
+
+**Each service owns its own metadata key.** Rejected: sharing a bare `truncated` flag between the clipper and the tools.
+Failure mode is the record above — `grep` and `read` set it to mean "I paged", the clipper read it as "already bounded",
+and every oversized search or file read escaped the bound while every test stayed green. `metadata` on a tool result is
+`Record(String, Json)` with no type relationship between writer and reader, so a key that two owners interpret
+differently cannot be caught by the compiler, by a lint rule, or by a unit test that builds its own input. When a service
+records state in another component's free-form record, namespace it under a key that names the service.
 
 **An unknown context window does not refuse the session.** `calculateCeiling` returns infinity when the model reports
 no window, and `UNKNOWN_WINDOW` assumes a common size for the compaction request. Rejected: guessing a small window and

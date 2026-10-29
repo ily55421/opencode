@@ -38,8 +38,8 @@ describe("ToolOutput", () => {
           const output = { items: [1, 2, 3] }
           const result = yield* service.truncate({ output, content: [{ type: "text", text: "one\ntwo\nthree" }] })
           expect(result.output).toBe(output)
-          expect(result.metadata).toMatchObject({ truncated: true })
-          const outputPath = result.metadata?.outputPath
+          expect(result.metadata?.[ToolOutput.RECORD]).toMatchObject({ truncated: true })
+          const outputPath = (result.metadata?.[ToolOutput.RECORD] as { outputPath?: string } | undefined)?.outputPath
           expect(typeof outputPath).toBe("string")
           if (typeof outputPath !== "string") return
           expect(yield* fs.readFileString(outputPath)).toBe("one\ntwo\nthree")
@@ -104,21 +104,30 @@ describe("ToolOutput", () => {
           expect(preview.text.endsWith("error: build failed")).toBe(true)
           expect(preview.text).not.toContain("line 2500")
           expect(marker.text).toMatch(/^\[showing lines 1-1000 and 4001-5000 of 5000; full output saved to /)
-          expect(yield* fs.readFileString(String(result.metadata?.outputPath))).toBe(lines.join("\n"))
+          expect(yield* fs.readFileString(String((result.metadata?.[ToolOutput.RECORD] as { outputPath: string }).outputPath))).toBe(lines.join("\n"))
         }),
       { maxLines: 2_000, maxBytes: 1_000_000 },
     ),
   )
 
-  it.live("skips results that report a truncation state", () =>
-    withStore((output) =>
-      Effect.gen(function* () {
-        const content: Tool.NormalizedResult["content"] = [{ type: "text", text: "one\ntwo" }]
-        const truncated = { content, metadata: { truncated: true, source: "tool" } }
-        const retained = { content, metadata: { truncated: false, source: "tool" } }
-        expect(yield* output.truncate(truncated)).toBe(truncated)
-        expect(yield* output.truncate(retained)).toBe(retained)
-      }),
+  it.live("skips only results it already recorded, not results carrying their own truncated flag", () =>
+    withStore(
+      (output) =>
+        Effect.gen(function* () {
+          const content: Tool.NormalizedResult["content"] = [{ type: "text", text: "one\ntwo\nthree" }]
+          // grep and read publish metadata.truncated to mean "this tool stopped paging". That is not permission to
+          // skip the size bound, which is how a 2000-match grep reached the model whole.
+          const reported = { content, metadata: { truncated: false, source: "tool" } }
+          const bounded = yield* output.truncate(reported)
+          expect(bounded.metadata?.[ToolOutput.RECORD]).toMatchObject({ truncated: true })
+          expect(bounded.content).toEqual([
+            { type: "text", text: "one" },
+            { type: "text", text: expect.stringMatching(/^\[showing lines 1-1 of 3; full output saved to /) },
+          ])
+          // Running it again is a no-op, so the recorded result is never clipped twice.
+          expect(yield* output.truncate(bounded)).toBe(bounded)
+        }),
+      { maxLines: 1, maxBytes: 1_000 },
     ),
   )
 
@@ -126,7 +135,7 @@ describe("ToolOutput", () => {
     withStore((output) =>
       Effect.gen(function* () {
         const content = [{ type: "text" as const, text: "small" }]
-        expect(yield* output.truncate({ content })).toEqual({ content, metadata: { truncated: false } })
+        expect(yield* output.truncate({ content })).toEqual({ content, metadata: { [ToolOutput.RECORD]: { truncated: false } } })
       }),
     ),
   )
@@ -137,7 +146,7 @@ describe("ToolOutput", () => {
         Effect.gen(function* () {
           expect(yield* output.truncate({ content: [{ type: "text", text: "one\ntwo\n" }] })).toEqual({
             content: [{ type: "text", text: "one\ntwo\n" }],
-            metadata: { truncated: false },
+            metadata: { [ToolOutput.RECORD]: { truncated: false } },
           })
         }),
       { maxLines: 2, maxBytes: 1_000 },
