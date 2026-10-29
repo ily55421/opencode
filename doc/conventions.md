@@ -55,6 +55,7 @@ the same diff.
 | The step/drain loop, continuation or nudge rules | `doc/session-loop.md` |
 | Inbox admission, delivery modes, interruption | `doc/session-loop.md` |
 | Tool definitions, side-effect classification, permission gating | `doc/session-loop.md`, and the tool's own doc comment |
+| A permission action name, the evaluator, or the approval modes | `doc/permissions.md` |
 | Token estimation, compaction budgets or triggers, tool-output clipping | `doc/context-economics.md` |
 | A model-visible prompt or notice token the UI echoes verbatim | the topic doc that owns the mechanism, spelling the token out literally |
 | The HTTP contract (`protocol`, server handlers) | run `bun run generate` from `packages/client`; note it in `CHANGELOG.md` |

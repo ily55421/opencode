@@ -17,6 +17,7 @@ import {
   type AutoApproveSweepEffect,
   type AutoApproveSweepEvent,
 } from "./auto-approve-machine"
+import { declinesAutoApproval } from "@/session/composer/permission-mode"
 
 const repliedLimit = 1000
 
@@ -257,13 +258,22 @@ export function createPermissionAutoApprover(input: { sdk: ServerSDK; data: Data
     void input.sdk.api.session
       .get({ sessionID: permission.sessionID }, { signal })
       .then((session) => {
+        if (!signal.aborted && declines(permission, session.permissions)) return
         if (!signal.aborted) approve(permission, session.projectID)
       })
       .catch(() => undefined)
   }
 
+  /** An explicit "Ask every time" on the session outranks this client-side setting. */
+  function declines(
+    permission: PermissionRequest,
+    permissions = input.data.session.get(permission.sessionID)?.permissions,
+  ) {
+    return declinesAutoApproval(permissions)
+  }
+
   function approve(permission: PermissionRequest, projectID = input.data.session.get(permission.sessionID)?.projectID) {
-    if (!covers(projectID)) return
+    if (!covers(projectID) || declines(permission)) return
     dispatch(permission.id, { type: "approve", sessionID: permission.sessionID, projectID, runId: uuid() })
   }
 

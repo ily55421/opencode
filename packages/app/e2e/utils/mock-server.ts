@@ -1395,14 +1395,14 @@ function mockHandlers(
 
             if (update.title !== undefined) session.title = update.title
 
+            if (update.permissions !== undefined) session.permissions = update.permissions
+
             if (update.archived !== undefined) {
               session.time = {
                 ...currentSession(session, config.directory).time,
                 archived: update.archived ? Date.now() : undefined,
               }
             }
-          }).pipe(Effect.andThen(noContent)),
-        sessionCommand: (ctx) => {
           const recordCommand = config.onCommand
 
           if (!recordCommand) return unsupported("run session commands", "onCommand")
@@ -1592,6 +1592,7 @@ export function currentSession(session: MockSession, fallbackDirectory?: string)
     location: { directory: seed.location?.directory ?? seed.directory ?? fallbackDirectory },
     subpath: session.subpath ?? session.path,
     revert: session.revert,
+    ...("permissions" in session ? { permissions: session.permissions } : {}),
   }
 }
 
@@ -1622,7 +1623,12 @@ const decodeSessionCreate = Schema.decodeUnknownOption(
 )
 
 const decodeSessionUpdate = Schema.decodeUnknownOption(
-  Schema.Struct({ title: Schema.optionalKey(Schema.String), archived: Schema.optionalKey(Schema.Boolean) }),
+  Schema.Struct({
+    title: Schema.optionalKey(Schema.String),
+    archived: Schema.optionalKey(Schema.Boolean),
+    permissions: Schema.optionalKey(Permission.Ruleset),
+  }),
+)
 )
 
 const decodeRevertStage = Schema.decodeUnknownOption(Schema.Struct({ messageID: Schema.String }))

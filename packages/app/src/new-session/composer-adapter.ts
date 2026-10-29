@@ -13,6 +13,8 @@ import { useServerSDK } from "@/runtime/server/client"
 import { useTabs } from "@/shell/tabs/tabs"
 import { createWorktree } from "@/workspaces/create"
 import { showToast } from "@/shell/notifications/toast"
+import { ruleset } from "@/session/composer/permission-mode"
+import { projectSettingsKey, useSettings } from "@/settings/model"
 import type { DraftMcpControls } from "./mcp"
 import {
   createNewSessionStartState,
@@ -88,6 +90,7 @@ export function createNewSessionComposerAdapter(props: {
   const state = prompt.capture()
   const local = useLocal()
   const data = useData()
+  const settings = useSettings()
   const server = useServer()
   const serverSDK = useServerSDK()
   const tabs = useTabs()
@@ -207,9 +210,22 @@ export function createNewSessionComposerAdapter(props: {
                     location: { directory: effect.directory },
                   })
                   .request.then(
-                    () => {
+                    async () => {
                       // The attempt ended first, so the prompt was never sent and the Session is still empty.
                       if (ended.signal.aborted) void data.session.remove(effect.sessionID).catch(() => undefined)
+
+                      // A new session starts in the mode this project last used; "ask" is the plain default, so only
+                      // a remembered override writes rules, and the server enforces them for every client.
+                      const remembered = settings.permissions.defaultModeFor(
+                        projectSettingsKey(
+                          serverSDK.scope,
+                          data.project.list().find((project) => project.canonical === projectDirectory)?.id,
+                        ),
+                      )
+                      if (remembered !== "ask")
+                        await serverSDK.api.session
+                          .update({ sessionID: effect.sessionID, permissions: ruleset(remembered) })
+                          .catch(() => undefined)
 
                       return { type: "session.created", attempt } as const
                     },
