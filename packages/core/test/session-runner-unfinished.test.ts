@@ -132,7 +132,7 @@ describe("SessionRunnerUnfinished", () => {
   })
 
   test("escalates the wording after three nudges", () => {
-    const steps = [user("do it"), assistant("list", [tool(TodoTool.name, open)])]
+    const steps: SessionMessage.Info[] = [user("do it"), assistant("list", [tool(TodoTool.name, open)])]
     for (let index = 0; index < 3; index++)
       steps.push(notice(index === 0 ? TODO_RESIDUE : TODO_RESIDUE_ESCALATED), assistant(`edit${index}`, [tool("edit")]))
 
@@ -140,7 +140,7 @@ describe("SessionRunnerUnfinished", () => {
   })
 
   test("stops at the hard cap even while the model keeps working", () => {
-    const steps = [user("do it"), assistant("list", [tool(TodoTool.name, open)])]
+    const steps: SessionMessage.Info[] = [user("do it"), assistant("list", [tool(TodoTool.name, open)])]
     for (let index = 0; index < 10; index++)
       steps.push(notice(index < 3 ? TODO_RESIDUE : TODO_RESIDUE_ESCALATED), assistant(`edit${index}`, [tool("edit")]))
 
