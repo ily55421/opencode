@@ -1,0 +1,10 @@
+{
+  "remote": "upstream",
+  "branch": "dev",
+  "cursor": "d500927b9d3c4f0746c0e7ba9f4c18507ef1bfc4",
+  "cursorSubject": "feat(core): record when a session's latest execution started (#59910)",
+  "cursorDate": "2026-10-29T07:45:09Z",
+  "versionBase": "2.2.0",
+  "syncCommit": "08aa1e5b3e9b666b79b0551337c493dacf4289b5",
+  "syncedAt": "2026-10-29"
+}

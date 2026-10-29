@@ -46,6 +46,15 @@ A fork version must never claim to be ahead of upstream. The number is a signal 
 - Keep a prerelease suffix rather than dropping it for a plain number. `2.2.0.1` is indistinguishable from a real upstream patch release, which reintroduces the stale-CLI trap in Local Release Builds and makes a fork build look like an official one.
 - Upstream already supports the suffixed form: the NSIS file version, `stageName()` in `packages/desktop/src/main/service/cli-version.ts`, the remote CLI version pattern in `packages/gui-plugins/src/ssh/remote-cli.ts`, and the desktop CLI stage layout (which `packages/desktop/src/main/service/cli-stages.test.ts` exercises with `2.1.0-beta.1`).
 
+## Upstream Sync
+
+- `upstream-sync.json` is the baseline: it records the last merged upstream commit (the cursor), its date, and the version base it implies. Read it before comparing instead of re-deriving the fork base from history.
+- The `upstream` remote is normally a local mirror clone, so its fetch refspec maps that clone's `refs/remotes/origin/dev`, not the clone's checked-out `dev`, which lags whenever it has fetched without merging. Keep the mapping when re-adding the remote.
+- Run `bun script/upstream-sync.ts` to fetch and report what upstream added since the cursor, what is still absent from this branch, and which upstream-touched files also carry fork changes. That last list is the conflict surface; expect a human decision on every entry in it.
+- Run `bun script/upstream-sync.ts --record` only after the merge commit exists, so the cursor and `syncCommit` describe merged state.
+- Resolve conflicted `packages/client/**` files by taking upstream's version and rerunning `bun run generate`; the codegen re-adds fork-only schema fields such as the config patch's `providers` map.
+- Take upstream's root `package.json` version as the new base and reset the fork suffix, per Version Numbers.
+
 ## Commits and PR Titles
 
 Use conventional commit-style messages and PR titles: `type(scope): summary`.
