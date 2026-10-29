@@ -3,6 +3,7 @@ import type { PermissionRequest } from "@opencode/client/promise"
 import type { Data } from "@opencode/client/solid"
 import type { ServerSDK } from "@/runtime/server/client"
 import { projectSettingsKey, useSettings } from "@/settings/model"
+import { declinesAutoApproval } from "@/session/composer/permission-mode"
 
 const respondedLimit = 1000
 
@@ -132,8 +133,16 @@ export function createPermissionAutoApprover(input: { sdk: ServerSDK; data: Data
     if (covers(undefined) || input.data.session.get(permission.sessionID)) return approve(permission)
     void input.sdk.api.session
       .get({ sessionID: permission.sessionID })
-      .then((session) => approve(permission, session.projectID))
+      .then((session) => {
+        if (declines(permission, session.permissions)) return
+        approve(permission, session.projectID)
+      })
       .catch(() => undefined)
+  }
+
+  /** An explicit "Ask every time" on the session outranks this client-side setting. */
+  function declines(permission: PermissionRequest, permissions = input.data.session.get(permission.sessionID)?.permissions) {
+    return declinesAutoApproval(permissions)
   }
 
   function approve(
@@ -144,6 +153,7 @@ export function createPermissionAutoApprover(input: { sdk: ServerSDK; data: Data
     // covers() guards the retry timer path: the user may disable the setting
     // between a failed reply and its scheduled retry.
     if (state.disposed || !covers(projectID) || state.responded.has(permission.id)) return
+    if (declines(permission)) return
     remember(permission.id)
     input.sdk.api.permission
       .reply({ sessionID: permission.sessionID, requestID: permission.id, decision: "once" })

@@ -1440,10 +1440,12 @@ function mockHandlers(
         },
         sessionRename: (ctx) =>
           Effect.sync(() => {
-            const title = Option.getOrUndefined(decodeSessionRename(ctx.payload))?.title
+            const body = Option.getOrUndefined(decodeSessionRename(ctx.payload))
             const session = config.sessions.find((item) => item.id === ctx.params.sessionID)
 
-            if (session && title !== undefined) session.title = title
+            if (!session || !body) return
+            if (body.title !== undefined) session.title = body.title
+            if (body.permissions !== undefined) session.permissions = body.permissions
           }).pipe(Effect.andThen(noContent)),
         sessionCommand: (ctx) => {
           const recordCommand = config.onCommand
@@ -1637,6 +1639,7 @@ export function currentSession(session: MockSession, fallbackDirectory?: string)
     location: { directory: seed.location?.directory ?? seed.directory ?? fallbackDirectory },
     subpath: session.subpath ?? session.path,
     revert: session.revert,
+    ...("permissions" in session ? { permissions: session.permissions } : {}),
   }
 }
 
@@ -1666,7 +1669,9 @@ const decodeSessionCreate = Schema.decodeUnknownOption(
   Schema.Struct({ id: lenient(Schema.String), title: lenient(Schema.String), parentID: lenient(Schema.String) }),
 )
 
-const decodeSessionRename = Schema.decodeUnknownOption(Schema.Struct({ title: Schema.String }))
+const decodeSessionRename = Schema.decodeUnknownOption(
+  Schema.Struct({ title: Schema.String.pipe(Schema.optionalKey), permissions: Permission.Ruleset.pipe(Schema.optionalKey) }),
+)
 
 const decodeRevertStage = Schema.decodeUnknownOption(Schema.Struct({ messageID: Schema.String }))
 

@@ -40,6 +40,7 @@ import { SessionActivityChips, type SessionActivityItem } from "./activity-chips
 import { SessionComposerLane, useComposerLaneAlignment } from "./composer-lane"
 import { SessionComposerStats } from "./stats-panel"
 import { SessionTodoPill } from "./todo-pill"
+import { SessionPermissionPill } from "./permission-pill"
 import { sessionTodos, todoFinished } from "./todos"
 import { useOpenSessionRoute } from "../session-identity-header"
 import { resolveSessionComposerSelection } from "./selection"
@@ -536,6 +537,15 @@ export function ActiveSessionComposerRegion(props: {
             <SessionActivityChips subagents={subagents()} shells={shells()} onOpen={open} onStop={stop} />
             <Show when={todosVisible()}>
               <SessionTodoPill todos={todos()} />
+            </Show>
+            <Show when={props.session.data.info()}>
+              {(info) => (
+                <SessionPermissionPill
+                  sessionID={info().id}
+                  projectID={info().projectID}
+                  permissions={info().permissions}
+                />
+              )}
             </Show>
             <SessionPluginPills session={props.view()} screen={props.screen} alignment={alignment} />
           </SessionComposerLane>

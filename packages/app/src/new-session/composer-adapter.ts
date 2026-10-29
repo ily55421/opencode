@@ -15,6 +15,8 @@ import { useWorkspaceLocation } from "@/workspaces/location"
 import { createWorktree } from "@/workspaces/create"
 import { showToast } from "@/shell/notifications/toast"
 import { SessionRouteKey, SessionStateKey } from "@/runtime/server/scope"
+import { projectSettingsKey, useSettings } from "@/settings/model"
+import { ruleset } from "@/session/composer/permission-mode"
 import { createSessionMessageHandoff } from "@/session/handoff"
 import type { DraftMcpControls } from "./mcp"
 
@@ -29,6 +31,7 @@ export function createNewSessionComposerAdapter(props: {
   const state = prompt.capture()
   const local = useLocal()
   const data = useData()
+  const settings = useSettings()
   const server = useServer()
   const serverSDK = useServerSDK()
   const tabs = useTabs()
@@ -104,8 +107,24 @@ export function createNewSessionComposerAdapter(props: {
         location: { directory: sessionDirectory },
       })
 
+      // A new session starts in the mode this project last used. "ask" is the plain default, so only a remembered
+      // override writes rules, and every later action gates on `creation` and cannot race the write.
+      const remembered = settings.permissions.defaultModeFor(
+        projectSettingsKey(
+          serverSDK.scope,
+          data.project.list().find((project) => project.canonical === projectDirectory)?.id,
+        ),
+      )
+
       const creation = created.request.then(
-        () => ({ ok: true as const }),
+        async () => {
+          if (remembered !== "ask")
+            await serverSDK.api.session
+              .update({ sessionID: created.id, permissions: ruleset(remembered) })
+              .catch(() => undefined)
+
+          return { ok: true as const }
+        },
         (error) => {
           showToast({
             title: language.t("prompt.toast.sessionCreateFailed.title"),

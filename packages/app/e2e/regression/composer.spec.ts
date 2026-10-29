@@ -1001,3 +1001,60 @@ test("pastes into the composer from the session view but not into other inputs",
   await expect(page.locator("#elsewhere")).toBeFocused()
   await expect.poll(() => editor.innerText()).toBe("pasted from the timeline")
 })
+
+test("the approval capsule reads its mode from the session and writes the chosen ruleset", async ({ page }) => {
+  const view = await openSession(page, {
+    name: "ApprovalMode",
+    sessions: [{ id: "ses_approval_mode", title: "Approval mode", permissions: [] }],
+  })
+  const trigger = page.locator('[data-slot="session-permission-trigger"]')
+
+  await expect(trigger).toHaveText("Ask every time")
+  await expect(trigger).toHaveAttribute("data-mode", "ask")
+
+  await trigger.click()
+  const options = page.locator('[data-slot="session-permission-option"]')
+  await expect(options).toHaveCount(3)
+  await expect(options.filter({ hasText: "Full access" })).toContainText("Never ask, with full access")
+
+  await options.filter({ hasText: "Full access" }).click()
+  await expect.poll(() => view.session.permissions).toEqual([{ action: "*", resource: "*", effect: "allow" }])
+})
+
+test("a session already carrying full-access rules reads that mode without any interaction", async ({ page }) => {
+  await openSession(page, {
+    name: "ApprovalModePreset",
+    sessions: [
+      {
+        id: "ses_approval_full",
+        title: "Already full",
+        permissions: [{ action: "*", resource: "*", effect: "allow" }],
+      },
+    ],
+  })
+  const trigger = page.locator('[data-slot="session-permission-trigger"]')
+
+  await expect(trigger).toHaveText("Full access")
+  await expect(trigger).toHaveAttribute("data-mode", "full")
+})
+
+test("auto approve keeps its risky actions as questions", async ({ page }) => {
+  const view = await openSession(page, {
+    name: "ApprovalModeAuto",
+    sessions: [{ id: "ses_approval_auto", title: "Auto mode", permissions: [] }],
+  })
+
+  await page.locator('[data-slot="session-permission-trigger"]').click()
+  await page.locator('[data-slot="session-permission-option"][data-mode="auto"]').click()
+  await expect
+    .poll(() => view.session.permissions)
+    .toEqual([
+      { action: "*", resource: "*", effect: "allow" },
+      { action: "edit", resource: "*", effect: "ask" },
+      { action: "shell", resource: "*", effect: "ask" },
+      { action: "external_directory", resource: "*", effect: "ask" },
+      { action: "webfetch", resource: "*", effect: "ask" },
+      { action: "websearch", resource: "*", effect: "ask" },
+      { action: "read", resource: "*.env*", effect: "ask" },
+    ])
+})

@@ -8,6 +8,7 @@ import { timelinePresets, type TimelineCategory, type TimelineDetail } from "@op
 import { persisted } from "@/runtime/persistence/storage"
 import { Persistence } from "@/runtime/persistence/schema"
 import { ScopedKey, type ServerScope } from "@/runtime/server/scope"
+import type { PermissionMode } from "@/session/composer/permission-mode"
 
 export type Settings = typeof settingsSchema.Type
 
@@ -154,6 +155,12 @@ const permissionsSchema = Persistence.struct({
   // Projects that override the default, keyed by server scope and project ID. Absent projects use the default.
   autoApproveProjects: Persistence.record(
     Schema.Boolean.pipe(Schema.catchDecoding(() => Effect.succeed(Option.none()))),
+  ),
+  // The approval mode a new session starts in, and what each project last used. These are remembered choices for
+  // the composer selector; the mode itself lives on the session as its ruleset.
+  defaultMode: Schema.Literals(["ask", "auto", "full"]),
+  modeProjects: Persistence.record(
+    Schema.Literals(["ask", "auto", "full"]).pipe(Schema.catchDecoding(() => Effect.succeed(Option.none()))),
   ),
 })
 
@@ -305,7 +312,7 @@ export const defaultSettings: Settings = {
   },
   appearance: { fontSize: 14, mono: "", sans: "", terminal: "", tabLayout: "horizontal", reduceMotion: "system" },
   keybinds: {},
-  permissions: { autoApprove: false, autoApproveProjects: {} },
+  permissions: { autoApprove: false, autoApproveProjects: {}, defaultMode: "ask", modeProjects: {} },
   workspaces: { defaultDestination: "last-used", lastUsed: {} },
   notifications: { agent: false, permissions: true, errors: false },
   sounds: {
@@ -374,6 +381,15 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
     // A project's explicit choice, or undefined when it uses the default.
     const autoApproveOverride = (project: ScopedKey | undefined) =>
       project ? store.permissions?.autoApproveProjects?.[project] : undefined
+
+    const defaultMode = withFallback(
+      () => store.permissions?.defaultMode,
+      defaultSettings.permissions.defaultMode,
+    )
+
+    // The mode each project last used, so a new session in it starts where the user left off.
+    const modeOverride = (project: ScopedKey | undefined) =>
+      project ? store.permissions?.modeProjects?.[project] : undefined
 
     return {
       ready,
@@ -500,6 +516,21 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
             ([key, value]) => value && key.startsWith(prefix),
           )
         },
+        defaultMode,
+        setDefaultMode(value: PermissionMode) {
+          setStore("permissions", "defaultMode", value)
+        },
+        modeOverride,
+        // Undefined drops the project's memory, so it falls back to the default again.
+        setModeOverride(project: ScopedKey, value: PermissionMode | undefined) {
+          const projects = { ...store.permissions?.modeProjects }
+
+          if (value === undefined) delete projects[project]
+          else projects[project] = value
+          setStore("permissions", "modeProjects", reconcile(projects))
+        },
+        // The mode a new session in this project should start in.
+        defaultModeFor: (project: ScopedKey | undefined) => modeOverride(project) ?? defaultMode(),
       },
       workspaces: {
         defaultDestination: withFallback(
