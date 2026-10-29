@@ -515,8 +515,77 @@ it.effect("auto compaction estimates current content against the buffered prompt
       time: { created: 0, completed: 0 },
     })
     expect(yield* due({ ...grown, messages: [checkpoint] })).toBe(false)
+
+    // Chinese is charged per glyph, not as a quarter of its UTF-16 length. The extra 20 is the system prompt,
+    // instructions, and the single tool definition, which the assertions above already measure the same way.
+    const han = "这".repeat(1_600)
+    const wide = Schema.decodeUnknownSync(SessionMessage.Assistant)({
+      id: SessionMessage.ID.make("msg_wide"),
+      type: "assistant",
+      agent: Agent.defaultID,
+      model: { id: "summary-model", providerID: "test" },
+      content: [{ type: "text", text: han }],
+      time: { created: 0 },
+    })
+    expect(SessionCompaction.estimateContext({ ...grown, messages: [wide] })).toBe(1_620)
+
+    // A conversation the CJK-blind rule reads as comfortably under the ceiling is over it in glyph counts, which is
+    // how a Chinese session reached a provider rejection instead of compacting.
+    const long = "这".repeat(84_000)
+    const over = Schema.decodeUnknownSync(SessionMessage.Assistant)({
+      id: SessionMessage.ID.make("msg_over"),
+      type: "assistant",
+      agent: Agent.defaultID,
+      model: { id: "summary-model", providerID: "test" },
+      content: [{ type: "text", text: long }],
+      time: { created: 0 },
+    })
+    expect(Token.estimate(long) + 20).toBeLessThan(84_000)
+    expect(SessionCompaction.estimateContext({ ...grown, messages: [over] })).toBeGreaterThanOrEqual(84_000)
+    expect(yield* due({ ...grown, messages: [over] })).toBe(true)
   }),
 )
+
+it.effect("automatic compaction stops after four summaries that made no room", () =>
+  Effect.gen(function* () {
+    requests = []
+    const compaction = yield* SessionCompaction.Service
+    const session = yield* insertSession(Session.ID.make("ses_stalled_compaction"))
+    yield* storeMessages(session.id, [
+      textUser("Keep going"),
+      ...Array.from({ length: 4 }, (_, index) => completedSummary(`summary ${index}`)),
+    ])
+    // Each step re-estimates, so a fifth automatic trigger after four completed checkpoints is a context that
+    // summarizing cannot shrink; the guard answers it without paying for another summary request.
+    const context = oversized(session, [textUser("Keep going")])
+
+    expect(yield* compaction.compact({ reason: "auto", context, estimate: { measured: 0, estimated: 200_000 } })).toEqual(
+      { status: "failed", error: { type: "compaction.stalled", message: expect.stringContaining("4 summaries") } },
+    )
+    expect(requests).toEqual([])
+    // The user's own /compact is not bound by the guard.
+    expect(yield* compactManually(session, [textUser("Keep going")], SessionMessage.ID.make("msg_stalled_manual"))).toEqual(
+      { status: "completed" },
+    )
+  }),
+)
+
+/** A loaded context whose estimate is over any ceiling this file uses, holding `messages` as its history. */
+const oversized = (session: Session.Info, messages: readonly SessionMessage.Info[]) => ({
+  session,
+  model: SessionRunnerModel.resolved(model, {
+    capabilities: { tools: true, input: ["text"], output: ["text"] },
+    cost: [],
+    limit: { context: 200_000, output: 32_000 },
+  }),
+  messages,
+  agent: {
+    id: Agent.defaultID,
+    info: { ...Agent.Info.default(Agent.defaultID), system: "You are a helpful assistant." },
+  },
+  initial: "Project instructions.",
+  tools: { definitions: [], execute: () => Effect.die("unused") },
+})
 
 /** Seeds the global project plus one session row, returning the projected session. */
 const insertSession = (id: Session.ID, overrides?: Partial<typeof SessionTable.$inferInsert>) =>

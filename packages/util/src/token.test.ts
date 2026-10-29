@@ -28,7 +28,7 @@ describe("estimateWide", () => {
   })
 
   test("keeps halfwidth forms narrow", () => {
-    expect(estimateWide("ｱｲｳｴｵ")).toBe(2)
+    expect(estimateWide("ｱｲｳｴｵ")).toBe(estimate("ｱｲｳｴｵ"))
   })
 
   test("charges a surrogate pair once, not as two narrow characters", () => {
@@ -36,9 +36,20 @@ describe("estimateWide", () => {
     expect(estimateWide("🙂")).toBe(1)
   })
 
+  test("matches the CJK-blind rule for text without wide characters", () => {
+    for (const text of ["hello world", "const x = 1", "a", "", "abcd", "abcde", "   ", "x".repeat(4_001)])
+      expect(estimateWide(text)).toBe(estimate(text))
+  })
+
   test("never reads Chinese as shorter than the CJK-blind estimate", () => {
     const text = "这是一段用于比较两种估算口径的中文文本，包含标点符号。"
 
     expect(estimateWide(text)).toBeGreaterThan(estimate(text))
+  })
+
+  test("splits mixed text by script instead of by length", () => {
+    const text = "ok 好的"
+
+    expect(estimateWide(text)).toBe(estimate("ok ") + estimateWide("好的"))
   })
 })
