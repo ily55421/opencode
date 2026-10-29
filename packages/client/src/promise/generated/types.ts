@@ -346,7 +346,22 @@ export type ConfigWorktree = { directory: string }
 
 export type ConfigModelReasoning =
   | { supported: false }
-  | { supported: true; toggle?: boolean; effort?: Array<string>; budget?: { min?: number; max?: number } }
+  | {
+      supported: true
+      toggle?: boolean
+      effort?: Array<string>
+      budget?: { min?: number; max?: number }
+      protocol?: "auto" | "effort" | "thinking" | "anthropic" | "gemini" | "toggle"
+      levelParam?:
+        | "auto"
+        | "reasoning_effort"
+        | "thinking.level"
+        | "thinking_config.thinking_level"
+        | "chat_template_kwargs.reasoning_effort"
+        | "enable_thinking"
+        | "chat_template_kwargs.enable_thinking"
+      default?: string
+    }
 
 export type ConfigShellOption = { path: string; name: string; acceptable: boolean }
 
@@ -899,6 +914,8 @@ export type ConfigModelCapabilities = {
   output?: Array<string>
   temperature?: boolean
   reasoning?: ConfigModelReasoning
+  webSearch?: boolean
+  autoScheduled?: boolean
 }
 
 export type SessionMessageLocationSwitched = {
@@ -2193,6 +2210,7 @@ export type ModelInfo = {
   body?: { [x: string]: any }
   capabilities: ModelCapabilities
   variants: Array<ModelVariant>
+  defaultVariant?: string
   time: { released: number }
   cost: Array<ModelCost>
   status: "alpha" | "beta" | "deprecated" | "active"

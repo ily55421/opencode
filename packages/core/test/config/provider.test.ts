@@ -968,6 +968,63 @@ describe("ConfigProviderPlugin.Plugin", () => {
     }),
   )
 
+  it.effect("spells configured thinking levels through the chosen protocol and level parameter", () =>
+    Effect.gen(function* () {
+      const models = yield* Model.Service
+      yield* addPlugin([
+        new Document({
+          type: "document",
+          info: decode({
+            providers: {
+              custom: {
+                package: "aisdk:@ai-sdk/openai",
+                models: {
+                  gateway: {
+                    capabilities: {
+                      reasoning: { supported: true, effort: ["low", "high"], protocol: "thinking", default: "high" },
+                    },
+                  },
+                  template: {
+                    capabilities: {
+                      reasoning: {
+                        supported: true,
+                        effort: ["low"],
+                        levelParam: "chat_template_kwargs.reasoning_effort",
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          }),
+        }),
+      ])
+
+      const providerID = Provider.ID.make("custom")
+      const gateway = required(yield* models.get(providerID, Model.ID.make("gateway")))
+      expect(gateway.variants).toEqual([
+        {
+          id: Model.VariantID.make("low"),
+          settings: { reasoningEffort: "low" },
+          body: { thinking: { type: "enabled" } },
+        },
+        {
+          id: Model.VariantID.make("high"),
+          settings: { reasoningEffort: "high" },
+          body: { thinking: { type: "enabled" } },
+        },
+      ])
+      expect(gateway.defaultVariant).toBe(Model.VariantID.make("high"))
+      expect((yield* ModelResolver.withVariant(gateway, undefined)).body).toEqual({ thinking: { type: "enabled" } })
+
+      const template = required(yield* models.get(providerID, Model.ID.make("template")))
+      expect(template.variants).toEqual([
+        { id: Model.VariantID.make("low"), body: { chat_template_kwargs: { reasoning_effort: "low" } } },
+      ])
+      expect(template.defaultVariant).toBeUndefined()
+    }),
+  )
+
   it.effect("applies configured release date, temperature support, and reasoning field", () =>
     Effect.gen(function* () {
       const models = yield* Model.Service

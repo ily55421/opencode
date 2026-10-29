@@ -124,6 +124,8 @@ export const Info = Schema.Struct({
   ...Overlays,
   capabilities: Capabilities,
   variants: Schema.Array(Variant),
+  /** Variant applied when the caller does not choose one. */
+  defaultVariant: VariantID.pipe(optional),
   time: Schema.Struct({
     released: Schema.Finite,
   }),

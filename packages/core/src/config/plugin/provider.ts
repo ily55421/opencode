@@ -234,13 +234,19 @@ function overlay(
   // Variants are spelled for the final package, which the update above normalizes from `aisdk:*`.
   models.update(providerID, id, (model) => {
     // Configured reasoning replaces the base variants; configured variants still overlay them below.
-    if (config.capabilities?.reasoning !== undefined)
+    const reasoning = config.capabilities?.reasoning
+    if (reasoning !== undefined) {
       model.variants = [
         ...Variant.resolve(
           { ...model, package: model.package ?? providerPackage },
-          Variant.supports(config.capabilities.reasoning),
+          Variant.supports(reasoning),
+          reasoning.supported ? { protocol: reasoning.protocol, levelParam: reasoning.levelParam } : {},
         ),
       ]
+      const level = reasoning.supported ? reasoning.default : undefined
+      if (level === undefined) delete model.defaultVariant
+      else model.defaultVariant = Model.VariantID.make(level)
+    }
     if (config.variants !== undefined) {
       model.variants ??= []
       for (const variant of config.variants) {

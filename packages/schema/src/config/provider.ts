@@ -57,6 +57,24 @@ class Limit extends Schema.Class<Limit>("Config.Model.Limit")({
   output: Schema.Int.pipe(optional),
 }) {}
 
+// Thinking dialects the model editor can pick instead of inferring one from the model package.
+export const Protocol = Schema.Literals(["auto", "effort", "thinking", "anthropic", "gemini", "toggle"]).annotate({
+  description: "Request dialect that carries the thinking level",
+})
+export type Protocol = typeof Protocol.Type
+
+// Request fields the thinking level can be written to when the endpoint names it differently from its protocol.
+export const LevelParam = Schema.Literals([
+  "auto",
+  "reasoning_effort",
+  "thinking.level",
+  "thinking_config.thinking_level",
+  "chat_template_kwargs.reasoning_effort",
+  "enable_thinking",
+  "chat_template_kwargs.enable_thinking",
+]).annotate({ description: "Dotted request-body path the thinking level is written to, overriding the protocol" })
+export type LevelParam = typeof LevelParam.Type
+
 // models.dev v2's `capabilities.reasoning`. OpenCode builds the model's variants from it; no control means none.
 export const Reasoning = Schema.Union([
   Schema.Struct({ supported: Schema.Literal(false) }),
@@ -68,6 +86,9 @@ export const Reasoning = Schema.Union([
       min: Schema.Int.pipe(optional),
       max: Schema.Int.pipe(optional),
     }).pipe(optional),
+    protocol: Protocol.pipe(optional),
+    levelParam: LevelParam.pipe(optional),
+    default: Schema.String.pipe(optional),
   }),
 ]).annotate({ identifier: "Config.Model.Reasoning" })
 export type Reasoning = typeof Reasoning.Type
@@ -90,6 +111,9 @@ class ModelConfig extends Schema.Class<ModelConfig>("Config.Model")({
     output: optional(fields.output),
     temperature: fields.temperature,
     reasoning: Reasoning.pipe(optional),
+    // Declared for the model editor; nothing reads them at runtime yet.
+    webSearch: Schema.Boolean.pipe(optional),
+    autoScheduled: Schema.Boolean.pipe(optional),
   }))
     .annotate({ identifier: "Config.Model.Capabilities" })
     .pipe(optional),

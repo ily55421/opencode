@@ -26,16 +26,35 @@ type Overlay = Omit<Variants[number], "id">
 
 type Protocol = (model: Model.Info, support: Support) => Variants
 
-export function resolve(model: Model.Info, supports: readonly Support[] = [{ type: "effort" }]): Variants {
-  const protocol = model.package === undefined ? undefined : PROTOCOLS[model.package]
-  if (!protocol) return []
-  const toggle = supports.some((support) => support.type === "toggle") ? protocol(model, { type: "toggle" }) : []
-  const effort = supports.find((support) => support.type === "effort")
-  const budget = supports.find((support) => support.type === "budget_tokens")
-  const main = effort ? protocol(model, effort) : budget ? protocol(model, budget) : toggle
+/** Editor overrides that redirect the thinking level away from the model package's own request spelling. */
+export type Overrides = {
+  readonly protocol?: ConfigProvider.Protocol
+  readonly levelParam?: ConfigProvider.LevelParam
+}
+
+export function resolve(
+  model: Model.Info,
+  supports: readonly Support[] = [{ type: "effort" }],
+  overrides: Overrides = {},
+): Variants {
+  const named = overrides.protocol === undefined || overrides.protocol === "auto" ? undefined : PROTOCOLS_BY_ID[overrides.protocol]
+  const level =
+    overrides.levelParam === undefined || overrides.levelParam === "auto" ? undefined : LEVEL_PARAMS[overrides.levelParam]
+  const spell = level ? namedParam(level) : (named?.spell ?? (model.package === undefined ? undefined : PROTOCOLS[model.package]))
+  if (!spell) return []
+  const requested = supports.find((support) => support.type === "effort")
+  const chosen: readonly Support[] = named
+    ? [named.shape.type === "effort" ? { type: "effort", values: effortValues(requested) } : named.shape]
+    : supports
+  const toggle = chosen.some((support) => support.type === "toggle") ? spell(model, { type: "toggle" }) : []
+  const effort = chosen.find((support) => support.type === "effort")
+  const budget = chosen.find((support) => support.type === "budget_tokens")
+  const main = effort ? spell(model, effort) : budget ? spell(model, budget) : toggle
   const variants = [...toggle.filter((variant) => variant.id === "none"), ...main]
   return variants.filter((variant, index) => variants.findIndex((other) => other.id === variant.id) === index)
 }
+
+const effortValues = (support: Support | undefined) => (support?.type === "effort" ? support.values : undefined)
 
 const EFFORTS = ["low", "medium", "high"]
 const ENCRYPTED_REASONING = ["reasoning.encrypted_content"]
@@ -684,4 +703,42 @@ const PROTOCOLS: Readonly<Record<string, Protocol>> = {
   [Provider.aisdk("@ai-sdk/gateway")]: vercelGateway,
   [Provider.aisdk("@jerome-benoit/sap-ai-provider-v2")]: sapAICore,
   [Provider.aisdk("gitlab-ai-provider")]: gitlab,
+}
+
+// Thinking protocols the model editor can pick explicitly instead of inferring one from `model.package`.
+// Each reuses the spelling an existing provider already sends.
+const PROTOCOLS_BY_ID: Record<Exclude<ConfigProvider.Protocol, "auto">, { shape: Support; spell: Protocol }> = {
+  effort: { shape: { type: "effort" }, spell: openaiChat },
+  thinking: { shape: { type: "effort" }, spell: deepseekChat },
+  anthropic: { shape: { type: "effort" }, spell: anthropicMessages },
+  gemini: { shape: { type: "effort" }, spell: gemini },
+  toggle: { shape: { type: "toggle" }, spell: deepseekChat },
+}
+
+type Level = { readonly path: readonly string[]; readonly boolean?: boolean }
+
+// Thinking intensity parameters offered for endpoints whose field name OpenCode can't infer.
+const LEVEL_PARAMS: Record<Exclude<ConfigProvider.LevelParam, "auto">, Level> = {
+  reasoning_effort: { path: ["reasoning_effort"] },
+  "thinking.level": { path: ["thinking", "level"] },
+  "thinking_config.thinking_level": { path: ["thinking_config", "thinking_level"] },
+  "chat_template_kwargs.reasoning_effort": { path: ["chat_template_kwargs", "reasoning_effort"] },
+  enable_thinking: { path: ["enable_thinking"], boolean: true },
+  "chat_template_kwargs.enable_thinking": { path: ["chat_template_kwargs", "enable_thinking"], boolean: true },
+}
+
+// A level-valued parameter still needs a value when the chosen protocol only switches thinking on or off.
+const TOGGLE_LEVEL = "high"
+
+const setPath = (path: readonly string[], value: unknown): Record<string, unknown> =>
+  path.length === 1 ? { [path[0]!]: value } : { [path[0]!]: setPath(path.slice(1), value) }
+
+const namedParam = (level: Level): Protocol => (_, support) => {
+  if (level.boolean || support.type === "toggle")
+    return toggle(
+      { body: setPath(level.path, false) },
+      { body: setPath(level.path, level.boolean ? true : TOGGLE_LEVEL) },
+    )
+  if (support.type !== "effort") return []
+  return efforts(support.values ?? EFFORTS, (value) => ({ body: setPath(level.path, value) }))
 }

@@ -11,8 +11,8 @@ const model = (packageName: string, modelID: string, output?: number, providerID
   return Model.Info.make(result)
 }
 
-const resolve = (input: Model.Info, supports: readonly Variant.Support[]) =>
-  Variant.resolve(input, supports).map((item) => ({ ...item, id: String(item.id) }))
+const resolve = (input: Model.Info, supports: readonly Variant.Support[], overrides?: Variant.Overrides) =>
+  Variant.resolve(input, supports, overrides).map((item) => ({ ...item, id: String(item.id) }))
 
 test("spells Messages variants for each provider", () => {
   expect(
@@ -558,4 +558,47 @@ test("reads models.dev v2 reasoning as variant support", () => {
     { type: "effort", values: ["low"] },
     { type: "budget_tokens", min: 1024, max: 8000 },
   ])
+})
+
+test("spells variants for a thinking protocol chosen in the model editor", () => {
+  const custom = model("@opencode/ai/providers/openai-compatible", "custom-reasoner")
+  const supports = [{ type: "effort", values: ["low", "max"] }] as const
+
+  expect(resolve(custom, supports, { protocol: "auto" })).toEqual([
+    { id: "low", settings: { reasoningEffort: "low" } },
+    { id: "max", settings: { reasoningEffort: "max" } },
+  ])
+  expect(resolve(custom, supports, { protocol: "thinking" })).toEqual([
+    { id: "low", settings: { reasoningEffort: "low" }, body: { thinking: { type: "enabled" } } },
+    { id: "max", settings: { reasoningEffort: "max" }, body: { thinking: { type: "enabled" } } },
+  ])
+  expect(resolve(custom, supports, { protocol: "gemini" })).toEqual([
+    { id: "low", settings: { thinkingConfig: { includeThoughts: true, thinkingLevel: "low" } } },
+    { id: "max", settings: { thinkingConfig: { includeThoughts: true, thinkingLevel: "max" } } },
+  ])
+  expect(resolve(custom, supports, { protocol: "toggle" })).toEqual([
+    { id: "none", body: { thinking: { type: "disabled" } } },
+    { id: "thinking", body: { thinking: { type: "enabled" } } },
+  ])
+})
+
+test("writes the thinking level to a request parameter named in the model editor", () => {
+  const custom = model("@opencode/ai/providers/openai-compatible", "custom-reasoner")
+
+  expect(resolve(custom, [{ type: "effort", values: ["low", "high"] }], { levelParam: "thinking.level" })).toEqual([
+    { id: "low", body: { thinking: { level: "low" } } },
+    { id: "high", body: { thinking: { level: "high" } } },
+  ])
+  expect(
+    resolve(custom, [{ type: "effort", values: ["low"] }], {
+      levelParam: "chat_template_kwargs.reasoning_effort",
+    }),
+  ).toEqual([{ id: "low", body: { chat_template_kwargs: { reasoning_effort: "low" } } }])
+  expect(
+    resolve(custom, [{ type: "effort" }], { protocol: "toggle", levelParam: "enable_thinking" }),
+  ).toEqual([{ id: "none", body: { enable_thinking: false } }, { id: "thinking", body: { enable_thinking: true } }])
+  // A named parameter replaces the protocol's own field, so only the body overlay is spelled.
+  expect(
+    resolve(custom, [{ type: "effort", values: ["low"] }], { protocol: "gemini", levelParam: "reasoning_effort" }),
+  ).toEqual([{ id: "low", body: { reasoning_effort: "low" } }])
 })

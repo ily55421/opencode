@@ -24,6 +24,7 @@ interface ModelOptions {
   readonly headers?: Info["headers"]
   readonly body?: Info["body"]
   readonly variants?: Info["variants"]
+  readonly defaultVariant?: Info["defaultVariant"]
   readonly limit?: Info["limit"]
 }
 
@@ -41,6 +42,7 @@ function model(packageName: string | undefined, options: ModelOptions = {}) {
     body: options.body ?? { custom_extension: { enabled: true } },
     capabilities: { tools: true, input: ["text"], output: ["text"] },
     variants: structuredClone(options.variants ?? []) as Model.MutableInfo["variants"],
+    defaultVariant: options.defaultVariant,
     time: { released: 0 },
     cost: [],
     status: "active",
@@ -1620,6 +1622,22 @@ describe("ModelResolver", () => {
       expect(ModelResolver.hasPackage(model(Provider.aisdk("@ai-sdk/openai")))).toBe(true)
       expect(ModelResolver.hasPackage(model("@opencode/ai/providers/custom"))).toBe(true)
       expect(ModelResolver.hasPackage(model(undefined))).toBe(false)
+    }),
+  )
+
+  it.effect("applies the model's default thinking level when the caller picks none", () =>
+    Effect.gen(function* () {
+      const variants = [{ id: VariantID.make("high"), body: { reasoning: { effort: "high" } } }]
+      const withDefault = model("@opencode/ai/providers/custom", { variants, defaultVariant: VariantID.make("high") })
+      const withoutDefault = model("@opencode/ai/providers/custom", { variants })
+      const body = { custom_extension: { enabled: true }, reasoning: { effort: "high" } }
+
+      expect((yield* ModelResolver.withVariant(withDefault, undefined)).body).toEqual(body)
+      expect((yield* ModelResolver.withVariant(withDefault, VariantID.make("default"))).body).toEqual(body)
+      expect((yield* ModelResolver.withVariant(withoutDefault, VariantID.make("high"))).body).toEqual(body)
+      expect(
+        yield* ModelResolver.withVariant(withDefault, VariantID.make("low")).pipe(Effect.flip),
+      ).toBeInstanceOf(ModelResolver.VariantUnavailableError)
     }),
   )
 })
