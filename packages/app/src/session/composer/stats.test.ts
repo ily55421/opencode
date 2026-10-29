@@ -1,16 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { SessionMessageAssistant } from "@opencode/client/promise"
-import { cacheHitRate, contextSize, estimateOutputTokens, stepTokensPerSecond } from "./stats"
-
-const step = (change: Partial<SessionMessageAssistant> = {}): SessionMessageAssistant => ({
-  id: "msg_step",
-  type: "assistant",
-  agent: "build",
-  model: { id: "model", providerID: "provider" },
-  content: [],
-  time: { created: 0 },
-  ...change,
-})
+import { cacheHitRate, contextSize, estimateOutputTokens } from "./stats"
 
 describe("estimateOutputTokens", () => {
   test("counts CJK glyphs once and other text at four characters per token", () => {
@@ -63,42 +53,6 @@ describe("estimateOutputTokens", () => {
     expect(estimateOutputTokens([{ type: "text", text: "one two three four five" }])).toBeGreaterThan(
       estimateOutputTokens([{ type: "text", text: "one two" }]),
     )
-  })
-})
-
-describe("stepTokensPerSecond", () => {
-  test("weights output and reasoning against the provider's streaming duration", () => {
-    const message = step({
-      time: { created: 1_000, streamed: 3_000 },
-      tokens: { input: 100, output: 100, reasoning: 20, cache: { read: 0, write: 0 } },
-    })
-
-    expect(stepTokensPerSecond(message)).toBe(60)
-  })
-
-  test("waits for the stream and ignores steps without output", () => {
-    expect(
-      stepTokensPerSecond(
-        step({ time: { created: 1_000 }, tokens: { input: 1, output: 2, reasoning: 0, cache: { read: 0, write: 0 } } }),
-      ),
-    ).toBeUndefined()
-    expect(stepTokensPerSecond(step({ time: { created: 1_000, streamed: 2_000 } }))).toBeUndefined()
-    expect(
-      stepTokensPerSecond(
-        step({
-          time: { created: 1_000, streamed: 1_000 },
-          tokens: { input: 1, output: 2, reasoning: 0, cache: { read: 0, write: 0 } },
-        }),
-      ),
-    ).toBeUndefined()
-    expect(
-      stepTokensPerSecond(
-        step({
-          time: { created: 1_000, streamed: 2_000 },
-          tokens: { input: 1, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-        }),
-      ),
-    ).toBeUndefined()
   })
 })
 

@@ -861,7 +861,7 @@ export const dict = {
   "session.summary.mcp.signInBeforeSend": "在傳送提示前請先登入 {{name}}。",
   "session.summary.mcp.notReady": "MCP 伺服器 {{name}} 尚未準備好。在傳送提示之前請先解決其連線問題。",
   "session.stats.speed": "{{value}} tok/s",
-  "session.stats.speed.tooltip": "每秒輸出的 token 數",
+  "session.stats.speed.tooltip": "本輪對話輸出與推理 token 的每秒速度",
   "session.stats.cacheHit": "快取命中 {{percent}}%",
   "session.stats.cacheHit.tooltip": "{{prompt}} 個輸入 token 中有 {{cached}} 個來自供應商快取",
   "session.stats.context": "上下文 {{percent}}%",

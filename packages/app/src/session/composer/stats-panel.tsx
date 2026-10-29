@@ -1,9 +1,10 @@
 import { lastAssistantWithUsage } from "@opencode/client/solid"
 import type { SessionMessageAssistant, SessionMessageInfo } from "@opencode/client/promise"
 import { Tooltip } from "@opencode/ui/tooltip"
+import { SessionTurn } from "@opencode/util/session-turn"
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, type Accessor } from "solid-js"
 import { useLanguage } from "@/runtime/i18n/language"
-import { cacheHitRate, contextSize, estimateOutputTokens, stepTokensPerSecond } from "./stats"
+import { cacheHitRate, contextSize, estimateOutputTokens } from "./stats"
 
 const WINDOW_MS = 2_500
 
@@ -13,7 +14,7 @@ const MIN_WINDOW_MS = 800
 
 /**
  * Output speed, cache reuse and context usage for the routed session, under its composer. While a step streams, the
- * speed follows sampled output; once the provider finishes, the step's recorded tokens replace the estimate.
+ * speed follows sampled output; once the turn finishes, every step of it is weighted by how long its provider streamed.
  */
 export function SessionComposerStats(props: {
   messages: Accessor<readonly SessionMessageInfo[]>
@@ -44,15 +45,16 @@ export function SessionComposerStats(props: {
     return message
   })
 
-  const completed = createMemo(() => {
-    const message = props
-      .messages()
-      .findLast(
-        (item): item is SessionMessageAssistant =>
-          item.type === "assistant" && item.tokens !== undefined && item.time.streamed !== undefined,
-      )
+  const legacy = createMemo(() => SessionTurn.legacy(props.messages()))
 
-    return message ? stepTokensPerSecond(message) : undefined
+  const completed = createMemo(() => {
+    const messages = props.messages()
+    const index = messages.findLastIndex(
+      (item) => item.type === "assistant" && item.tokens !== undefined && item.time.streamed !== undefined,
+    )
+
+    if (index === -1) return
+    return SessionTurn.tokensPerSecond(messages, messages[index], { index, legacy: legacy() })
   })
 
   const usage = createMemo(() => {

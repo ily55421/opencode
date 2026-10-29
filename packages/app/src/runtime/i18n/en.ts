@@ -1263,7 +1263,7 @@ export const dict = {
   "session.summary.mcp.signInBeforeSend": "Sign in to {{name}} before sending the prompt.",
   "session.summary.mcp.notReady": "MCP server {{name}} is not ready. Resolve its connection before sending the prompt.",
   "session.stats.speed": "{{value}} tok/s",
-  "session.stats.speed.tooltip": "Output tokens per second",
+  "session.stats.speed.tooltip": "Output and reasoning tokens per second across this turn",
   "session.stats.cacheHit": "Cache hit {{percent}}%",
   "session.stats.cacheHit.tooltip": "{{cached}} of {{prompt}} prompt tokens came from the provider cache",
   "session.stats.context": "Context {{percent}}%",
