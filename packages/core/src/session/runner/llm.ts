@@ -27,6 +27,7 @@ import { llmClient } from "../../effect/app-node-platform.js"
 import { StepFailedError } from "../error.js"
 import { SessionRunnerRetry } from "./retry.js"
 import { SessionStep } from "./step.js"
+import { SessionRunnerUnfinished } from "./unfinished.js"
 import { ToolOutput } from "../../tool-output.js"
 import { Plugin } from "../../plugin.js"
 import { MAX_STEPS_PROMPT } from "./max-steps.js"
@@ -325,12 +326,22 @@ const layer = Layer.effect(
         })
         const completed = yield* SessionStep.Outcome.$match(outcome, {
           Completed: Effect.fnUntraced(function* (outcome) {
+            if (outcome.needsContinuation) return true
+            const messages = yield* store.context(sessionID)
+            // The model stopped without calling a tool, but its own todo list may still have open items.
+            const nudge = SessionRunnerUnfinished.decide(messages)
+            if (nudge) {
+              yield* bus.publish(SessionEvent.Synthetic, {
+                sessionID,
+                text: nudge.text,
+                description: nudge.description,
+                metadata: { notice: nudge.notice },
+              })
+              if (nudge.continue) return true
+            }
             // The Session is about to go idle, which leaves the background summary time to finish.
-            if (!outcome.needsContinuation)
-              yield* compaction.precompute(
-                store.context(sessionID).pipe(Effect.map((messages) => ({ ...loaded, messages }))),
-              )
-            return outcome.needsContinuation
+            yield* compaction.precompute(Effect.succeed({ ...loaded, messages }))
+            return false
           }),
           Retry: (outcome) =>
             retry.wait({

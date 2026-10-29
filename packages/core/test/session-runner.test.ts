@@ -85,6 +85,11 @@ import { Expected } from "./lib/session-message"
 import { permissionLayer } from "./lib/permission"
 import { agentHost, modelHost, host, noProviders } from "./plugin/host"
 import { CodeModeInstructions } from "@opencode/core/codemode/instructions"
+import { TodoTool } from "@opencode/core/tool/plugin/todo"
+import {
+  TODO_RESIDUE,
+  TODO_RESIDUE_STOPPED,
+} from "@opencode/core/session/runner/unfinished"
 
 const emptyCodeMode = `${CodeModeInstructions.render({ total: 0, shown: 0, namespaces: [] })}\n\n`
 type ToolBarrier = {
@@ -6916,5 +6921,72 @@ describe("SessionRunnerLLM", () => {
     expect(defect).toBeInstanceOf(Error)
     if (!(defect instanceof Error)) return
     expect(defect.message).toBe("Tool input delta before start: call-1")
+  })
+
+  const todoRegistry = Effect.gen(function* () {
+    const registry = yield* Tool.Service
+    yield* transformTools(
+      registry,
+      {
+        [TodoTool.name]: {
+          name: TodoTool.name,
+          description: "Replace the todo list",
+          input: Schema.Struct({
+            todos: Schema.Array(Schema.Struct({ content: Schema.String, status: Schema.String })),
+          }),
+          output: Schema.Struct({ count: Schema.Number }),
+          execute: ({ todos }) =>
+            Effect.succeed({ output: { count: todos.length }, content: "Todos updated", metadata: { todos } }),
+        },
+      },
+      { codemode: false },
+    )
+    return registry
+  })
+  const pendingTodo = { todos: [{ content: "Write the test", status: "pending" }] }
+  const completedTodo = { todos: [{ content: "Write the test", status: "completed" }] }
+  const todoCall = (call: string, todos: typeof pendingTodo) => TestLLM.tool(call, TodoTool.name, todos)
+  const residueNotices = (s: Scenario) =>
+    Effect.map(s.context, (messages) =>
+      messages.flatMap((message) =>
+        message.type === "synthetic" &&
+        (message.metadata?.notice === "todo-residue" || message.metadata?.notice === "todo-residue-stopped")
+          ? [{ text: message.text, notice: message.metadata.notice }]
+          : [],
+      ),
+    )
+
+  scenario("nudges a turn that stops with unfinished todos, then stops with a notice", function* (s) {
+    yield* todoRegistry
+    yield* s.llm.push(
+      todoCall("call-todo", pendingTodo),
+      ...Array.from({ length: 5 }, (_, index) => TestLLM.text(`Nothing more ${index}`, `stubborn-${index}`)),
+    )
+
+    yield* s.runPrompt("Write the test")
+
+    // Three nudges for a list that never moves, then the stop notice ends the turn without an error.
+    expect(s.requests).toHaveLength(5)
+    expect(yield* residueNotices(s)).toEqual([
+      { text: TODO_RESIDUE, notice: "todo-residue" },
+      { text: TODO_RESIDUE, notice: "todo-residue" },
+      { text: TODO_RESIDUE, notice: "todo-residue" },
+      { text: TODO_RESIDUE_STOPPED, notice: "todo-residue-stopped" },
+    ])
+  })
+
+  scenario("stops nudging once the model closes the list", function* (s) {
+    yield* todoRegistry
+    yield* s.llm.push(
+      todoCall("call-todo", pendingTodo),
+      TestLLM.text("All done", "residue-claim"),
+      todoCall("call-todo-done", completedTodo),
+      TestLLM.text("Really done", "residue-finish"),
+    )
+
+    yield* s.runPrompt("Write the test")
+
+    expect(s.requests).toHaveLength(4)
+    expect(yield* residueNotices(s)).toEqual([{ text: TODO_RESIDUE, notice: "todo-residue" }])
   })
 })

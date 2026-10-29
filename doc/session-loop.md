@@ -52,6 +52,19 @@ Three mechanisms end or extend a loop without user input:
 | Step budget | `step >= agent.info.steps` appends `MAX_STEPS_PROMPT` as an assistant message and sets `toolChoice: "none"` | `core/src/session/runner/max-steps.ts`, used by `runStep` |
 | Interrupted stream | `Outcome.Continue` publishes the `CONTINUE_AFTER_INCOMPLETE_STREAM` text | `core/src/session/runner/llm.ts` |
 | Output limit | `Outcome.OutputLimit` publishes `CONTINUE_AFTER_OUTPUT_LIMIT`, and fails with the `output-limit` session error after two consecutive `finish: "length"` assistants | `core/src/session/runner/llm.ts` |
+| Unfinished work | `Outcome.Completed` without a tool call, while the todo list the model itself last wrote still has `pending` or `in_progress` items | `core/src/session/runner/unfinished.ts`, called by `runStep` |
+
+`SessionRunnerUnfinished.decide` is the only task-level completion check in the loop, and it is fenced by
+`experimental.todo`: no todo tool means no list means nothing to detect. Its four constants are the whole contract —
+`MAX_NUDGES` (10) and `STALL_LIMIT` (3) are the two independent breakers, whichever hits first wins, and
+`ESCALATE_AFTER` (3) switches the wording. `NOTICE` (`todo-residue`) and `NOTICE_STOPPED`
+(`todo-residue-stopped`) are the `metadata.notice` values a client should label these messages with; match those, never
+the text, since the text is model-visible and may be reworded.
+
+Progress is a **real side effect**, not a claim: a completed `edit`, `write`, `patch`, or `shell` call, or a `todowrite`
+that leaves fewer open items than the list before it. Rewriting the same list is the model restating the task, so it
+does not reset the stall run. When both breakers are exhausted the turn publishes `TODO_RESIDUE_STOPPED` and goes idle —
+deliberately not a session error, because an error reads as a broken session when the truth is that work remains.
 
 A nudge is published as `SessionEvent.Synthetic` — durable, model-visible, projected as a message that is not a user
 message (`to-llm-message.ts` renders it with the user role; `message-updater.ts` records it as synthetic). The
@@ -118,11 +131,27 @@ bounded retry into an unbounded spend. See the output-limit streak query for the
 **`needsContinuation` stays "a tool was involved".** Rejected: making it mean "the model has not finished the task".
 Failure mode: it is also the signal that keeps tool results attached to their calls; overloading it with task judgment
 couples settlement correctness to a heuristic that can be wrong. Task-level completion checks belong in front of the
-idle verdict, as their own decision with its own cap.
+idle verdict, as their own decision with its own cap — which is how `SessionRunnerUnfinished` is wired.
+
+**The nudge turns over to `SessionStep.Outcome.Completed` rather than to a drain result variant.** Rejected: adding
+`DrainResult.Rerun(reason)`. Failure mode: `SessionExecution` re-enters `drain` for non-`Complete` results, so a rerun
+would re-run drain entry work (`settleStaleCompactions`, `settleStaleToolCalls`, instruction preparation) for something
+that is really just another step of the same drain. Returning `true` from `runStep` reuses the path a tool call already
+takes.
+
+**Todo residue is detected only from the list the model wrote.** Rejected: a "did the user ask for work?" heuristic that
+inspects the prompt for action verbs and fires when few tools ran. Failure mode: it cannot tell a finished three-call
+fix from an abandoned refactor, so it nudges correct answers, and its verb list would be a language-specific policy
+inside the loop. `doc/records/2026-10-todo-completion-nudge.md` keeps the full reasoning.
+
+**Turn scoping uses the `idle` marker, not the last user message.** Failure mode of the alternative: a steer mid-turn
+moves the boundary, the earlier nudges fall outside the window, and each steer hands the model a fresh nudge allowance
+inside one turn.
 
 ## Tests
 
 `packages/core/test/session-runner.test.ts` drives full drain loops against a `TestLLM` and asserts on `DrainResult`
 and the event sequence; `session-step.test.ts` covers one step, `session-runner-tool-events.test.ts` covers tool
-settlement, and `session-execution.test.ts` covers the coordinator. Run them from `packages/core` with
-`bun run test`; never from the repository root.
+settlement, `session-execution.test.ts` covers the coordinator, and `session-runner-unfinished.test.ts` covers the
+nudge decision on projected history directly. Run them from `packages/core` with `bun run test`; never from the
+repository root.
