@@ -3,6 +3,16 @@
 - This repository does not use Changesets. Do not add `.changeset` files; follow the existing release workflow instead.
 - The default branch is `dev`. Base branches and worktrees on `origin/dev`, target PRs at `dev`, and diff against `origin/dev` unless told otherwise.
 
+## Documentation
+
+- `doc/` holds the mechanism knowledge for people **changing** this code: how a subsystem works, why it was built that way, and what was rejected. `packages/web/src/content/docs/` is for people **using** it. This file stays an index — new conventions go into the topic doc that owns them, with at most one index line here.
+- Doc sync is part of the definition of done. A change to behaviour or a contract is unfinished until the doc that owns it says so, in the same change. Look up the landing point in the change map in `doc/conventions.md`.
+- When code and doc disagree, the code wins and the person who noticed fixes the doc. Do not carry the wrong description into the next change.
+- Record the **why**, including rejected approaches and the failure behind them, in the `Decisions` section of the topic doc. A note that only says "X is implemented" loses the one thing nobody can re-derive later.
+- Plans and implementation records under `doc/records/` are historical and are never rewritten to match a later design; add a superseded line at the top instead.
+- Reference code by symbol name, event name, config key, or file path — never by appending a line number, which goes stale on the first edit above it. `bun script/doc-refs.ts` runs in `bun run lint` and fails on stale anchors, dead paths, and missing symbols.
+- Index: `doc/conventions.md` (the discipline and the change map), `doc/session-loop.md` (steps, drain, nudges, recovery claims), `doc/context-economics.md` (token estimates, compaction budgets, tool-output clipping).
+
 ## Live TUI Testing
 
 - Run `bun run dev:live` from a development worktree to test its TUI against the currently elected `opencode` background server and live sessions.
