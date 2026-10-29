@@ -36,6 +36,16 @@ Use a short branch name of at most three words, separated by hyphens. Do not use
 
 Examples: `session-recovery`, `fix-scroll-state`, `regenerate-sdk`.
 
+## Version Numbers
+
+A fork version must never claim to be ahead of upstream. The number is a signal for "have we merged yet", so a plain `x.y.z` above upstream's destroys that signal.
+
+- The base is the `version` in upstream's root `package.json` at the merge point, read from the tree rather than from a published tag. The fork suffix is `<base>-fork.<N>`, for example `2.2.0-fork.1`. Never raise the base on your own.
+- Increment `N` for every local release build. Reset it to `1` when the base changes, so merging a `v2.2.1` upstream tree gives `2.2.1-fork.1`.
+- Only the root `package.json` carries the version. Leave `packages/*/package.json` and `services/*/package.json` at whatever upstream has; the release tooling (`script/pack.ts`, `.github/release/tag-release.sh`) rewrites every workspace at publish time.
+- Keep a prerelease suffix rather than dropping it for a plain number. `2.2.0.1` is indistinguishable from a real upstream patch release, which reintroduces the stale-CLI trap in Local Release Builds and makes a fork build look like an official one.
+- Upstream already supports the suffixed form: the NSIS file version, `stageName()` in `packages/desktop/src/main/service/cli-version.ts`, the remote CLI version pattern in `packages/gui-plugins/src/ssh/remote-cli.ts`, and the desktop CLI stage layout (which `packages/desktop/src/main/service/cli-stages.test.ts` exercises with `2.1.0-beta.1`).
+
 ## Commits and PR Titles
 
 Use conventional commit-style messages and PR titles: `type(scope): summary`.
@@ -187,13 +197,20 @@ const table = sqliteTable("session", {
 
 - Build only Windows targets for local releases unless asked for another platform. Do not run the full multi-target CLI build that also produces Linux and macOS binaries.
 - Base local release builds on the current fork branch (`origin` is the fork). Do not switch to upstream or rebuild from another branch unless asked.
-- A release build needs `OPENCODE_CHANNEL=latest` plus `OPENCODE_VERSION` (the root `package.json` version). Without them the scripts stamp a `0.0.0-<branch>-<timestamp>` preview build.
+- A release build needs `OPENCODE_CHANNEL=latest` plus `OPENCODE_VERSION` (the root `package.json` version, which follows Version Numbers). Without them the scripts stamp a `0.0.0-<branch>-<timestamp>` preview build.
 - CLI: from `packages/cli`, run `bun run build` with `OPENCODE_TARGET=windows-x64`; the artifact is `packages/cli/dist/cli-windows-x64/bin/opencode.exe`.
 - Desktop GUI: a Windows x64 desktop build bundles the `windows-x64-baseline` CLI, so build that CLI first (`OPENCODE_TARGET=windows-x64-baseline`), then run `bun run build` and `bun run pack` from `packages/desktop`. The unpacked app lands in `dist/desktop/app`.
 - Installer: copy the unpacked app outside `dist/desktop` first because `pack` deletes that directory, then rerun `bun run pack` with `OPENCODE_DESKTOP_APP=<staged app>`. The NSIS installer lands at `dist/desktop/opencode-desktop-win-x64.exe`.
 - Verify `opencode.exe --version` or the installer's file version before handing an artifact over.
+- A same-version desktop update reuses the backend CLI staged under `%APPDATA%\ai.opencode.desktop\cli\<version>\opencode-cli.exe`; it does not replace it from the newly installed `resources\opencode-cli.exe`. After overwriting an installation, stop the app and its `opencode-cli` background service, replace that staged executable (or delete it so the app re-stages it), relaunch, and confirm the staged and bundled hashes match. Installing the desktop app alone leaves server and core changes inactive. Bumping `N` between builds sidesteps this entirely, since the new version stages in a fresh directory and prunes the old one.
+- A suffixed fork version never equals upstream's latest, so the CLI's default `notify` update policy reports an update on every check, and `auto` would replace the fork build with an upstream binary. Set `"update": "disable"` in the global `config.json` or `opencode.json` before distributing a fork build.
 - The build's internal `bun install` rewrites `bun.lock` to the local npm registry; restore it with `git checkout -- bun.lock` afterwards.
 - In mainland China set `ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/` and `ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/` before packaging, otherwise the Electron download stalls.
+
+## Performance Validation
+
+- Before claiming an agent-loop speedup, confirm the installed backend CLI is the new build (see Local Release Builds), then compare the same prompt, model, model variant, and output size. Different tasks or `high` vs `max` variants are not comparable.
+- Run `bun script/session-efficiency.ts --title "<session title>" [--directory <path>] [--dev] [--json]` to separate wall time into model streaming, tool settlement, and gaps, and report output/reasoning tokens, cache reuse, steps, and parallel tool gain. When tool settlement is a small share of wall time, batching tools cannot account for a speedup; output tokens and model throughput are the limit.
 
 ## Session Core
 
