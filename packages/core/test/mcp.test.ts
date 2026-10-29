@@ -1600,9 +1600,9 @@ it.live("discovers and reads MCP resources through Code Mode", () =>
       const bounded = yield* ToolOutput.Service.use((output) => output.truncate(large)).pipe(
         Effect.provide(AppNodeBuilder.build(ToolOutput.node)),
       )
-      expect(bounded.metadata?.truncated).toBe(true)
+      expect(bounded.metadata?.[ToolOutput.RECORD]).toMatchObject({ truncated: true })
       expect(bounded.content[0]).toMatchObject({ type: "text" })
-      const outputPath = bounded.metadata?.outputPath
+      const outputPath = (bounded.metadata?.[ToolOutput.RECORD] as { outputPath?: string } | undefined)?.outputPath
       expect(typeof outputPath).toBe("string")
       if (typeof outputPath !== "string") throw new Error("Missing full resource output")
       expect(yield* Effect.promise(() => Bun.file(outputPath).text())).toBe("line\n".repeat(20_000))
