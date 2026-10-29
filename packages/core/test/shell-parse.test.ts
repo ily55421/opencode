@@ -32,20 +32,10 @@ describe("ShellParse", () => {
       ],
       directories: [],
     })
-    const malformed = await Effect.runPromiseExit(
+    const malformed = await Effect.runPromise(
       ShellParse.scan('echo "', "/bin/bash", "/workspace", { wasm: shellParserWasm }),
     )
-    expect(malformed).toMatchObject({
-      _tag: "Failure",
-      cause: {
-        reasons: [
-          {
-            _tag: "Fail",
-            error: { message: expect.stringContaining("Portable shell scanner cannot analyze command") },
-          },
-        ],
-      },
-    })
+    expect(malformed).toMatchObject({ commands: [], directories: [], opaque: expect.any(String) })
   })
 
   test("portable scanning preserves supported command resources and directories", async () => {

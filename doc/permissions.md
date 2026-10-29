@@ -42,6 +42,47 @@ selector shows without pretending to be one of its choices.
 `ask` writes an explicit rule rather than an empty array on purpose: `[]` means nobody has chosen, which is what keeps
 the older client-side auto-approve setting working for existing sessions.
 
+## Escalation: what a broad allow rule cannot cover
+
+`Permission.evaluate` is last-match-wins, so one `shell: {"*": allow}` rule historically authorised every command,
+including `rm -rf /`. A caller that can see more about its request than a wildcard can therefore pass that judgement
+independently:
+
+```ts
+permission.assert({ action: "shell", resources, save, risk: "dangerous" | "unanalyzable" })
+```
+
+`risk` is on `AssertInput`, not on `Request`, so it never reaches the wire or a client's pending list. The ordering in
+`evaluateInput` is **deny → escalation → allow**: a deny still wins, and an escalation outranks every allow rule an
+agent or a project config carries. Two things clear it, because both are a human deciding about the specific thing in
+front of them — a saved "always allow" rule covering that exact resource, and a session that allowed everything
+outright.
+
+`packages/core/src/shell/danger.ts` produces the verdict from the command text:
+
+- **dangerous** — a recognised destructive shape: recursive removal against `/`, `~`, `$HOME` or a top-level system
+  directory, `dd`/`mkfs`/`shred`/`wipefs` against a device, `find / -delete`, recursive `chmod`/`chown` on a root, a
+  fork bomb, pipe-to-shell installers, `shutdown`/`reboot`/`init 0|6`.
+- **unanalyzable** — the rule engine is being asked to approve text whose target it cannot see. Two different things
+  hide in a `$`: a substitution (`$(…)` or a backtick) runs code no rule can see, so it escalates wherever it appears;
+  a bare expansion (`$X`, `$HOME`) escalates only in a command that can change state (`rm`, `mv`, `chmod`, `kill`,
+  `dd`, `tar`, `xargs`, …), because that is the case where the operand *is* the target. `rm -rf "$X"` escalates;
+  `rm -rf /tmp/build; echo "exit=$?"` does not — a real false positive this rule was found by.
+
+`ShellParse` no longer fails on an unreadable command. `scanPortable` used to return `Effect.fail` for `opaque` and the
+legacy path for a parse error, so the model got a tool error and retried; the result now carries `opaque: reason` and
+the shell tool escalates on it. A person decides in one tap what a parser cannot.
+
+The one opt-out is a session whose **own** rules contain `{action:"*", resource:"*", effect:"allow"}` — what the
+composer's Full access mode writes. An agent-level allow-all is not an opt-out; see `Decisions`.
+
+**This flips a default.** The built-in `build` agent's rules begin with `{action:"*",resource:"*",effect:"allow"}`, so
+before the escalation every shell command the model proposed ran without a prompt — including `rm -rf "$TARGET"`. What
+a user gains is a question before an irreversible command; what they lose is the silence. The escape hatches are
+answering **always allow** on the prompt that appears (a saved rule clears the escalation for that exact resource), or
+choosing **Full access** for the session. A non-interactive `opencode run` without `--auto` cannot ask, so an
+escalated command there now fails with the standard "cannot ask" rejection instead of executing.
+
 ## Where the memory lives
 
 The selector remembers the last choice per project (`permissions.modeProjects` in the app's persisted settings) and
@@ -62,6 +103,26 @@ precision either way, and the fine version belongs in the `permission.evaluate` 
 list errs toward asking: `edit` and `shell` stay questions in "Auto approve" even though most of their calls are
 harmless.
 
+**The opt-out reads the session's rules only, never the merged set.** Failure mode otherwise: the default build agent
+carries `{action:"*",resource:"*",effect:"allow"}`, so checking the merged ruleset would treat every ordinary session as
+having opted out and silence the escalation entirely. The cost is that "Full access" is recognised by rule shape rather
+than by a named flag.
+
+**Classification reads the command text, not the parse tree.** Rejected: deriving the verdict per parsed command from
+`ShellParse`. Failure mode: the legacy tree-sitter path and the portable scanner path would escalate differently for the
+same input, and a command the scanner drops entirely (a declaration-only statement, an opaque read) would produce no
+resources and therefore no prompt at all. Text classification is scanner-independent, so both paths agree, and the
+`opaque` case still escalates.
+
+**A glob operand is not unanalyzable.** Rejected the reference behaviour of escalating on any `*`/`?`. Failure mode:
+`rm -rf dist/*` and `npm run build -- --watch *` are ordinary work, and opencode's rules already match against the
+literal command text, so a glob does not hide the target the way `$X` does. A glob at a root position (`rm -rf /*`) is
+caught as dangerous instead.
+
+**`dangerous` does not silently pass `--auto`.** The escalation happens server-side before any client sees a request, so
+a non-interactive run still gets a prompt — which the CLI's `--auto` path then answers. Deciding that a machine should
+preempt the escalation belongs to the caller's explicit rules, not to a heuristic that cannot see the target.
+
 **A remembered mode applies at creation, not on view.** Rejected: applying the project default the first time a
 session renders. Failure mode: opening a session created elsewhere — by the TUI, the CLI, or a colleague's shared
 session — would silently widen its permissions to whatever this browser last chose.
@@ -72,6 +133,10 @@ picks "Ask every time", the setting is still on, and prompts keep disappearing �
 
 ## Tests
 
-`packages/app/src/session/composer/permission-mode.test.ts` pins the mode↔ruleset round trip, the risky set, the
-`custom` reading, and that only an explicit ask opts out of auto-approval. Run from `packages/app` with
-`bun run test:unit`. `packages/core/test/permission.test.ts` covers the evaluator itself.
+`packages/core/test/shell-danger.test.ts` pins the classifier's safe / dangerous / unanalyzable tables, wrapper
+stripping and nested payloads. `packages/core/test/permission-escalation.test.ts` is the contract test: a broad allow
+rule clears an ordinary command but not a dangerous or unanalyzable one, a deny still wins, an agent-level allow-all is
+not an opt-out, and a session-level one is. `packages/core/test/shell-parse-parity.test.ts` and
+`shell-parse.test.ts` assert the new `opaque` result in place of the old failure.
+`packages/app/src/session/composer/permission-mode.test.ts` covers the composer modes. Run from `packages/core` or
+`packages/app` (`bun run test:unit` there); never from the repository root.

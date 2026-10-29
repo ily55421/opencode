@@ -16,6 +16,7 @@ import { Session } from "../../session.js"
 import { SessionSchema } from "../../session/schema.js"
 import { Shell } from "../../shell.js"
 import { shellParserWasm } from "#shell-parser-wasm"
+import { ShellDanger } from "../../shell/danger.js"
 import { ShellParse } from "../../shell/parse.js"
 import { ShellSelect } from "../../shell/select.js"
 import { ShellResult } from "../../shell/result.js"
@@ -134,11 +135,17 @@ export const Plugin = {
         }),
       )
       yield* access.authorizeExternal([target, ...directories], context)
-      if (parsed.commands.length > 0)
+      // Classification reads the command text, not the parse, so both scanners escalate identically and an unreadable
+      // command cannot dodge it by producing no resources.
+      const risk = parsed.opaque ? "unanalyzable" : ShellDanger.classify(invocation.command)
+      const fallback = [{ resource: invocation.command, save: invocation.command }]
+      const commands = parsed.commands.length === 0 && risk !== "safe" ? fallback : parsed.commands
+      if (commands.length > 0)
         yield* permission.assert({
           action: name,
-          resources: parsed.commands.map((command) => command.resource),
-          save: parsed.commands.map((command) => command.save),
+          resources: commands.map((command) => command.resource),
+          save: commands.map((command) => command.save),
+          risk: risk === "safe" ? undefined : risk,
           sessionID: context.sessionID,
           agent: context.agent,
           source,

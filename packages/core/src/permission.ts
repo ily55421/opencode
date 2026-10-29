@@ -30,9 +30,18 @@ export type Request = typeof Request.Type
 export const Reply = Permission.Reply
 export type Reply = typeof Reply.Type
 
+export const Escalation = Permission.Escalation
+export type Escalation = typeof Escalation.Type
+
 export interface AssertInput extends Omit<Request, "id" | "message"> {
   readonly id?: ID
   readonly agent?: Agent.ID
+  /**
+   * Set by a caller whose rules cannot see the request's real target — a destructive or unparseable shell command.
+   * It forces a prompt over allow rules; an explicit deny still wins, and only a session that allowed everything
+   * outright opts out.
+   */
+  readonly risk?: Permission.Escalation
 }
 
 export interface ReplyInput {
@@ -148,7 +157,14 @@ const layer = Layer.effect(
       const session = yield* sessions.get(sessionID)
       if (!session) return yield* new SessionErrors.NotFoundError({ sessionID })
       const agent = yield* agents.resolve(agentID ?? session.agent)
-      return merge(agent?.permissions ?? missingAgentPermissions, session.permissions ?? [])
+      return {
+        rules: merge(agent?.permissions ?? missingAgentPermissions, session.permissions ?? []),
+        // Only the session's own rules count here: the default agent already carries `*/* allow`, so reading the
+        // merged set would treat every ordinary session as opted in and silence the escalation entirely.
+        opted: (session.permissions ?? []).some(
+          (rule) => rule.action === "*" && rule.resource === "*" && rule.effect === "allow",
+        ),
+      }
     })
 
     function denied(input: Pick<Request, "action" | "resources">, rules: Permission.Ruleset) {
@@ -160,10 +176,22 @@ const layer = Layer.effect(
     }
 
     const evaluateInput = Effect.fnUntraced(function* (input: AssertInput) {
-      const rules = yield* configured(input.sessionID, input.agent)
+      const { rules, opted } = yield* configured(input.sessionID, input.agent)
       if (denied(input, rules)) return { effect: "deny" as const, rules }
-      const all = [...rules, ...(yield* savedRules())]
-      const effects = input.resources.map((resource) => evaluate(input.action, resource, all).effect)
+      const saved = yield* savedRules()
+      const all = [...rules, ...saved]
+      // A saved rule only exists because a person clicked "always allow" on that exact resource, so it clears an
+      // escalation. A config or agent allow rule never does — that is the broad allow this exists to survive.
+      const cleared = (resource: string) =>
+        opted ||
+        saved.some(
+          (rule) =>
+            rule.effect === "allow" && Wildcard.match(input.action, rule.action) &&
+            Wildcard.match(resource, rule.resource),
+        )
+      const effects = input.resources.map((resource) =>
+        input.risk && !cleared(resource) ? ("ask" as const) : evaluate(input.action, resource, all).effect,
+      )
       const effect: Permission.Effect = effects.includes("ask") ? "ask" : "allow"
       const event = yield* hooks.trigger("permission", "evaluate", {
         sessionID: input.sessionID,

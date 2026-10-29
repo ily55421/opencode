@@ -18,6 +18,11 @@ const POWERSHELL_PATH_FLAG_RE =
 export type Result = {
   commands: Array<{ resource: string; save: string }>
   directories: string[]
+  /**
+   * Set when the scanner could not read the command at all. Callers treat it as an unanalyzable request rather than a
+   * tool failure: a person can judge text the parser cannot, and a hard error only teaches the model to retry.
+   */
+  opaque?: string
 }
 
 const ARITY: Record<string, number> = {
@@ -176,13 +181,13 @@ const scanLegacy = Effect.fnUntraced(function* (command: string, shell: string, 
   const parsers = yield* Effect.promise(load)
   const powershell = ShellSelect.ps(shell)
   const tree = (powershell ? parsers.ps : parsers.bash).parse(command)
-  if (!tree) return yield* Effect.fail(new Error("Failed to parse shell command"))
+  if (!tree) return { commands: [], directories: [], opaque: "the shell grammar rejected the command" }
 
   return yield* Effect.acquireUseRelease(
     Effect.succeed(tree),
     (tree) =>
-      Effect.sync(() =>
-        tree.rootNode.descendantsOfType("command").reduce(
+      Effect.sync(() => {
+        const output = tree.rootNode.descendantsOfType("command").reduce(
           (result, node) => {
             if (!node) return result
             const command = parts(node)
@@ -199,9 +204,10 @@ const scanLegacy = Effect.fnUntraced(function* (command: string, shell: string, 
             })
             return result
           },
-          { commands: [] as Array<{ resource: string; save: string }>, directories: [] as string[] },
-        ),
-      ),
+          { commands: [] as Result["commands"], directories: [] as string[] } as Result,
+        )
+        return output
+      }),
     (tree) => Effect.sync(() => tree.delete()),
   )
 })
@@ -216,8 +222,7 @@ export const scanPortable = Effect.fnUntraced(function* (command: string, shell:
   const result = powershell
     ? ShellScan.scanPowerShell(command)
     : ShellScan.scan(command, name === "bash" || name === "zsh" ? name : "posix")
-  if (result.kind === "opaque")
-    return yield* Effect.fail(new Error(`Portable shell scanner cannot analyze command: ${result.reason}`))
+  if (result.kind === "opaque") return { commands: [], directories: [], opaque: result.reason }
 
   const output: Result = { commands: [], directories: [] }
   for (const item of result.commands) {

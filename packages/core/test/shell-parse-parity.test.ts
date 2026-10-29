@@ -82,21 +82,13 @@ describe("ShellParse malformed native syntax", () => {
     ["pwsh", 'Write-Output "unterminated', "unterminated-quote"],
     ["pwsh", "git 12>bar", "invalid-redirect"],
     ["pwsh", "Write-Output `", "unterminated-escape"],
-  ] as const)("fails explicitly for malformed %s syntax: %s", async (shell, command, reason) => {
+  ] as const)("reports malformed %s syntax as opaque instead of failing: %s", async (shell, command, reason) => {
     const scanned = shell === "pwsh" ? ShellScan.scanPowerShell(command) : ShellScan.scan(command)
     expect(scanned).toEqual({ kind: "opaque", reason })
-    expect(await Effect.runPromise(Effect.result(ShellParse.scanPortable(command, shell, "/workspace")))).toMatchObject(
-      {
-        _tag: "Failure",
-        failure: { message: `Portable shell scanner cannot analyze command: ${reason}` },
-      },
-    )
-    expect(
-      await Effect.runPromise(Effect.result(ShellParse.scan(command, shell, "/workspace", { portable: true }))),
-    ).toMatchObject({
-      _tag: "Failure",
-      failure: { message: `Portable shell scanner cannot analyze command: ${reason}` },
-    })
+    // An unreadable command is a question for the user, not a tool error: the caller escalates on `opaque`.
+    const opaque = { commands: [], directories: [], opaque: reason }
+    expect(await Effect.runPromise(ShellParse.scanPortable(command, shell, "/workspace"))).toEqual(opaque)
+    expect(await Effect.runPromise(ShellParse.scan(command, shell, "/workspace", { portable: true }))).toEqual(opaque)
   })
 })
 
