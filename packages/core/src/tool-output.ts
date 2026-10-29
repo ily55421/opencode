@@ -77,41 +77,49 @@ const layer = Layer.effect(
       if (lines.length <= limits.maxLines && totalBytes <= limits.maxBytes)
         return { ...result, metadata: { ...result.metadata, truncated: false } }
 
-      const kept: string[] = []
+      // A build or test log fails at the end, so a head-only slice would keep the setup and drop the reason.
+      const headCount = Math.max(1, Math.floor(limits.maxLines / 2))
+      const head: string[] = []
       let bytes = 0
-      for (const line of lines.slice(0, limits.maxLines)) {
-        const size = Buffer.byteLength(line, "utf-8") + (kept.length > 0 ? 1 : 0)
-        if (bytes + size > limits.maxBytes) break
-        kept.push(line)
+      for (const line of lines.slice(0, headCount)) {
+        const size = Buffer.byteLength(line, "utf-8") + (head.length > 0 ? 1 : 0)
+        if (bytes + size > Math.floor(limits.maxBytes / 2)) break
+        head.push(line)
         bytes += size
       }
+      const tail: string[] = []
+      for (const line of lines.slice(head.length).toReversed()) {
+        const size = Buffer.byteLength(line, "utf-8") + (tail.length > 0 ? 1 : 0)
+        if (bytes + size > limits.maxBytes || head.length + tail.length >= limits.maxLines) break
+        tail.unshift(line)
+        bytes += size
+      }
+      const kept = [...head, ...tail]
+      const shown =
+        head.length === 0
+          ? `lines ${lines.length - tail.length + 1}-${lines.length}`
+          : tail.length === 0
+            ? `lines 1-${head.length}`
+            : `lines 1-${head.length} and ${lines.length - tail.length + 1}-${lines.length}`
       const file = path.join(directory, fileName())
       yield* fs.ensureDir(directory).pipe(Effect.orDie)
       yield* fs.writeFileString(file, text).pipe(Effect.orDie)
-      const shown = kept.length > 0 ? `lines 1-${kept.length}` : "0 lines"
       const marker = `[showing ${shown} of ${lines.length}; full output saved to ${file}]`
+      // The preview is head plus tail, so it cannot be sliced out of the original items. It takes the first text
+      // slot, and file parts keep their position.
       const bounded: Tool.Content[] = []
-      let remaining = kept.join("\n").length
-      let seenText = false
-      let marked = false
+      let placed = kept.length === 0
       for (const item of content) {
         if (item.type === "file") {
           bounded.push(item)
           continue
         }
-        if (seenText && remaining > 0) remaining--
-        seenText = true
-        if (remaining >= item.text.length) {
-          bounded.push(item)
-          remaining -= item.text.length
-          continue
-        }
-        if (remaining > 0) bounded.push({ ...item, text: item.text.slice(0, remaining) })
-        if (!marked) bounded.push({ type: "text", text: marker })
-        remaining = 0
-        marked = true
+        if (placed) continue
+        bounded.push({ type: "text", text: kept.join("\n") })
+        placed = true
       }
-      if (!marked) bounded.push({ type: "text", text: marker })
+      if (!placed) bounded.push({ type: "text", text: kept.join("\n") })
+      bounded.push({ type: "text", text: marker })
       return {
         ...result,
         content: bounded,
