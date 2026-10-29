@@ -16,6 +16,11 @@ const POWERSHELL_STACK_FLAG_RE = /^-(?:stack(?:name|nam|na|n)?|st):?$/i
 export type Result = {
   commands: Array<{ resource: string; save: string }>
   directories: string[]
+  /**
+   * Set when the scanner could not read the command at all. Callers treat it as an unanalyzable request rather than a
+   * tool failure: a person can judge text the parser cannot, and a hard error only teaches the model to retry.
+   */
+  opaque?: string
 }
 
 const ARITY: Record<string, number> = {
@@ -166,8 +171,7 @@ export function scan(command: string, shell: string, cwd: string): Effect.Effect
     const scanned = powershell
       ? ShellScan.scanPowerShell(command)
       : ShellScan.scan(command, shellName === "bash" || shellName === "zsh" ? shellName : "posix")
-    if (scanned.kind === "opaque")
-      return Effect.fail(new Error(`Portable shell scanner cannot analyze command: ${scanned.reason}`))
+    if (scanned.kind === "opaque") return { commands: [], directories: [], opaque: scanned.reason }
 
     const output: Result = { commands: [], directories: [] }
     for (const item of scanned.commands) {

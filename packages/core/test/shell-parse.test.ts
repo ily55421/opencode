@@ -18,19 +18,9 @@ describe("ShellParse", () => {
     })
   })
 
-  test("rejects malformed syntax with an explicit scanner error", async () => {
-    const malformed = await Effect.runPromiseExit(ShellParse.scan('echo "', "/bin/bash", "/workspace"))
-    expect(malformed).toMatchObject({
-      _tag: "Failure",
-      cause: {
-        reasons: [
-          {
-            _tag: "Fail",
-            error: { message: expect.stringContaining("Portable shell scanner cannot analyze command") },
-          },
-        ],
-      },
-    })
+  test("returns an opaque result for malformed syntax", async () => {
+    const malformed = await Effect.runPromise(ShellParse.scan('echo "', "/bin/bash", "/workspace"))
+    expect(malformed).toMatchObject({ commands: [], directories: [], opaque: expect.any(String) })
   })
 
   test("preserves command resources and directories across compound forms", async () => {

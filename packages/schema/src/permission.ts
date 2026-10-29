@@ -56,6 +56,15 @@ export const Event = { Asked, Replied, Definitions: inventory(Asked, Replied) }
 export const Effect = Schema.Literals(["allow", "deny", "ask"]).annotate({ identifier: "Permission.Effect" })
 export type Effect = typeof Effect.Type
 
+/**
+ * A caller's own judgement that its rules cannot see what it is being asked to approve. It outranks every allow rule
+ * an agent or project config carries, and only a session that explicitly allowed everything opts out.
+ */
+export const Escalation = Schema.Literals(["dangerous", "unanalyzable"]).annotate({
+  identifier: "Permission.Escalation",
+})
+export type Escalation = typeof Escalation.Type
+
 export interface Rule extends Schema.Schema.Type<typeof Rule> {}
 export const Rule = Schema.Struct({
   action: Schema.String,
