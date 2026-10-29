@@ -14,6 +14,12 @@ export const MAX_LINES = 2_000
 export const MAX_BYTES = 50 * 1024 // 50 KiB
 export const RETENTION = Duration.days(7)
 export const DIRECTORY = "tool-output"
+/**
+ * The key this service records its own decision under. It must not be a bare `truncated`: `grep` and `read` already
+ * publish `metadata.truncated` to mean "this tool stopped paging", and reading that as "the bound was handled" left
+ * every oversized search or file read unbounded.
+ */
+export const RECORD = "toolOutput"
 
 export const fileName = (timestamp?: number) => "tool_" + Identifier.create(false, timestamp)
 
@@ -67,7 +73,7 @@ const layer = Layer.effect(
     })
 
     const truncate = Effect.fnUntraced(function* (result: Result) {
-      if (result.metadata?.truncated !== undefined) return result
+      if (result.metadata?.[RECORD] !== undefined) return result
       const content = result.content
       const text = content.flatMap((item) => (item.type === "text" ? [item.text] : [])).join("\n")
       const limits = state.get()
@@ -75,7 +81,7 @@ const layer = Layer.effect(
       if (text.endsWith("\n")) lines.pop()
       const totalBytes = Buffer.byteLength(text, "utf-8")
       if (lines.length <= limits.maxLines && totalBytes <= limits.maxBytes)
-        return { ...result, metadata: { ...result.metadata, truncated: false } }
+        return { ...result, metadata: { ...result.metadata, [RECORD]: { truncated: false } } }
 
       // A build or test log fails at the end, so a head-only slice would keep the setup and drop the reason.
       const headCount = Math.max(1, Math.floor(limits.maxLines / 2))
@@ -123,7 +129,7 @@ const layer = Layer.effect(
       return {
         ...result,
         content: bounded,
-        metadata: { ...result.metadata, truncated: true, outputPath: file },
+        metadata: { ...result.metadata, [RECORD]: { truncated: true, outputPath: file } },
       }
     })
 
