@@ -180,17 +180,11 @@ const layer = Layer.effect(
       if (denied(input, rules)) return { effect: "deny" as const, rules }
       const saved = yield* savedRules()
       const all = [...rules, ...saved]
-      // A saved rule only exists because a person clicked "always allow" on that exact resource, so it clears an
-      // escalation. A config or agent allow rule never does — that is the broad allow this exists to survive.
-      const cleared = (resource: string) =>
-        opted ||
-        saved.some(
-          (rule) =>
-            rule.effect === "allow" && Wildcard.match(input.action, rule.action) &&
-            Wildcard.match(resource, rule.resource),
-        )
+      // An escalation outranks every allow rule, a saved "always allow" included: remembering a decision about one
+      // command must not become a standing decision about the destructive shape it matched. Only the session itself
+      // opting into everything clears it.
       const effects = input.resources.map((resource) =>
-        input.risk && !cleared(resource) ? ("ask" as const) : evaluate(input.action, resource, all).effect,
+        input.risk && !opted ? ("ask" as const) : evaluate(input.action, resource, all).effect,
       )
       const effect: Permission.Effect = effects.includes("ask") ? "ask" : "allow"
       const event = yield* hooks.trigger("permission", "evaluate", {
@@ -211,7 +205,9 @@ const layer = Layer.effect(
         sessionID: input.sessionID,
         action: input.action,
         resources: input.resources,
-        save: input.save,
+        // An escalated request is re-decided every time, so there is nothing to remember; `reply` only persists a
+        // non-empty save list, which makes an "always" answer here behave as a one-time approval.
+        save: input.risk ? [] : input.save,
         // Tools copy optional inputs straight into metadata; undefined values are not JSON and would
         // fail the HttpApi response encoder when clients list pending requests.
         metadata:

@@ -44,8 +44,19 @@ describe("ShellDanger", () => {
   })
 
   test("a target the rules cannot see escalates as unanalyzable", () => {
-    for (const command of ['rm -rf "$X"', "chmod -R 777 ${TARGET}", "kill -9 'echo $$'", "cat `which secret`"])
+    for (const command of ['rm -rf "$X"', "chmod -R 777 ${TARGET}", "kill -9 'echo $$'", "mv $A $B"])
       expect(ShellDanger.classify(command), command).toBe("unanalyzable")
+  })
+
+  test("a substitution is judged by what it runs, not by its syntax", () => {
+    // The payload decides: literal text around a substitution can prove danger, never safety.
+    expect(ShellDanger.classify("echo $(rm -rf /)")).toBe("dangerous")
+    expect(ShellDanger.classify("echo `mkfs.ext4 /dev/sda`")).toBe("dangerous")
+    // A harmless payload in a read-only command is ordinary work, which is what PowerShell lives on.
+    expect(ShellDanger.classify('Write-Output "$(Write-Output hello)"')).toBe("safe")
+    expect(ShellDanger.classify("cat `which secret`")).toBe("safe")
+    // A consequential command whose operand comes from a substitution still hides its victim.
+    expect(ShellDanger.classify("rm -rf $(echo build)")).toBe("unanalyzable")
   })
 
   test("wrappers do not hide the command underneath", () => {
@@ -69,9 +80,29 @@ describe("ShellDanger", () => {
     // The real case that motivated this rule: a model appending its own exit-code echo must not escalate the rm.
     expect(ShellDanger.classify('rm -rf /tmp/build; echo "exit=$?"')).toBe("safe")
     expect(ShellDanger.classify("cat $FILE")).toBe("safe")
+    expect(ShellDanger.classify("if ($true) { Write-Output yes }")).toBe("safe")
     expect(ShellDanger.classify('mv "$A" "$B"')).toBe("unanalyzable")
-    // A substitution runs code whatever it is embedded in.
-    expect(ShellDanger.classify("echo $(whoami)")).toBe("unanalyzable")
+  })
+
+  test("a program that runs whatever follows it cannot be remembered", () => {
+    for (const command of [
+      "sh -c 'echo hi'",
+      "bash script.sh",
+      "python -c 'import os'",
+      "xargs rm",
+      "sudo rm file",
+      "env rm file",
+      // `bun *` and `node *` name no program, so a standing grant for them is a standing grant for anything.
+      "bun test",
+      "node script.js",
+    ])
+      expect(ShellDanger.rememberable(command), command).toBe(false)
+
+    for (const command of ["git status", "rm -rf /tmp/build", "grep TODO src", "echo hi", "cargo build"])
+      expect(ShellDanger.rememberable(command), command).toBe(true)
+
+    // One banned stage is enough: the whole request loses its remember option.
+    expect(ShellDanger.rememberable("git status && sh deploy.sh")).toBe(false)
   })
 
   test("an empty command asks for nothing", () => {

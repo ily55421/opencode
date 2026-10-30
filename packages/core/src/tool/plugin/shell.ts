@@ -144,7 +144,9 @@ export const Plugin = {
         yield* permission.assert({
           action: name,
           resources: commands.map((command) => command.resource),
-          save: commands.map((command) => command.save),
+          // Approving `sh …` or `python …` forever would authorise whatever follows them, so those commands are
+          // offered once at a time.
+          save: commands.filter((command) => ShellDanger.rememberable(command.resource)).map((command) => command.save),
           risk: risk === "safe" ? undefined : risk,
           sessionID: context.sessionID,
           agent: context.agent,

@@ -128,22 +128,36 @@ describe("Permission escalation", () => {
     }),
   )
 
-  // A saved rule only exists because a person clicked "always allow" on that exact resource.
-  it.effect("an explicit always-allow clears the escalation for its own resource", () =>
+  // A remembered decision must not become a standing one for the destructive shape it matched.
+  it.effect("an always-allow cannot clear the escalation", () =>
     Effect.gen(function* () {
-      yield* setup(BROAD_ALLOW, [])
+      yield* setup([], [])
       const service = yield* Permission.Service
       const request = shell("dangerous")
 
       expect(yield* service.ask(request)).toMatchObject({ effect: "ask" })
+      // The request itself offers nothing to remember, so an "always" answer persists no rule.
+      expect((yield* service.get(request.id))?.save).toEqual([])
+
       yield* (yield* PermissionSaved.Service).add({
         projectID: Project.ID.global,
         action: "shell",
-        resources: request.resources,
+        resources: [request.resources[0]!],
       })
-      expect(yield* service.ask(shell("dangerous"))).toMatchObject({ effect: "allow" })
-      // A different destructive command is still a question.
-      expect(yield* service.ask(shell("dangerous", "rm -rf /etc"))).toMatchObject({ effect: "ask" })
+      expect(yield* service.ask(shell("dangerous"))).toMatchObject({ effect: "ask" })
+      // The same saved rule does govern an ordinary request, so remembering decisions still works where it is safe.
+      expect(yield* service.ask(shell(undefined))).toMatchObject({ effect: "allow" })
+    }),
+  )
+
+  it.effect("an unescalated request keeps its save list", () =>
+    Effect.gen(function* () {
+      yield* setup([], [])
+      const service = yield* Permission.Service
+      const request = shell(undefined, "rm -rf /var")
+
+      expect(yield* service.ask(request)).toMatchObject({ effect: "ask" })
+      expect((yield* service.get(request.id))?.save).toEqual(["rm *"])
     }),
   )
 })
