@@ -18,6 +18,12 @@ export class VcsInitNotSupportedError extends Schema.TaggedError<VcsInitNotSuppo
   { httpApiStatus: 501 },
 ) {}
 
+/** The repository refused, or the provider cannot write. Carries Git's own words so a person can act on them. */
+export class VcsOperationError extends Schema.TaggedError<VcsOperationError>()("VcsOperationError", {
+  message: Schema.String,
+  operation: Schema.Literals(["commit", "push"]),
+}) {}
+
 const BranchesQuery = Schema.Struct({
   ...LocationQuery.fields,
   search: Schema.optional(Schema.String),
@@ -120,6 +126,40 @@ export const VcsGroup = HttpApiGroup.make("server.vcs")
           summary: "VCS diff",
           description:
             "Diff HEAD to the working copy (working), the base merge-base to the working copy (branch), or the base merge-base to HEAD (committed). Omitting base preserves repository-default comparison; supplying it overrides the comparison without saving it.",
+        }),
+      ),
+  )
+  .add(
+    HttpApiEndpoint.post("vcs.commit", "/api/vcs/commit", {
+      query: LocationQuery,
+      payload: Vcs.CommitInput,
+      success: Location.response(Vcs.CommitResult),
+      error: [InvalidRequestError, VcsOperationError],
+    })
+      .annotateMerge(locationQueryOpenApi)
+      .annotateMerge(
+        OpenApi.annotations({
+          identifier: "vcs.commit",
+          summary: "Commit listed paths",
+          description:
+            "Commit exactly the listed worktree-relative paths with the given message, leaving anything else a person staged untouched. Hooks run; nothing here forces or skips them. Returns the new commit and how many paths it carried.",
+        }),
+      ),
+  )
+  .add(
+    HttpApiEndpoint.post("vcs.push", "/api/vcs/push", {
+      query: LocationQuery,
+      payload: Vcs.PushInput,
+      success: Location.response(Vcs.PushResult),
+      error: [InvalidRequestError, VcsOperationError],
+    })
+      .annotateMerge(locationQueryOpenApi)
+      .annotateMerge(
+        OpenApi.annotations({
+          identifier: "vcs.push",
+          summary: "Push current branch",
+          description:
+            "Push the checked-out branch to the named remote, or the repository's primary remote, with an explicit refspec. Never forces, and a rejected push returns the remote's message.",
         }),
       ),
   )

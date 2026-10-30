@@ -39,3 +39,30 @@ export const FileStatus = Schema.Struct({
   status: Schema.Literals(["added", "deleted", "modified"]),
 }).annotate({ identifier: "Vcs.FileStatus" })
 export interface FileStatus extends Schema.Schema.Type<typeof FileStatus> {}
+
+/**
+ * A commit a person asked for from the session rail: these paths, this message, nothing else. `files` is
+ * worktree-relative, and the commit is scoped to them so a change someone staged earlier stays staged.
+ */
+export const CommitInput = Schema.Struct({
+  message: Schema.String,
+  files: Schema.Array(Schema.String),
+}).annotate({ identifier: "Vcs.CommitInput" })
+export interface CommitInput extends Schema.Schema.Type<typeof CommitInput> {}
+
+export const CommitResult = Schema.Struct({
+  commit: Schema.String,
+  files: NonNegativeInt,
+}).annotate({ identifier: "Vcs.CommitResult" })
+export interface CommitResult extends Schema.Schema.Type<typeof CommitResult> {}
+
+export const PushInput = Schema.Struct({ remote: optional(Schema.String) }).annotate({ identifier: "Vcs.PushInput" })
+export interface PushInput extends Schema.Schema.Type<typeof PushInput> {}
+
+/** Where the push went and how many commits it carried, so the rail can say so instead of just succeeding. */
+export const PushResult = Schema.Struct({
+  remote: Schema.String,
+  branch: Schema.String,
+  commits: NonNegativeInt,
+}).annotate({ identifier: "Vcs.PushResult" })
+export interface PushResult extends Schema.Schema.Type<typeof PushResult> {}

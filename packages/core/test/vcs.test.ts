@@ -1362,4 +1362,92 @@ describe("Vcs", () => {
       }),
     ),
   )
+
+  it.live("commits only the paths it was given and leaves a hand-staged change staged", () =>
+    withGit((directory) =>
+      Effect.gen(function* () {
+        yield* Effect.promise(async () => {
+          await fs.writeFile(path.join(directory, "keep.txt"), "keep\n")
+          await commitAll(directory, "initial")
+          await fs.writeFile(path.join(directory, "keep.txt"), "keep edited\n")
+          await fs.writeFile(path.join(directory, "send.txt"), "send\n")
+          await $`git add keep.txt`.cwd(directory).quiet()
+        })
+        const vcs = yield* Vcs.Service
+        const result = yield* vcs.commit({ message: "add send", files: ["send.txt"] })
+        const committed = (
+          yield* Effect.promise(() => $`git show --name-only --format= HEAD`.cwd(directory).text())
+        ).trim()
+        const status = yield* Effect.promise(() => $`git status --porcelain`.cwd(directory).text())
+        expect(result).toEqual({ commit: result.commit, files: 1 })
+        expect(result.commit).toMatch(/^[a-f0-9]{40}$/)
+        expect(committed).toBe("send.txt")
+        expect(status).toContain("M  keep.txt")
+      }),
+    ),
+  )
+
+  it.live("commits a file the index has never seen", () =>
+    withGit((directory) =>
+      Effect.gen(function* () {
+        yield* Effect.promise(async () => {
+          await fs.writeFile(path.join(directory, "root.txt"), "root\n")
+          await commitAll(directory, "initial")
+          await fs.writeFile(path.join(directory, "new.txt"), "new\n")
+        })
+        const vcs = yield* Vcs.Service
+        yield* vcs.commit({ message: "add new", files: ["new.txt"] })
+        const listed = (
+          yield* Effect.promise(() => $`git show --name-only --format= HEAD`.cwd(directory).text())
+        ).trim()
+        expect(listed).toBe("new.txt")
+      }),
+    ),
+  )
+
+  it.live("refuses to commit nothing, or with no message", () =>
+    withGit((directory) =>
+      Effect.gen(function* () {
+        const vcs = yield* Vcs.Service
+        expect(yield* vcs.commit({ message: "x", files: [] }).pipe(Effect.flip)).toMatchObject({
+          message: "Nothing was selected to commit",
+        })
+        expect(yield* vcs.commit({ message: "   ", files: ["a.txt"] }).pipe(Effect.flip)).toMatchObject({
+          message: "The commit message is empty",
+        })
+      }),
+    ),
+  )
+
+  it.live("pushes the checked-out branch and reports what it carried", () =>
+    withGit((directory) =>
+      Effect.gen(function* () {
+        const origin = path.join(directory, "origin.git")
+        yield* Effect.promise(async () => {
+          await $`git init --bare ${origin}`.quiet()
+          await fs.appendFile(path.join(directory, ".git", "info", "exclude"), "origin.git/\n")
+          await $`git remote add origin ${origin}`.cwd(directory).quiet()
+          await fs.writeFile(path.join(directory, "file.txt"), "one\n")
+        })
+        const vcs = yield* Vcs.Service
+        yield* vcs.commit({ message: "one", files: ["file.txt"] })
+        expect(yield* vcs.push()).toEqual({ remote: "origin", branch: "main", commits: 1 })
+        const remote = (yield* Effect.promise(() => $`git rev-list --count main`.cwd(origin).text())).trim()
+        expect(remote).toBe("1")
+      }),
+    ),
+  )
+
+  it.live("says so when there is nowhere to push", () =>
+    withGit((directory) =>
+      Effect.gen(function* () {
+        yield* Effect.promise(async () => {
+          await fs.writeFile(path.join(directory, "file.txt"), "one\n")
+        })
+        const vcs = yield* Vcs.Service
+        yield* vcs.commit({ message: "one", files: ["file.txt"] })
+        expect(yield* vcs.push().pipe(Effect.flip)).toMatchObject({ message: "Push failed: the repository has no remote" })
+      }),
+    ),
+  )
 })

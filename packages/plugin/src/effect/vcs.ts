@@ -24,6 +24,15 @@ export interface VcsDiffInput extends VcsScope {
   readonly untracked?: Vcs.Untracked
 }
 
+export interface VcsCommitInput extends VcsScope {
+  readonly message: string
+  readonly files: readonly string[]
+}
+
+export interface VcsPushInput extends VcsScope {
+  readonly remote?: string
+}
+
 export interface VcsDefinition {
   readonly id: string
   readonly name: string
@@ -33,6 +42,10 @@ export interface VcsDefinition {
   readonly branches: (input: VcsBranchesInput) => Effect.Effect<Vcs.BranchList, unknown>
   readonly status: (input: VcsScope) => Effect.Effect<readonly Vcs.FileStatus[], unknown>
   readonly diff: (input: VcsDiffInput) => Effect.Effect<readonly FileDiff.Info[], unknown>
+  /** Commits only the listed paths. Absent means the provider cannot commit and the route reports that. */
+  readonly commit?: (input: VcsCommitInput) => Effect.Effect<Vcs.CommitResult, unknown>
+  /** Pushes the current branch without forcing. Absent means the provider cannot push. */
+  readonly push?: (input: VcsPushInput) => Effect.Effect<Vcs.PushResult, unknown>
 }
 
 export interface VcsDomain extends Omit<VcsApi<unknown>, "init"> {

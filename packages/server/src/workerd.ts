@@ -103,6 +103,9 @@ const vcsLayer = Layer.succeed(
     branches: () => Effect.succeed([]),
     status: () => Effect.succeed([]),
     diff: () => Effect.succeed([]),
+    // Reads degrade to empty like every other unsupported location; a write says so rather than looking like it worked.
+    commit: () => Effect.fail(new Vcs.OperationError({ message: "Committing is unavailable in the workerd profile" })),
+    push: () => Effect.fail(new Vcs.OperationError({ message: "Pushing is unavailable in the workerd profile" })),
   }),
 )
 

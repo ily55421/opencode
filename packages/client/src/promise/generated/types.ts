@@ -88,7 +88,9 @@ export type SessionStatsToolUsage = {
   durationP50?: number
 }
 
-export type SessionStatsActivity = { date: string; steps: number }
+export type SessionStatsLongestSession = { sessionID: string; duration: number }
+
+export type SessionStatsActivity = { date: string; steps: number; tokens: number }
 
 export type PromptBase64 = string
 
@@ -333,6 +335,10 @@ export type VcsFileStatus = {
 }
 
 export type VcsBranchList = Array<string>
+
+export type VcsCommitResult = { commit: string; files: number }
+
+export type VcsPushResult = { remote: string; branch: string; commits: number }
 
 export type WebSearchID = string
 
@@ -2162,11 +2168,14 @@ export type SessionStatsInfo = {
   subagents: number
   prompts: number
   steps: number
+  messages: number
   tokens: TokenUsageInfo
   cost: MoneyUSD
   tools: SessionStatsTools
   activeDays: number
   streak: number
+  currentStreak: number
+  longestSession?: SessionStatsLongestSession
   activity: Array<SessionStatsActivity>
   models: Array<SessionStatsModelUsage>
 }
@@ -3094,6 +3103,14 @@ export type VcsInitNotSupportedError = {
 }
 export const isVcsInitNotSupportedError = (value: unknown): value is VcsInitNotSupportedError =>
   typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "VcsInitNotSupportedError"
+
+export type VcsOperationError = {
+  readonly _tag: "VcsOperationError"
+  readonly message: string
+  readonly operation: "commit" | "push"
+}
+export const isVcsOperationError = (value: unknown): value is VcsOperationError =>
+  typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "VcsOperationError"
 
 export type ServerInfoOutput = ServerInfo
 
@@ -4469,6 +4486,21 @@ export type VcsDiffInput = {
 }
 
 export type VcsDiffOutput = { location: LocationPublicRef; data: Array<FileDiffInfo> }
+
+export type VcsCommitInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly message: string
+  readonly files: ReadonlyArray<string>
+}
+
+export type VcsCommitOutput = { location: LocationPublicRef; data: VcsCommitResult }
+
+export type VcsPushInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly remote?: string | undefined
+}
+
+export type VcsPushOutput = { location: LocationPublicRef; data: VcsPushResult }
 
 export type DebugHeapDumpInput = { readonly directory?: string | undefined }
 

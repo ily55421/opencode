@@ -532,6 +532,8 @@ export function fromPromise(plugin: Plugin) {
             },
             status: adaptApiMethod(VcsEndpoints["vcs.status"], host.vcs.status),
             diff: adaptApiMethod(VcsEndpoints["vcs.diff"], host.vcs.diff),
+            commit: adaptApiMethod(VcsEndpoints["vcs.commit"], host.vcs.commit),
+            push: adaptApiMethod(VcsEndpoints["vcs.push"], host.vcs.push),
             reload: () => run(host.vcs.reload()),
             transform: (callback) =>
               register(

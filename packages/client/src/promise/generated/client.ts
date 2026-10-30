@@ -275,6 +275,10 @@ import type {
   VcsBranchListOutput,
   VcsDiffInput,
   VcsDiffOutput,
+  VcsCommitInput,
+  VcsCommitOutput,
+  VcsPushInput,
+  VcsPushOutput,
   DebugHeapDumpInput,
   DebugHeapDumpOutput,
   DebugLocationListOutput,
@@ -2313,6 +2317,32 @@ export function make(options: ClientOptions) {
             },
             successStatus: 200,
             declaredStatuses: [400, 401, 404, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      commit: (input: VcsCommitInput, requestOptions?: RequestOptions) =>
+        request<VcsCommitOutput>(
+          {
+            method: "POST",
+            path: `/api/vcs/commit`,
+            query: { location: input["location"] },
+            body: { message: input["message"], files: input["files"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 500],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      push: (input?: VcsPushInput, requestOptions?: RequestOptions) =>
+        request<VcsPushOutput>(
+          {
+            method: "POST",
+            path: `/api/vcs/push`,
+            query: { location: input?.["location"] },
+            body: { remote: input?.["remote"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 500],
             empty: false,
           },
           requestOptions,

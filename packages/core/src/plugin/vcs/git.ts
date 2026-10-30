@@ -8,11 +8,11 @@ import { define } from "@opencode/plugin/effect/plugin"
 import { Effect } from "effect"
 import { ChildProcess } from "effect/process"
 import { FileDiff } from "@opencode/schema/file-diff"
-import { Base, BranchList, FileStatus, Info, Mode } from "@opencode/schema/vcs"
+import { Base, BranchList, CommitResult, FileStatus, Info, Mode, PushResult } from "@opencode/schema/vcs"
 import { AppProcess } from "@opencode/util/process"
 import { Location } from "../../location.js"
-import type { Adapter, BranchOptions, DiffOptions, Untracked } from "../../vcs.js"
-import { DiffError } from "../../vcs.js"
+import type { Adapter, BranchOptions, CommitOptions, DiffOptions, PushOptions, Untracked } from "../../vcs.js"
+import { DiffError, OperationError } from "../../vcs.js"
 import { gitExecutable } from "../../util/git-executable.js"
 import {
   chunksByFile,
@@ -54,6 +54,8 @@ export const Plugin = define({
         status: () => adapter.status(),
         diff: (input) =>
           adapter.diff(input.mode, { context: input.context, base: input.base, untracked: input.untracked }),
+        commit: (input) => adapter.commit({ message: input.message, files: input.files }),
+        push: (input) => adapter.push({ remote: input.remote }),
       })
     })
   }),
@@ -130,6 +132,14 @@ function make(proc: AppProcess.Interface, input: { directory: string; worktree: 
         })
       }
       return yield* diffAgainstRef(ctx, ref, { ...options, target: mode === "committed" ? "HEAD" : undefined })
+    }),
+    // Commits and pushes run from the worktree root: the paths arrive worktree-relative, and a nested
+    // directory would otherwise scope the commit to itself.
+    commit: Effect.fn("VcsGit.commit")(function* (options: CommitOptions) {
+      return yield* ctx.git.commit(ctx.worktree, options.files, options.message)
+    }),
+    push: Effect.fn("VcsGit.push")(function* (options?: PushOptions) {
+      return yield* ctx.git.push(ctx.worktree, options?.remote)
     }),
   } satisfies Adapter
 }
@@ -239,6 +249,25 @@ function makeGit(proc: AppProcess.Interface, env?: Record<string, string>) {
       .split(/\r?\n/)
       .map((item) => item.trim())
       .filter(Boolean)
+  })
+
+  /**
+   * Writes need the exit code and Git's own words, which `run` deliberately throws away. A spawn failure
+   * still has to come back as a result, so callers only ever report through OperationError.
+   */
+  const strict = Effect.fnUntraced(function* (args: string[], opts: { cwd: string }) {
+    const result = yield* proc
+      .run(
+        ChildProcess.make(gitExecutable(), [...cfg, ...args], {
+          cwd: opts.cwd,
+          env,
+          extendEnv: true,
+          stdin: "ignore",
+        }),
+      )
+      .pipe(Effect.catchCause(() => Effect.succeed(undefined)))
+    if (!result) return { exitCode: 1, out: "", err: "git could not be started" }
+    return { exitCode: result.exitCode, out: result.stdout.toString("utf8"), err: result.stderr.toString("utf8") }
   })
 
   const configured = Effect.fnUntraced(function* (cwd: string, list: string[]) {
@@ -512,6 +541,43 @@ function makeGit(proc: AppProcess.Interface, env?: Record<string, string>) {
     )
   })
 
+  /** The last lines of Git's complaint, which is what a person needs to see when a hook refuses a commit. */
+  const refused = (operation: string, detail: string) =>
+    new OperationError({
+      message: `${operation} failed: ${detail.split(/\r?\n/).filter(Boolean).slice(-4).join(" · ") || "git reported nothing"}`,
+    })
+
+  const ahead = Effect.fn("VcsGit.ahead")(function* (cwd: string, ref: string) {
+    const known = yield* strict(["rev-parse", "--verify", "--end-of-options", `${ref}^{commit}`], { cwd })
+    const list = yield* strict(["rev-list", "--count", known.exitCode === 0 ? `${ref}..HEAD` : "HEAD"], { cwd })
+    if (list.exitCode !== 0) return 0
+    return Number.parseInt(list.out.trim(), 10) || 0
+  })
+
+  const commit = Effect.fn("VcsGit.commitPaths")(function* (cwd: string, files: readonly string[], message: string) {
+    // `--only` keeps the commit to these paths, so a change someone staged by hand earlier stays staged rather
+    // than riding along. Untracked paths must be known to the index first, which is what --intent-to-add does;
+    // it errors on already-deleted paths, and the commit below is what decides.
+    yield* strict(["add", "--intent-to-add", "--", ...files], { cwd })
+    const result = yield* strict(["commit", "--only", "-m", message, "--", ...files], { cwd })
+    if (result.exitCode !== 0) return yield* refused("Commit", result.err || result.out)
+    const head = yield* strict(["rev-parse", "HEAD"], { cwd })
+    if (head.exitCode !== 0) return yield* refused("Commit", head.err)
+    return { commit: head.out.trim(), files: files.length } satisfies CommitResult
+  })
+
+  const push = Effect.fn("VcsGit.pushBranch")(function* (cwd: string, remote?: string) {
+    const current = yield* branch(cwd)
+    if (!current) return yield* new OperationError({ message: "Push failed: the repository is not on a branch" })
+    const target = remote ?? (yield* primary(cwd))
+    if (!target) return yield* new OperationError({ message: "Push failed: the repository has no remote" })
+    const commits = yield* ahead(cwd, `${target}/${current}`)
+    // An explicit refspec and never --force: a rejected push says why, and the person decides what to do about it.
+    const result = yield* strict(["push", target, `HEAD:refs/heads/${current}`], { cwd })
+    if (result.exitCode !== 0) return yield* refused("Push", result.err || result.out)
+    return { remote: target, branch: current, commits } satisfies PushResult
+  })
+
   const worktreeStats = Effect.fn("VcsGit.worktreeStats")(function* (cwd: string) {
     return numstat(yield* text(["diff", "--no-ext-diff", "--no-renames", "--numstat", "-z"], { cwd }))
   })
@@ -539,6 +605,8 @@ function makeGit(proc: AppProcess.Interface, env?: Record<string, string>) {
     patchUntracked,
     statUntracked,
     intentToAdd,
+    commit,
+    push,
     worktreeStats,
     worktreePatch,
   }

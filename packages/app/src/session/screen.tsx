@@ -20,7 +20,7 @@ import { MessageTimeline } from "@/session/timeline/message-timeline"
 import { ComposerDropzone } from "@/composer/dropzone"
 import { useSettings } from "@/settings/model"
 import type { SessionModel } from "@/session/model"
-import { SESSION_PANEL_WIDTH_MIN } from "@/session/session-panel-width"
+import { SESSION_PANEL_WIDTH_MIN, SESSION_RAIL_WIDTH } from "@/session/session-panel-width"
 import { SessionPanelFrame } from "@/session/session-frame"
 import { PluginLinks } from "@/runtime/plugin/render"
 import { createPanelSidebar, createRegion, MobilePanel } from "@/runtime/plugin/panels"
@@ -30,6 +30,7 @@ import { createMountedSession } from "@/runtime/plugin/mounted-session"
 import { useUsageExceededDialogs } from "./usage-exceeded-dialogs"
 import { SessionErrorFallback } from "./route-error"
 import { createSessionScreenLayout } from "./screen-layout"
+import { SessionRail } from "./rail/session-rail"
 import { PaneTabs, SideRegion } from "@/runtime/plugin/side-region"
 import { createPaneDrag } from "@/runtime/plugin/pane-drag"
 import { useLanguage } from "@/runtime/i18n/language"
@@ -118,6 +119,14 @@ function SessionScreenContent(props: {
       }),
   })
 
+  // The rail is the right-hand pane whenever the side panel is not open, so the chat panel reserves its column.
+  const railShown = createMemo(
+    () =>
+      isDesktop() &&
+      !!session.identity.params.id &&
+      settings.appearance.sessionRail() &&
+      !session.layout.view().side.opened(),
+  )
   const screen = createSessionScreenLayout(session, { wide: region.wide })
 
   const timeline = createSessionTimelineInteraction(session)
@@ -154,6 +163,10 @@ function SessionScreenContent(props: {
 
   // The chat keeps its open width as the far end of a close's travel.
   const chatOpenWidth = createMemo<string>((previous) => (sideVisible() ? screen.panel.width() : previous), "100%")
+  /** With no side panel the chat fills the row, minus the gap and the rail that shares it. */
+  const chatIdleWidth = createMemo(() =>
+    railShown() ? `calc(100% - ${SESSION_RAIL_WIDTH + 8}px)` : "100%",
+  )
   let chat: HTMLDivElement | undefined
   let sidePresence: HTMLDivElement | undefined
 
@@ -183,7 +196,7 @@ function SessionScreenContent(props: {
       const open = chatOpenWidth()
 
       if (closed === 1) {
-        chat.style.width = "100%"
+        chat.style.width = chatIdleWidth()
 
         return
       }
@@ -192,6 +205,15 @@ function SessionScreenContent(props: {
     },
     element: () => sidePresence,
     distance: screen.side.width,
+  })
+
+  // The motion controller only paints while a close travels, so a rail that appears or disappears with the
+  // setting, or on first mount, has to reserve its column here instead.
+  createEffect(() => {
+    const width = chatIdleWidth()
+
+    if (!chat || session.layout.view().side.opened()) return
+    chat.style.width = width
   })
 
   const hideTimelineScrollbar = () => setStore("timelineScrollbarHidden", true)
@@ -536,6 +558,11 @@ function SessionScreenContent(props: {
                 </div>
               </div>
             </div>
+          </Show>
+
+          {/* The rail yields its column to the side panel rather than competing with it for width. */}
+          <Show when={messagesReady() && railShown()}>
+            <SessionRail session={session} />
           </Show>
         </div>
 

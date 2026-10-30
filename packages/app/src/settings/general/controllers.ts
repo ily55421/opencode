@@ -102,6 +102,10 @@ export function createAppearanceSettingsController() {
       current: settings.appearance.reduceMotion,
       select: (value: ReduceMotion) => settings.appearance.setReduceMotion(value),
     },
+    sessionRail: {
+      current: settings.appearance.sessionRail,
+      select: (value: boolean) => settings.appearance.setSessionRail(value),
+    },
     fonts: {
       ui: createMemo(() => ({
         value: sansInput(settings.appearance.uiFont()),

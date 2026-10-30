@@ -4,7 +4,10 @@ Release notes for OpenCode V2, newest first.
 
 ## Unreleased
 
-- The desktop app no longer lists session tabs across the top of the window. The workspaces rail already groups sessions by project directory, so it is now the one place a session is switched, and the two switchers no longer show the same sessions twice. Its rows took over what the top strip carried: close on hover, rename in place, the delete confirmation, and the busy and unread marks. `Ctrl+Tab`, `Ctrl+Shift+Tab`, `Alt+up / Alt+down`, the unseen variants and `Cmd+1..9` still cycle sessions with no strip on screen. Settings → General → Interface names that mode **Workspaces** ("Sessions grouped by folder in the sidebar"); Side tabs and Inbox are unchanged.
+- The desktop session view keeps a right-hand rail with the session's changed files and line counts, its branch and uncommitted count, the skills and MCP servers it used, and the pages it consulted.
+- New routes `POST /api/vcs/commit` and `POST /api/vcs/push` back the rail's two actions. A commit takes exactly the paths it is given (`git commit --only`), runs hooks, and returns the new commit; a push sends the checked-out branch with an explicit refspec and never forces. `bun run generate` was rerun in `packages/client`.
+- The desktop app no longer lists session tabs across the top of the window. The workspaces rail already groups sessions by project directory, so it is now the one place a session is switched, and the two switchers no longer show the same sessions twice. Its rows took over what the top strip carried: close on hover, rename in place, the delete confirmation, and the busy and unread marks. `Ctrl+Tab`, `Ctrl+Shift+Tab`, `Alt+↑ / Alt+↓`, the unseen variants and `Cmd+1..9` still cycle sessions with no strip on screen. Settings → General → Interface names that mode **Workspaces** ("Sessions grouped by folder in the sidebar"); Side tabs and Inbox are unchanged.
+
 
 ## v2.2.0 — 2026-10-27
 

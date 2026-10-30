@@ -146,6 +146,9 @@ const appearanceSchema = Persistence.struct({
   // "inbox" is experimental: the vertical layout with a server-wide session inbox in place of tabs.
   tabLayout: Schema.Literals(["horizontal", "vertical", "inbox"]),
   sidebarOpen: Persistence.optional(Schema.Boolean),
+  // The always-visible right column. Absent means shown, because it is the only place the session's outputs,
+  // skills and commit controls live; the side panel takes its space while it is open.
+  sessionRail: Persistence.optional(Schema.Boolean),
   reduceMotion: Schema.Literals(["system", "on", "off"]),
 })
 
@@ -467,6 +470,10 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         sidebarOpen: withFallback(() => store.appearance?.sidebarOpen, true),
         setSidebarOpen(value: boolean) {
           setStore("appearance", "sidebarOpen", value)
+        },
+        sessionRail: withFallback(() => store.appearance?.sessionRail, true),
+        setSessionRail(value: boolean) {
+          setStore("appearance", "sessionRail", value)
         },
         reduceMotion,
         setReduceMotion(value: ReduceMotion) {

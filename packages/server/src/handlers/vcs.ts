@@ -6,7 +6,7 @@ import { Plugin } from "@opencode/core/plugin"
 import { Location } from "@opencode/core/location"
 import { LocationServiceMap } from "@opencode/core/location-services"
 import { ConflictError, InvalidRequestError, ServiceUnavailableError } from "@opencode/protocol/errors"
-import { VcsInitNotSupportedError } from "@opencode/protocol/groups/vcs"
+import { VcsInitNotSupportedError, VcsOperationError } from "@opencode/protocol/groups/vcs"
 import { Effect } from "effect"
 import { HttpApiBuilder, HttpApiSchema } from "effect/http-api"
 import { Api } from "../api"
@@ -99,6 +99,35 @@ export const VcsHandler = HttpApiBuilder.group(Api, "server.vcs", (handlers) =>
                 untracked: ctx.query.untracked,
               })
               .pipe(Effect.mapError((error) => new ServiceUnavailableError({ service: "vcs", message: error.message })))
+          }),
+        ),
+      )
+      .handle("vcs.commit", (ctx) =>
+        response(
+          Effect.gen(function* () {
+            const message = ctx.payload.message.trim()
+            const files = ctx.payload.files.filter((file) => file.trim() !== "")
+            if (message === "") return yield* new InvalidRequestError({ message: "A commit message is required", field: "message" })
+            if (files.length === 0)
+              return yield* new InvalidRequestError({ message: "Select at least one file to commit", field: "files" })
+            const vcs = yield* Vcs.Service
+            return yield* vcs
+              .commit({ message, files })
+              .pipe(
+                Effect.mapError(
+                  (error) => new VcsOperationError({ operation: "commit", message: error.message }),
+                ),
+              )
+          }),
+        ),
+      )
+      .handle("vcs.push", (ctx) =>
+        response(
+          Effect.gen(function* () {
+            const vcs = yield* Vcs.Service
+            return yield* vcs
+              .push({ remote: ctx.payload.remote })
+              .pipe(Effect.mapError((error) => new VcsOperationError({ operation: "push", message: error.message })))
           }),
         ),
       )

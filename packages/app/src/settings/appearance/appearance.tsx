@@ -1,5 +1,6 @@
 import { Component, Show } from "solid-js"
 import { Select } from "@opencode/ui/select"
+import { Switch } from "@opencode/ui/switch"
 import { TextInput } from "@opencode/ui/text-input"
 import { useLanguage } from "@/runtime/i18n/language"
 import { ExternalLink } from "@/runtime/platform/external-link"
@@ -166,6 +167,17 @@ export const SettingsAppearance: Component = () => {
                 value={(option) => option.value}
                 label={(option) => language.t(option.label)}
                 onSelect={(option) => option && appearance.reduceMotion.select(option.value)}
+              />
+            </SettingsRow>
+
+            <SettingsRow
+              title={language.t("settings.appearance.row.sessionRail.title")}
+              description={language.t("settings.appearance.row.sessionRail.description")}
+            >
+              <Switch
+                data-action="settings-session-rail"
+                checked={appearance.sessionRail.current()}
+                onChange={appearance.sessionRail.select}
               />
             </SettingsRow>
           </SettingsList>
