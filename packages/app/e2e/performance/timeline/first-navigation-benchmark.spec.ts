@@ -26,7 +26,7 @@ benchmark.describe("performance: first navigation paint", () => {
       destinationSelector: messageSelector(fixture.expected.targetMessageIDs.at(-1)!),
       contentSelector,
       navigate: async () => {
-        await page.locator(`[data-slot="titlebar-tabs"] a[href="${href}"]`).first().click()
+        await page.locator(`[data-slot="vertical-tabs-sidebar"] a[href="${href}"]`).first().click()
         await expectSessionTitle(page, fixture.expected.targetTitle)
       },
     })
@@ -47,7 +47,7 @@ benchmark.describe("performance: first navigation paint", () => {
       destinationSelector: '[data-component="composer-editor"]',
       contentSelector,
       navigate: async () => {
-        await page.locator(`[data-slot="titlebar-tabs"] a[href="${href}"]`).first().click()
+        await page.locator(`[data-slot="vertical-tabs-sidebar"] a[href="${href}"]`).first().click()
         await expect(page.locator('[data-component="composer-editor"]')).toBeVisible()
       },
     })
@@ -64,13 +64,13 @@ benchmark.describe("performance: first navigation paint", () => {
     await page.goto("/")
 
     const draftLink = draftHref(draftID)
-    const draftTab = page.locator(`[data-slot="titlebar-tabs"] a[href="${draftLink}"]`)
+    const draftTab = page.locator(`[data-slot="vertical-tabs-sidebar"] a[href="${draftLink}"]`)
     await expect(draftTab).toHaveCount(1)
     await draftTab.click()
     await expect(page.locator('[data-component="new-session"]')).toBeVisible()
 
     const href = sessionHref(fixture.targetID)
-    const sessionTab = page.locator(`[data-slot="titlebar-tabs"] a[href="${href}"]`)
+    const sessionTab = page.locator(`[data-slot="vertical-tabs-sidebar"] a[href="${href}"]`)
     await expect(sessionTab).toHaveCount(1)
 
     const result = await measureFirstNavigation(page, {

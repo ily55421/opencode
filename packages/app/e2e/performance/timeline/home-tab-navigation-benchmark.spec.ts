@@ -26,7 +26,7 @@ benchmark.describe("performance: home and tab navigation", () => {
       triggerSelector: homeRow,
       milestones: {
         content: { selector: messageSelector(fixture.expected.targetMessageIDs.at(-1)!) },
-        tab: { selector: `[data-slot="titlebar-tabs"] a[href="${href}"]` },
+        tab: { selector: `[data-slot="vertical-tabs-sidebar"] a[href="${href}"]` },
       },
       navigate: async () => {
         await row.click()
@@ -35,7 +35,7 @@ benchmark.describe("performance: home and tab navigation", () => {
     })
 
     report(result)
-    await expect(page.locator(`[data-slot="titlebar-tabs"] a[href="${href}"]`)).toContainText(
+    await expect(page.locator(`[data-slot="vertical-tabs-sidebar"] a[href="${href}"]`)).toContainText(
       fixture.expected.targetTitle,
     )
   })
@@ -97,16 +97,16 @@ benchmark.describe("performance: home and tab navigation", () => {
     await page.goto(href)
     await expectSessionTitle(page, fixture.expected.sourceTitle)
     await waitForStableTimeline(page, fixture.expected.sourceMessageIDs.at(-1)!)
-    const tab = page.locator(`[data-slot="titlebar-tabs"] a[href="${href}"]`).first()
+    const tab = page.locator(`[data-slot="vertical-tabs-sidebar"] a[href="${href}"]`).first()
     const close = tab.locator("..").locator('[data-component="icon-button-v2"]')
     await expect(close).toBeVisible()
 
     const result = await measureNavigationMilestones(page, {
-      triggerSelector: '[data-slot="titlebar-tabs"] [data-component="icon-button-v2"]',
+      triggerSelector: '[data-slot="vertical-tabs-sidebar"] [data-component="icon-button-v2"]',
       milestones: {
         home: { selector: homeShell },
         row: { selector: homeRow },
-        tabRemoved: { selector: `[data-slot="titlebar-tabs"] a[href="${href}"]`, visible: false },
+        tabRemoved: { selector: `[data-slot="vertical-tabs-sidebar"] a[href="${href}"]`, visible: false },
       },
       navigate: async () => {
         await close.click()

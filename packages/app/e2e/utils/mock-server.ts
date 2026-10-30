@@ -1343,6 +1343,8 @@ function mockHandlers(
               (item) => Predicate.isObject(item) && item.sessionID === ctx.params.sessionID,
             ),
           })),
+        // The session rail lists a turn's changed files. Tests that do not stage a diff see an empty rail.
+        sessionDiff: () => Effect.sync(() => ({ data: [] })),
         sessionPrompt: (ctx) =>
           Effect.sync(() => {
             const body = Option.getOrElse(decodeJsonObject(ctx.payload), () => ({}))

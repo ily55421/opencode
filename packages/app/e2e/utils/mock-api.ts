@@ -352,6 +352,12 @@ const Group = HttpApiGroup.make("mock")
     }),
   )
   .add(
+    HttpApiEndpoint.get("sessionDiff", "/api/session/:sessionID/diff", {
+      params: SessionParams,
+      success: Json,
+    }),
+  )
+  .add(
     HttpApiEndpoint.post("sessionPrompt", "/api/session/:sessionID/prompt", {
       params: SessionParams,
       payload: JsonPayload,

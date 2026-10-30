@@ -241,7 +241,8 @@ test("the browser title names the open session and resets after leaving it", asy
   await expect(page).toHaveTitle("OpenCode")
 })
 
-for (const tabLayout of ["horizontal", "vertical"] as const) {
+// The default layout puts sessions in the workspaces rail, so the strip is only ever mounted on the side.
+for (const tabLayout of ["vertical"] as const) {
   test(`a ${tabLayout} tab can be renamed again while its previous rename is still saving`, async ({ page }) => {
     await mockWorkspace(page, { name: "Tabs", sessions: [a, b], seed: { settings: { appearance: { tabLayout } } } })
     await page.goto(sessionHref(a.id))
@@ -278,7 +279,8 @@ for (const tabLayout of ["horizontal", "vertical"] as const) {
   })
 }
 
-for (const tabLayout of ["horizontal", "vertical"] as const) {
+// The default layout puts sessions in the workspaces rail, so the strip is only ever mounted on the side.
+for (const tabLayout of ["vertical"] as const) {
   test(`a ${tabLayout} tab deletes its session after confirmation`, async ({ page }) => {
     await mockWorkspace(page, { name: "Tabs", sessions: [a, b], seed: { settings: { appearance: { tabLayout } } } })
     await page.goto(sessionHref(a.id))
@@ -355,25 +357,26 @@ test("option arrows move to the previous or next tab, and with shift to the next
   await expectPath(page, sessionHref(c.id))
 })
 
-for (const navigation of ["horizontal", "vertical", "keyboard"] as const) {
-  test(`switching session tabs restores the caret and pastes into the destination draft (${navigation})`, async ({
+// Three ways to leave a session and come back: the side strip, the workspaces rail, and the tab shortcut keys.
+for (const navigation of ["strip", "rail", "keyboard"] as const) {
+  test(`switching sessions restores the caret and pastes into the destination draft (${navigation})`, async ({
     page,
     context,
   }) => {
-    const tabLayout = navigation === "vertical" ? "vertical" : "horizontal"
-
-    const strip = page.locator(
-      tabLayout === "vertical" ? '[data-slot="vertical-tabs-sidebar"]' : '[data-slot="titlebar-tabs"]',
-    )
-
     await context.grantPermissions(["clipboard-read", "clipboard-write"])
     await openSession(page, {
       name: "TabFocus",
       sessions: [a, b],
-      seed: { settings: { appearance: { tabLayout } } },
+      seed: { settings: { appearance: { tabLayout: navigation === "strip" ? "vertical" : "horizontal" } } },
     })
     const editor = page.locator('[data-component="composer-editor"]')
-    const tabB = strip.locator(`[data-titlebar-tab-link][href="${sessionHref(b.id)}"]`)
+    const tabB =
+      navigation === "strip"
+        ? page.locator(`[data-slot="vertical-tabs-sidebar"] [data-titlebar-tab-link][href="${sessionHref(b.id)}"]`)
+        : page
+            .locator(`[data-slot="workspace-session-row"][data-session-id="${b.id}"]`)
+            .getByRole("button", { name: b.title, exact: true })
+
     await editor.fill("Draft A")
 
     await (navigation === "keyboard" ? page.keyboard.press("Control+Alt+ArrowRight") : tabB.click())
@@ -467,44 +470,6 @@ for (const row of [
     })
   })
 }
-
-test("icon-only inactive tabs retain their avatar and attention badge instead of showing a close overlay", async ({
-  page,
-}) => {
-  await mockWorkspace(page, {
-    name: "CompactTabs",
-    sessions: [
-      a,
-      b,
-      ...Array.from({ length: 30 }, (_, index) => ({ id: `ses_compact_${index}`, title: `Compact ${index}` })),
-    ],
-    sessionPermissions: {
-      [b.id]: [
-        {
-          id: "permission-compact-b",
-          sessionID: b.id,
-          action: "shell",
-          resources: ["git status"],
-          metadata: {},
-          save: [],
-        },
-      ],
-    },
-  })
-  await page.goto(sessionHref(a.id))
-  const tabB = page.locator(`[data-titlebar-tab-slot]:has(a[href="${sessionHref(b.id)}"])`)
-  await expect(tabB.locator('[data-slot="tab-title"]')).toBeHidden()
-  await expect(tabB.locator('[data-component="project-avatar-v2"]')).toBeVisible()
-  await expect(tabB.locator('[data-slot="tab-avatar-unread-dot"]')).toBeVisible()
-  await expect(tabB.locator('[data-slot="tab-avatar-unread-dot"]')).toHaveCSS("width", "6px")
-  await expect(tabB.locator('[data-slot="tab-avatar-unread-dot"]')).toHaveCSS("height", "6px")
-  await expect(tabB.locator('[data-slot="tab-close"]')).toBeHidden()
-  await tabB.hover()
-  await expect(tabB.locator('[data-slot="tab-close"]')).toBeHidden()
-  await tabB.locator("[data-titlebar-tab-link]").click()
-  await expectPath(page, sessionHref(b.id))
-  await expect(tabB.locator('[data-slot="tab-avatar-unread-dot"]')).toHaveCount(0)
-})
 
 test("vertical tabs resize, scroll, show shortcut hints, and navigate", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 480 })
@@ -1020,7 +985,9 @@ test("inactive tabs load attention and inbox, but read the transcript only on se
   await expectPath(page, sessionHref(fixture.sourceID))
 
   state.text = "Latest fixture answer after tab restoration"
-  await page.locator(`[data-slot="titlebar-tabs"] a[href="${sessionHref(fixture.targetID)}"]`).click()
+  await page
+    .locator(`[data-titlebar-tab-slot]:has(a[href="${sessionHref(fixture.targetID)}"]) [data-titlebar-tab-link]`)
+    .click()
   await expectSessionTitle(page, fixture.expected.targetTitle)
   await expect(page.locator(`[data-timeline-part-id="msg_${fixture.targetID}_assistant:text:0"]`)).toContainText(
     state.text,

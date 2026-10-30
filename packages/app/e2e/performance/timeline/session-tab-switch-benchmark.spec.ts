@@ -126,7 +126,7 @@ async function expectReadyTimeline(page: Page, sessionID: string) {
 }
 
 async function switchSession(page: Page, sessionID: string, title: string) {
-  const tab = page.locator(`[data-slot="titlebar-tabs"] a[href="${sessionHref(sessionID)}"]`)
+  const tab = page.locator(`[data-slot="vertical-tabs-sidebar"] a[href="${sessionHref(sessionID)}"]`)
   await expect(tab).toHaveCount(1)
   await tab.click()
   await expectSessionTitle(page, title)

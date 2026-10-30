@@ -61,9 +61,9 @@ test.describe("timeline history", () => {
     await expect.poll(() => requests).toEqual([undefined, "older"])
     await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(200)
 
-    await page.locator(`[data-slot="titlebar-tabs"] a[href="${sessionHref(other)}"]`).click()
+    await page.locator(`[data-slot="vertical-tabs-sidebar"] a[href="${sessionHref(other)}"]`).click()
     await expect(page.getByText("Other session", { exact: true })).toBeVisible()
-    await page.locator(`[data-slot="titlebar-tabs"] a[href="${sessionHref(id)}"]`).click()
+    await page.locator(`[data-slot="vertical-tabs-sidebar"] a[href="${sessionHref(id)}"]`).click()
     await expect(page.locator("[data-timeline-virtual-content]")).toHaveCSS("visibility", "visible")
     // Exhaust the delayed leading-turn enrichment without a real-time sleep.
     await page.clock.runFor(1_000)

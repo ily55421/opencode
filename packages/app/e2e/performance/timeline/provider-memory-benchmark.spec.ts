@@ -60,7 +60,7 @@ benchmark("measures retained renderer memory with a large model catalog", async 
     if (index > 0) {
       const target = index % 2 === 1
       const id = target ? fixture.targetID : fixture.sourceID
-      await page.locator(`[data-slot="titlebar-tabs"] a[href="${sessionHref(id)}"]`).click()
+      await page.locator(`[data-slot="vertical-tabs-sidebar"] a[href="${sessionHref(id)}"]`).click()
       await expectSessionTitle(page, target ? fixture.expected.targetTitle : fixture.expected.sourceTitle)
       await waitForStableTimeline(
         page,

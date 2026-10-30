@@ -6,7 +6,7 @@ import { reviewTabs } from "../utils/side-panel"
 import { expectSessionTitle } from "../utils/waits"
 import { mockRemoteServer, mockWorkspace, openSession } from "../utils/workspace"
 
-const tabs = (page: Page) => page.locator('[data-slot="titlebar-tabs"] a')
+const tabs = (page: Page) => page.locator('[data-slot="vertical-tabs-sidebar"] a')
 
 for (const direction of ["ltr", "rtl"] as const) {
   test(`session header groups controls and exposes session details in ${direction}`, async ({ page }) => {

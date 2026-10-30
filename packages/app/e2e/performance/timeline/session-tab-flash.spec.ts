@@ -24,7 +24,7 @@ benchmark("samples cached session repaint after the click", async ({ page, repor
   await expectSessionTitle(page, fixture.expected.targetTitle)
   await waitForStableTimeline(page, fixture.expected.targetMessageIDs.at(-1)!)
   await page
-    .locator(`[data-slot="titlebar-tabs"] a[href="${sessionHref(fixture.sourceID)}"]`)
+    .locator(`[data-slot="vertical-tabs-sidebar"] a[href="${sessionHref(fixture.sourceID)}"]`)
     .first()
     .click()
   await expectSessionTitle(page, fixture.expected.sourceTitle)
@@ -39,7 +39,7 @@ benchmark("samples cached session repaint after the click", async ({ page, repor
   })
 
   await page
-    .locator(`[data-slot="titlebar-tabs"] a[href="${sessionHref(fixture.targetID)}"]`)
+    .locator(`[data-slot="vertical-tabs-sidebar"] a[href="${sessionHref(fixture.targetID)}"]`)
     .first()
     .click()
   await Promise.all([expectSessionTitle(page, fixture.expected.targetTitle), waitForCachedRepaintWindow(page, 1_000)])

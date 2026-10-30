@@ -172,7 +172,7 @@ for (const mode of ["compact", "ungrouped"] as const) {
         requireBottomAnchor: true,
         href: sessionHref(session.info.id),
         switch: async () => {
-          await page.locator(`[data-slot="titlebar-tabs"] a[href="${sessionHref(session.info.id)}"]`).click()
+          await page.locator(`[data-slot="vertical-tabs-sidebar"] a[href="${sessionHref(session.info.id)}"]`).click()
         },
       })
 
@@ -216,7 +216,7 @@ for (const mode of ["compact", "ungrouped"] as const) {
         break
       }
 
-      await page.locator(`[data-slot="titlebar-tabs"] a[href="${sessionHref(sourceID)}"]`).click()
+      await page.locator(`[data-slot="vertical-tabs-sidebar"] a[href="${sessionHref(sourceID)}"]`).click()
       await expectSessionTitle(page, "Benchmark source")
       await expect(page.locator('[data-slot="user-message-text"]')).toHaveText("Benchmark source")
       await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toBeEditable()

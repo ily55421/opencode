@@ -145,7 +145,7 @@ for (const close of [false, true]) {
         requiredPartID: `${pages[target.id].at(-1)!.id}:text:0`,
         href: sessionHref(target.id),
         switch: async () => {
-          await page.locator(`[data-slot="titlebar-tabs"] a[href="${sessionHref(target.id)}"]`).click()
+          await page.locator(`[data-slot="vertical-tabs-sidebar"] a[href="${sessionHref(target.id)}"]`).click()
           await expectSessionTitle(page, target.title)
         },
       })

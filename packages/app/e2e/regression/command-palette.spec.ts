@@ -481,7 +481,7 @@ test("navigation replaces commands without retaining disposed owners", async ({ 
   await page.locator('[data-slot="mobile-tabs-trigger"]').click()
   await expect(page.locator('[data-slot="mobile-tabs-drawer"] [data-titlebar-tab-link]')).toHaveCount(4)
   await page.setViewportSize({ width: 1280, height: 800 })
-  await expect(page.locator('[data-slot="titlebar-tabs"] [data-titlebar-tab-link]')).toHaveCount(4)
+  await expect(page.locator('[data-slot="vertical-tabs-sidebar"] [data-titlebar-tab-link]')).toHaveCount(4)
   const active = new URL(page.url())
   const closing = page.locator(`[data-titlebar-tab-link][href="${active.pathname}${active.search}"]`)
   await expect(closing).toHaveCount(1)
