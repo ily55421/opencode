@@ -5,7 +5,7 @@ import { Cause, Context, Effect, FiberSet, Layer, Schema, Semaphore, Stream } fr
 import type { VcsDefinition, VcsEditor } from "@opencode/plugin/effect/vcs"
 import { FileDiff } from "@opencode/schema/file-diff"
 import { FileSystem } from "@opencode/schema/filesystem"
-import { Base, BranchList, FileStatus, Info, Mode, Untracked } from "@opencode/schema/vcs"
+import { Base, BranchList, CommitResult, FileStatus, Info, Mode, PushResult, Untracked } from "@opencode/schema/vcs"
 import { VcsEvent } from "@opencode/schema/vcs-event"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { FSUtil } from "@opencode/util/fs-util"
@@ -15,9 +15,14 @@ import { Bus } from "./bus.js"
 import { State } from "./state.js"
 import { emptyPatch, MAX_TOTAL_PATCH_BYTES, PATCH_CONTEXT_LINES } from "./vcs/patch.js"
 
-export { Base, BranchList, FileStatus, Info, Mode, Untracked }
+export { Base, BranchList, CommitResult, FileStatus, Info, Mode, PushResult, Untracked }
 
 export class DiffError extends Schema.TaggedError<DiffError>()("Vcs.DiffError", {
+  message: Schema.String,
+}) {}
+
+/** A write the person asked for did not happen: the provider cannot do it, or the repository refused. */
+export class OperationError extends Schema.TaggedError<OperationError>()("Vcs.OperationError", {
   message: Schema.String,
 }) {}
 
@@ -36,17 +41,31 @@ export interface BranchOptions {
   readonly limit?: number
 }
 
+export interface CommitOptions {
+  readonly message: string
+  readonly files: readonly string[]
+}
+
+export interface PushOptions {
+  readonly remote?: string
+}
+
 export interface Adapter {
   readonly info: () => Effect.Effect<Info>
   readonly base?: () => Effect.Effect<Base | null, DiffError>
   readonly branches: (options?: BranchOptions) => Effect.Effect<BranchList>
   readonly status: () => Effect.Effect<FileStatus[]>
   readonly diff: (mode: Mode, options?: DiffOptions) => Effect.Effect<FileDiff.Info[], DiffError>
+  readonly commit?: (options: CommitOptions) => Effect.Effect<CommitResult, OperationError>
+  readonly push?: (options?: PushOptions) => Effect.Effect<PushResult, OperationError>
 }
 
+/** The service always answers a write, even where no provider can perform it, so the caller sees a reason. */
 export interface Interface extends Adapter, State.Transformable<VcsEditor> {
   readonly base: () => Effect.Effect<Base | null, DiffError>
   readonly initialize: (providerID: string) => Effect.Effect<void, InitializeError>
+  readonly commit: (options: CommitOptions) => Effect.Effect<CommitResult, OperationError>
+  readonly push: (options?: PushOptions) => Effect.Effect<PushResult, OperationError>
 }
 
 interface Data {
@@ -78,6 +97,8 @@ const layer = Layer.effect(
     const decodeBranches = Schema.decodeUnknownEffect(BranchList)
     const decodeStatus = Schema.decodeUnknownEffect(Schema.Array(FileStatus))
     const decodeDiff = Schema.decodeUnknownEffect(Schema.Array(FileDiff.Info))
+    const decodeCommit = Schema.decodeUnknownEffect(CommitResult)
+    const decodePush = Schema.decodeUnknownEffect(PushResult)
     const state: State.Interface<Data, VcsEditor> = State.create<Data, VcsEditor>({
       name: "vcs",
       initial: () => ({ providers: new Map() }),
@@ -120,6 +141,26 @@ const layer = Layer.effect(
                         operation === "base"
                           ? "VCS provider could not resolve a review base"
                           : "VCS provider could not produce a diff",
+                    }),
+              ),
+            ),
+          )
+        }),
+      )
+    // A write is different from a read: nothing here has a safe fallback, because the person asked for a
+    // commit or a push and silence would look like success.
+    const operate = <A>(provider: VcsDefinition, operation: "commit" | "push", effect: Effect.Effect<A, unknown>) =>
+      effect.pipe(
+        Effect.catchCause((cause) => {
+          if (Cause.hasInterrupts(cause)) return Effect.failCause(cause).pipe(Effect.orDie)
+          const error = Cause.squash(cause)
+          return Effect.logWarning("vcs provider failed", { provider: provider.id, operation, cause }).pipe(
+            Effect.andThen(
+              Effect.fail(
+                error instanceof OperationError
+                  ? error
+                  : new OperationError({
+                      message: error instanceof Error && error.message ? error.message : `VCS ${operation} failed`,
                     }),
               ),
             ),
@@ -250,6 +291,33 @@ const layer = Layer.effect(
           total += bytes
           return row
         })
+      }),
+      commit: Effect.fn("Vcs.commit")(function* (options: CommitOptions) {
+        const provider = selected()
+        if (!provider) return yield* new OperationError({ message: "This project has no version control" })
+        if (!provider.commit)
+          return yield* new OperationError({ message: `The ${provider.name} provider cannot commit` })
+        if (options.files.length === 0) return yield* new OperationError({ message: "Nothing was selected to commit" })
+        if (options.message.trim() === "") return yield* new OperationError({ message: "The commit message is empty" })
+        return yield* operate(
+          provider,
+          "commit",
+          provider
+            .commit({ ...scope, message: options.message, files: options.files })
+            .pipe(Effect.flatMap(decodeCommit)),
+        )
+      }),
+      push: Effect.fn("Vcs.push")(function* (options?: PushOptions) {
+        const provider = selected()
+        if (!provider) return yield* new OperationError({ message: "This project has no version control" })
+        if (!provider.push) return yield* new OperationError({ message: `The ${provider.name} provider cannot push` })
+        return yield* operate(
+          provider,
+          "push",
+          provider
+            .push({ ...scope, ...(options?.remote === undefined ? {} : { remote: options.remote }) })
+            .pipe(Effect.flatMap(decodePush)),
+        )
       }),
     })
   }),

@@ -11,7 +11,7 @@
 - Record the **why**, including rejected approaches and the failure behind them, in the `Decisions` section of the topic doc. A note that only says "X is implemented" loses the one thing nobody can re-derive later.
 - Plans and implementation records under `doc/records/` are historical and are never rewritten to match a later design; add a superseded line at the top instead.
 - Reference code by symbol name, event name, config key, or file path — never by appending a line number, which goes stale on the first edit above it. `bun script/doc-refs.ts` runs in `bun run lint` and fails on stale anchors, dead paths, and missing symbols.
-- Index: `doc/conventions.md` (the discipline and the change map), `doc/session-loop.md` (steps, drain, nudges, recovery claims), `doc/context-economics.md` (token estimates, compaction budgets, tool-output clipping), `doc/permissions.md` (permission evaluation and the composer approval modes), `doc/session-switching.md` (which surface switches sessions in each interface mode, and who keeps an open tab warm).
+- Index: `doc/conventions.md` (the discipline and the change map), `doc/session-loop.md` (steps, drain, nudges, recovery claims), `doc/context-economics.md` (token estimates, compaction budgets, tool-output clipping), `doc/permissions.md` (permission evaluation and the composer approval modes), `doc/session-rail.md` (the right-hand session column and its commit/push writes), `doc/session-switching.md` (which surface switches sessions in each interface mode, and who keeps an open tab warm).
 
 ## Live TUI Testing
 

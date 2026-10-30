@@ -56,6 +56,7 @@ the same diff.
 | Inbox admission, delivery modes, interruption | `doc/session-loop.md` |
 | Tool definitions, side-effect classification, permission gating | `doc/session-loop.md`, and the tool's own doc comment |
 | A permission action name, the evaluator, or the approval modes | `doc/permissions.md` |
+| The session rail, its fold, or the `vcs.commit` / `vcs.push` write path | `doc/session-rail.md` |
 | Which surface lists and switches sessions, or who owns an open tab's upkeep and shortcuts | `doc/session-switching.md` |
 | Token estimation, compaction budgets or triggers, tool-output clipping | `doc/context-economics.md` |
 | A model-visible prompt or notice token the UI echoes verbatim | the topic doc that owns the mechanism, spelling the token out literally |
