@@ -3,3 +3,9 @@
   flex-shrink: 0;
   color: var(--v2-icon-icon-muted, #808080);
 }
+
+/* In a dense list row the muted strength disappears with the radar's part-opacity dots, so the working mark there
+   takes the standard icon strength. */
+[data-component="session-progress-indicator-v2"][data-emphasis="strong"] {
+  color: var(--v2-icon-icon-base, #808080);
+}

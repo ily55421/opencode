@@ -7,7 +7,9 @@ import {
 } from "@opencode/ui/project-avatar"
 import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
+import { Menu } from "@opencode/ui/menu"
 import { Tooltip } from "@opencode/ui/tooltip"
+import { useDialog } from "@opencode/ui/context/dialog"
 import { SessionProgressIndicatorV2 } from "@opencode/session-ui/v2/session-progress-indicator-v2"
 import { useQuery } from "@tanstack/solid-query"
 import { useLocation, useNavigate } from "@solidjs/router"
@@ -23,11 +25,15 @@ import { pathKey } from "@/workspaces/path-key"
 import { useLanguage } from "@/runtime/i18n/language"
 import { usePlatform } from "@/runtime/platform/platform"
 import { ServerConnection } from "@/runtime/server/registry"
+import { useGlobal, useServerCtx } from "@/runtime/server/runtime"
+import { useSessionTabAvatarState } from "@/shell/layout/project-avatar-state"
+import { DeleteSessionDialog, renameSessionTitle } from "@/shell/tabs/activity"
+import { EditableTitle } from "@/shell/editable-title"
 import { sessionLabel } from "@/session/title"
 import { useSettingsDialog } from "@/settings/command"
 import { useCommand } from "@/shell/commands/command"
 import { homeProjectDirectories } from "@/shell/layout/helpers"
-import { draftHref, useTabs } from "@/shell/tabs/tabs"
+import { draftHref, findSessionTab, useTabs } from "@/shell/tabs/tabs"
 import { useDirectoryPicker } from "@/workspaces/selection/picker"
 
 type WorkspaceGroup = {
@@ -180,7 +186,11 @@ export function WorkspaceSidebar() {
     return ServerConnection.local(conn) ? language.t("composer.status.local") : home.server.label(conn)
   }
 
-  const running = (sessionID: string) => home.server.focusedContext()?.data.session.status(sessionID) === "running"
+  const focusedKey = createMemo(() => {
+    const conn = home.server.focused()
+
+    return conn && ServerConnection.key(conn)
+  })
 
   // Segment compare: a substring match would also light up for a longer ID that contains this one.
   const selected = (sessionID: string) => {
@@ -341,34 +351,20 @@ export function WorkspaceSidebar() {
                             </button>
                           )}
                         </For>
-                        <For each={visible()}>
-                          {(record) => (
-                            <button
-                              type="button"
-                              data-session-id={record.session.id}
-                              aria-current={selected(record.session.id) ? "page" : undefined}
-                              class="group/session flex h-7 w-full min-w-0 items-center gap-1.5 rounded-md px-1.5 text-start text-[12px] transition-colors focus-visible:outline-none"
-                              classList={{
-                                "bg-v2-overlay-simple-overlay-pressed text-v2-text-text-base": selected(
-                                  record.session.id,
-                                ),
-                                "text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base":
-                                  !selected(record.session.id),
-                              }}
-                              onClick={() => open(record)}
-                            >
-                              <span class="flex size-3.5 shrink-0 items-center justify-center">
-                                <Show
-                                  when={running(record.session.id)}
-                                  fallback={<span class="size-1.5 rounded-full bg-v2-icon-icon-faint" />}
-                                >
-                                  <SessionProgressIndicatorV2 class="scale-75" />
-                                </Show>
-                              </span>
-                              <span class="min-w-0 truncate">{sessionLabel(record.session)}</span>
-                            </button>
+                        <Show when={focusedKey()}>
+                          {(serverKey) => (
+                            <For each={visible()}>
+                              {(record) => (
+                                <WorkspaceSessionRow
+                                  record={record}
+                                  serverKey={serverKey()}
+                                  selected={selected(record.session.id)}
+                                  onOpen={() => open(record)}
+                                />
+                              )}
+                            </For>
                           )}
-                        </For>
+                        </Show>
                         <Show when={group.sessions.length > GROUP_LIMIT}>
                           <button
                             type="button"
@@ -434,5 +430,148 @@ function SidebarAction(props: { icon: "plus" | "magnifying-glass"; label: string
       <Icon name={props.icon} size="small" class="shrink-0 text-v2-icon-icon-muted" />
       <span class="min-w-0 truncate">{props.label}</span>
     </button>
+  )
+}
+
+/**
+ * One session in the rail. It carries what the top bar's tab strip used to own: the busy and unread marks, the
+ * close control for an open tab, and the rename and delete menu, so the rail is the only place a session is switched.
+ */
+function WorkspaceSessionRow(props: {
+  record: HomeSessionRecord
+  serverKey: ServerConnection.Key
+  selected: boolean
+  onOpen: () => void
+}) {
+  const language = useLanguage()
+  const dialog = useDialog()
+  const tabs = useTabs()
+  const global = useGlobal()
+  const [menu, setMenu] = createStore({ open: false, rename: false })
+  const [editing, setEditing] = createSignal(false)
+  let root!: HTMLDivElement
+
+  const serverCtx = useServerCtx(() =>
+    global.servers.list().find((item) => ServerConnection.key(item) === props.serverKey),
+  )
+
+  const status = useSessionTabAvatarState(
+    () => props.serverKey,
+    () => props.record.session.id,
+    () => true,
+  )
+
+  const tab = createMemo(() => findSessionTab(tabs.store, props.serverKey, props.record.session.id))
+
+  const close = () => {
+    const value = tab()
+
+    if (!value) return
+    tabs.closeTab(tabs.store.findIndex((item) => item === value))
+  }
+
+  const commit = (value: string) => {
+    const original = props.record.session.title ?? ""
+    setEditing(false)
+
+    if (!value || value === original) return
+    void renameSessionTitle(serverCtx(), props.record.session, value, language)
+  }
+
+  return (
+    <div
+      ref={root}
+      data-slot="workspace-session-row"
+      data-session-id={props.record.session.id}
+      class="group/session flex h-7 w-full min-w-0 items-center gap-1.5 rounded-md pe-1 text-[12px] transition-colors"
+      classList={{
+        "bg-v2-overlay-simple-overlay-pressed text-v2-text-text-base": props.selected,
+        "text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base":
+          !props.selected,
+      }}
+    >
+      <Menu.Context modal={false} onOpenChange={(open) => setMenu("open", open)}>
+        <Menu.Context.Trigger
+          as="button"
+          type="button"
+          data-session-switch
+          aria-current={props.selected ? "page" : undefined}
+          class="flex h-full min-w-0 flex-1 items-center gap-1.5 ps-1.5 text-start focus-visible:outline-none"
+          onClick={props.onOpen}
+        >
+          <span class="flex size-4 shrink-0 items-center justify-center">
+            <Show
+              when={status.loading()}
+              fallback={
+                <Show
+                  when={!props.selected && (status.attention() || status.unread())}
+                  fallback={<span class="size-1.5 rounded-full bg-v2-icon-icon-faint" />}
+                >
+                  <span
+                    data-slot="workspace-session-unread"
+                    aria-hidden="true"
+                    class="size-1.5 rounded-full"
+                    classList={{
+                      "bg-v2-state-fg-warning": status.attention(),
+                      "bg-v2-background-bg-accent": !status.attention(),
+                    }}
+                  />
+                </Show>
+              }
+            >
+              <SessionProgressIndicatorV2 data-emphasis="strong" />
+            </Show>
+          </span>
+          <EditableTitle
+            text={() => sessionLabel(props.record.session)}
+            editing={editing()}
+            root={() => root}
+            class="truncate"
+            attributes={{ "data-slot": "workspace-session-title" }}
+            onEditRequest={() => setEditing(true)}
+            onCommit={commit}
+            onCancel={() => setEditing(false)}
+          />
+        </Menu.Context.Trigger>
+        <Menu.Context.Portal>
+          <Menu.Context.Content
+            onCloseAutoFocus={(event) => {
+              if (!menu.rename) return
+              event.preventDefault()
+              setMenu("rename", false)
+              setEditing(true)
+            }}
+          >
+            <Menu.Item onSelect={() => setMenu("rename", true)}>{language.t("common.rename")}</Menu.Item>
+            <Menu.Item disabled={!tab()} onSelect={close}>
+              {language.t("common.closeTab")}
+            </Menu.Item>
+            <Menu.Separator />
+            <Menu.Item
+              data-variant="critical"
+              onSelect={() =>
+                dialog.show(() => <DeleteSessionDialog server={props.serverKey} session={() => props.record.session} />)
+              }
+            >
+              {language.t("session.delete.title")}…
+            </Menu.Item>
+          </Menu.Context.Content>
+        </Menu.Context.Portal>
+      </Menu.Context>
+      <Show when={tab()}>
+        <IconButton
+          type="button"
+          variant="ghost-muted"
+          size="small"
+          class="hover-reveal shrink-0 group-hover/session:opacity-100 focus-visible:opacity-100"
+          icon={<Icon name="xmark-small" size="small" />}
+          aria-label={language.t("common.closeTab")}
+          onClick={(event: MouseEvent) => {
+            event.stopPropagation()
+            close()
+          }}
+        />
+      </Show>
+    </div>
   )
 }

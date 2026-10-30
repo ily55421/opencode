@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, on, onMount, untrack, type Accessor } from "solid-js"
+import { createEffect, createMemo, createSignal, on, onCleanup, onMount, untrack, type Accessor } from "solid-js"
 import { useDialog } from "@opencode/ui/context/dialog"
 import type { ComposerControls } from "@/composer/adapter"
 import { setCursorPosition } from "@/composer/editor/dom"
@@ -55,6 +55,32 @@ export function createSessionComposerController(input: {
   })
 
   const composer = createComposerModel(adapter, { queue })
+  // This controller is recreated when a session becomes active. Wait for its draft and
+  // the editor's DOM commit, without reacting to subsequent cursor or message updates.
+  createEffect(
+    on(adapter.ready, (ready) => {
+      if (!ready) return
+
+      const frame = requestAnimationFrame(() => {
+        if (!editor?.isConnected || !region.showComposer() || region.child() || dialog.active) return
+        const active = document.activeElement
+
+        // A control chosen while the session was loading owns focus now. The switchers are exempt: a tab link or a
+        // rail row is how you arrive at a session, and arriving should put the caret in the composer.
+        if (
+          active &&
+          active !== document.body &&
+          active !== editor &&
+          !active.matches("[data-titlebar-tab-link],[data-session-switch]")
+        )
+          return
+        editor.focus({ preventScroll: true })
+        setCursorPosition(editor, adapter.state.cursor() ?? promptLength(adapter.state.current()))
+      })
+
+      onCleanup(() => cancelAnimationFrame(frame))
+    }),
+  )
   const editable = createMemo(() => region.showComposer() && !region.child())
   // This controller is recreated when a session becomes active, which is when its composer takes focus
   // (focus-machine.ts). It waits for the draft, the editor and any request dock or dialog to clear.
