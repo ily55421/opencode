@@ -8,15 +8,17 @@ const stats: SessionStatsInfo = {
   subagents: 99,
   prompts: 24,
   steps: 50,
+  messages: 74,
   activeDays: 2,
   streak: 2,
+  currentStreak: 2,
   tokens: { input: 1, output: 2, reasoning: 3, cache: { read: 4, write: 5 } },
   cost: 0,
   tools: { mode: "none" },
   models: [],
   activity: [
-    { date: "2026-01-01", steps: 1 },
-    { date: "2026-01-02", steps: 50 },
+    { date: "2026-01-01", steps: 1, tokens: 5 },
+    { date: "2026-01-02", steps: 50, tokens: 10 },
   ],
 }
 
