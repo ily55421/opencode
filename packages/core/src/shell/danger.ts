@@ -83,11 +83,24 @@ export function classify(command: string, depth = RECURSION_DEPTH): Risk {
   const pipeline = text.split(/[|;&]{1,2}/).filter((part) => part.trim() !== "")
 
   for (const part of pipeline) {
+    // A substitution runs before the command around it, so `echo $(rm -rf /)` is as dangerous as running it directly.
+    // Surrounding literal text can prove danger; it can never prove a payload safe. Extraction reads the raw stage,
+    // because the payload itself contains the spaces that would split it into separate tokens.
+    for (const payload of substitutions(part)) {
+      const risk = classify(payload, depth - 1)
+      if (risk !== "safe") return risk
+    }
+
     const risk = classifyWords(words(part), depth)
     if (risk !== "safe") return risk
   }
 
   return "safe"
+}
+
+/** The payloads of `$(…)` and backtick substitutions, which run before the surrounding command does. */
+function substitutions(text: string) {
+  return [...text.matchAll(/\$\(([^)]*)\)|`([^`]*)`/g)].map((match) => match[1] ?? match[2] ?? "")
 }
 
 function classifyWords(tokens: string[], depth: number): Risk {
@@ -106,10 +119,8 @@ function classifyWords(tokens: string[], depth: number): Risk {
   if (POWEROFF.has(name) && rest.some((token) => !token.startsWith("-"))) return "dangerous"
   if (name === "init" && ["0", "6"].includes(rest.find((token) => !token.startsWith("-")) ?? "")) return "dangerous"
 
-  // Two different secrets hide in a `$`. `$(…)` or a backtick run arbitrary code no rule can see, whatever the head
-  // command is. A bare expansion only matters when the command can change state, because that is when the rule engine
-  // cannot see what gets touched — `echo "exit=$?"` at the end of a safe command is not a hidden target.
-  if (head.some(substitution)) return "unanalyzable"
+  // An unknown operand only matters where the operand is the target. `Write-Output $value` and `if ($true)` are
+  // ordinary PowerShell; `rm -rf "$X"` is a deletion whose victim no rule can read.
   if (CONSEQUENTIAL.has(name) && head.some(expansion)) return "unanalyzable"
 
   return "safe"
@@ -172,13 +183,53 @@ function destructive(name: string | undefined) {
   return name === "chmod" || name === "chown" || name === "chgrp"
 }
 
+/**
+ * Programs that run whatever text follows them. Approving one "always" would authorise every command reachable
+ * through it, so a request for one of these is never rememberable: the answer is once, or nothing.
+ */
+const BANNED_SAVE = new Set([
+  ...NESTED,
+  "xargs",
+  "sudo",
+  "doas",
+  "env",
+  "nohup",
+  "command",
+  "busybox",
+  "pwsh",
+  "powershell",
+  "cmd",
+  "python",
+  "python3",
+  "perl",
+  "ruby",
+  "php",
+  "node",
+  "bun",
+  "deno",
+  "osascript",
+])
+
+/** Whether a "always allow" answer on this command can be remembered as a rule. */
+export function rememberable(command: string) {
+  const text = command.trim()
+  if (text === "") return true
+
+  // The saved prefix is the raw first token, so that is what decides: `sudo *` and `env *` name no program, and
+  // unwrapping here would mistake them for the harmless command underneath.
+  for (const part of text.split(/[|;&]{1,2}/)) {
+    const tokens = words(part)
+    if (tokens.length === 0) continue
+    if (BANNED_SAVE.has(base(tokens[0]!))) return false
+  }
+
+  return true
+}
+
 /** `find . -delete` is ordinary cleanup; `find / -delete` is not. */
 const targetsRoot = (tokens: string[]) => tokens.includes("/") || ROOTS.has(tokens[1] ?? "")
 
 const dynamic = (token: string) => token.includes("$") || token.includes("`")
-
-/** Runs code the rule engine never sees, whatever it is embedded in. */
-const substitution = (token: string) => token.includes("$(") || token.includes("`")
 
 /** Names a value rather than a literal, so the target of a state-changing command is unknown. */
 const expansion = (token: string) => token.includes("$")

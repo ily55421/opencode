@@ -53,10 +53,22 @@ permission.assert({ action: "shell", resources, save, risk: "dangerous" | "unana
 ```
 
 `risk` is on `AssertInput`, not on `Request`, so it never reaches the wire or a client's pending list. The ordering in
-`evaluateInput` is **deny → escalation → allow**: a deny still wins, and an escalation outranks every allow rule an
-agent or a project config carries. Two things clear it, because both are a human deciding about the specific thing in
-front of them — a saved "always allow" rule covering that exact resource, and a session that allowed everything
-outright.
+`evaluateInput` is **deny → escalation → allow**: a deny still wins, and an escalation outranks every allow rule — an
+agent default, a project config, or a saved "always allow". The only thing that clears it is a session that allowed
+everything outright, which is a standing choice the user made on purpose.
+
+An escalated request is published with `save: []`. `Permission.reply` only persists a non-empty save list, so an
+"always allow" click on such a request approves it once and remembers nothing — the next occurrence asks again. That is
+the `PromptUser` property (a remembered decision cannot satisfy it), expressed inside the existing
+`allow | deny | ask` vocabulary instead of a fourth public effect.
+
+Separately, a command whose raw first token is a shell, an interpreter, or a runner (`sh`, `bash`, `python`, `bun`,
+`node`, `xargs`, `sudo`, `env`, …) is never rememberable at all: `bun *` names no program, so saving it would authorise
+anything. `ShellDanger.rememberable` drops those entries from the shell tool's `save` list.
+
+Rules themselves are **not** folded by severity. opencode writes `deny *` first and grants after it, so
+most-restrictive-wins would break the `explore` agent and Plan mode; see
+`doc/records/2026-10-permission-fold-ordering.md`.
 
 `packages/core/src/shell/danger.ts` produces the verdict from the command text:
 
@@ -78,9 +90,9 @@ composer's Full access mode writes. An agent-level allow-all is not an opt-out; 
 
 **This flips a default.** The built-in `build` agent's rules begin with `{action:"*",resource:"*",effect:"allow"}`, so
 before the escalation every shell command the model proposed ran without a prompt — including `rm -rf "$TARGET"`. What
-a user gains is a question before an irreversible command; what they lose is the silence. The escape hatches are
-answering **always allow** on the prompt that appears (a saved rule clears the escalation for that exact resource), or
-choosing **Full access** for the session. A non-interactive `opencode run` without `--auto` cannot ask, so an
+a user gains is a question before an irreversible command; what they lose is the silence. The escape hatch is choosing
+**Full access** for the session: answering "always allow" is deliberately not one, because a destructive command should
+not become permanently silent from a single click. A non-interactive `opencode run` without `--auto` cannot ask, so an
 escalated command there now fails with the standard "cannot ask" rejection instead of executing.
 
 ## Where the memory lives
