@@ -776,31 +776,17 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                   <Show
                     when={props.verticalTabs}
                     fallback={
-                      <>
-                        <TitlebarTabStrip
-                          tabs={tabsStore}
-                          currentTab={currentTab()}
-                          onNavigate={(tab, el) => {
-                            tabs.select(tab)
-                            el?.scrollIntoView({ behavior: "instant" })
-                          }}
-                          onClose={(tab) => {
-                            const index = tabsStore.findIndex((item) => tabKey(item) === tabKey(tab))
-
-                            if (index !== -1) tabsStoreActions.closeTab(index)
-                          }}
-                          onReorder={(keys) => tabsStoreActions.reorder(keys)}
-                        />
-                        <RecentlyClosedTabsMenu
-                          onNewTab={openNewTab}
-                          tooltip={
-                            <>
-                              {language.t("command.session.new")}
-                              <Keybind keys={command.keybindParts("tab.new")} variant="neutral" />
-                            </>
-                          }
-                        />
-                      </>
+                      // The workspaces rail owns switching here, so no tab strip shares the top bar with it. Its
+                      // unread badges, transcript warmup and tab shortcuts live in the tab activity layer instead.
+                      <RecentlyClosedTabsMenu
+                        onNewTab={openNewTab}
+                        tooltip={
+                          <>
+                            {language.t("command.session.new")}
+                            <Keybind keys={command.keybindParts("tab.new")} variant="neutral" />
+                          </>
+                        }
+                      />
                     }
                   >
                     {(vertical) => (

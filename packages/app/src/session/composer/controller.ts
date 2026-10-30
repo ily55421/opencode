@@ -62,8 +62,14 @@ export function createSessionComposerController(input: {
         if (!editor?.isConnected || !region.showComposer() || region.child() || dialog.active) return
         const active = document.activeElement
 
-        // A control chosen while the session was loading owns focus now.
-        if (active && active !== document.body && active !== editor && !active.matches("[data-titlebar-tab-link]"))
+        // A control chosen while the session was loading owns focus now. The switchers are exempt: a tab link or a
+        // rail row is how you arrive at a session, and arriving should put the caret in the composer.
+        if (
+          active &&
+          active !== document.body &&
+          active !== editor &&
+          !active.matches("[data-titlebar-tab-link],[data-session-switch]")
+        )
           return
         editor.focus({ preventScroll: true })
         setCursorPosition(editor, adapter.state.cursor() ?? promptLength(adapter.state.current()))

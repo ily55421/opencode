@@ -17,6 +17,7 @@ import { useLanguage } from "@/runtime/i18n/language"
 import { useGlobal } from "@/runtime/server/runtime"
 import { useServers } from "@/runtime/server/registry"
 import { useTabs } from "@/shell/tabs/tabs"
+import { TabActivityHost } from "@/shell/tabs/activity"
 import {
   CollapsedSidebarToggle,
   collapsedSidebarToggleEnd,
@@ -289,6 +290,8 @@ export default function Layout(props: ParentProps) {
         </Show>
         {/* The desktop workspaces rail replaces the horizontal tab strip's project browsing. */}
         <Show when={!mobile() && !verticalTabs()}>
+          {/* With no strip on screen, the open tabs' upkeep and shortcuts need a home of their own. */}
+          <TabActivityHost />
           <WorkspaceSidebar />
         </Show>
         {/* Size containment collapses percentage-height descendants in WebKit. */}

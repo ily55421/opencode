@@ -13,11 +13,12 @@ import { useGlobal, useServerCtx, type ServerCtx } from "@/runtime/server/runtim
 import { useLanguage } from "@/runtime/i18n/language"
 import { useCommand } from "@/shell/commands/command"
 import { useTabs } from "@/shell/tabs/tabs"
+import { registerTabCommands } from "@/shell/tabs/commands"
 import { useSessionTabAvatarState } from "@/shell/layout/project-avatar-state"
 import { createTabComposerState } from "@/composer/persistence"
 import { base64Encode } from "@opencode/util/encode"
 import { showToast } from "@/shell/notifications/toast"
-import { adjacentTabKey, mergeVisibleTabOrder } from "./tab-order"
+import { mergeVisibleTabOrder } from "./tab-order"
 import { Button } from "@opencode/ui/button"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { Dialog, DialogFooter, DialogHeader, DialogTitleGroup } from "@opencode/ui/dialog"
@@ -27,10 +28,6 @@ import { errorMessage } from "@/shell/layout/helpers"
 import { notifySessionTabsRemoved } from "./session-events"
 import { setSidebarUnread } from "@/shell/sidebar-peek"
 import type { SessionInfo } from "@opencode/client/promise"
-
-export const previousSessionCommand = { id: "session.previous", keybind: "alt+arrowup" }
-
-export const nextSessionCommand = { id: "session.next", keybind: "alt+arrowdown" }
 
 function SessionTabSlot(props: {
   tab: SessionTab
@@ -404,75 +401,16 @@ export function TitlebarTabStrip(props: {
     onCleanup(() => setSidebarUnread(false))
   })
 
-  command.register("titlebar-tab-cycle", () => [
-    {
-      id: `tab.prev`,
-      category: "tab",
-      title: "",
-      keybind: `mod+option+ArrowLeft,ctrl+shift+tab`,
-      hidden: true,
-      onSelect: () => selectAdjacentTab(-1),
-    },
-    {
-      id: `tab.next`,
-      category: "tab",
-      title: "",
-      keybind: `mod+option+ArrowRight,ctrl+tab`,
-      hidden: true,
-      onSelect: () => selectAdjacentTab(1),
-    },
-    {
-      ...previousSessionCommand,
-      category: language.t("command.category.session"),
-      title: language.t("command.session.previous"),
-      onSelect: () => selectAdjacentTab(-1),
-    },
-    {
-      ...nextSessionCommand,
-      category: language.t("command.category.session"),
-      title: language.t("command.session.next"),
-      onSelect: () => selectAdjacentTab(1),
-    },
-    {
-      id: "session.previous.unseen",
-      category: language.t("command.category.session"),
-      title: language.t("command.session.previous.unseen"),
-      keybind: "shift+alt+arrowup",
-      onSelect: () => selectAdjacentTab(-1, (key) => !!unread[key]),
-    },
-    {
-      id: "session.next.unseen",
-      category: language.t("command.category.session"),
-      title: language.t("command.session.next.unseen"),
-      keybind: "shift+alt+arrowdown",
-      onSelect: () => selectAdjacentTab(1, (key) => !!unread[key]),
-    },
-  ])
-
   // One registration numbers the visible tabs, so a reorder, a close or a tab coming into view never leaves two tabs
   // holding the same number while their owners update.
   const tabRefs = new Map<string, () => HTMLDivElement | undefined>()
 
-  command.register("titlebar-tab-numbers", () =>
-    visibleTabs()
-      .slice(0, 9)
-      .map((tab, index) => ({
-        id: `tab.${index + 1}`,
-        category: "tab",
-        title: "",
-        keybind: `mod+${index + 1}`,
-        hidden: true,
-        onSelect: () => props.onNavigate(tab, tabRefs.get(tabKey(tab))?.()),
-      })),
-  )
-
-  function selectAdjacentTab(offset: -1 | 1, include?: (key: string) => boolean) {
-    const current = props.currentTab
-    const key = adjacentTabKey(visibleTabIds(), current ? tabKey(current) : undefined, offset, include)
-    const next = props.tabs.find((tab) => tabKey(tab) === key)
-
-    if (next) props.onNavigate(next)
-  }
+  registerTabCommands(command, language, {
+    visibleTabs,
+    currentTab: () => props.currentTab,
+    unread: (key) => !!unread[key],
+    select: (tab) => props.onNavigate(tab, tabRefs.get(tabKey(tab))?.()),
+  })
 
   return (
     <div

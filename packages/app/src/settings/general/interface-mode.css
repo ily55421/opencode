@@ -149,18 +149,6 @@
     }
   }
 
-  [data-slot="preview-tabs"] {
-    display: flex;
-    gap: 3px;
-    padding: 4px 6px;
-    border-bottom: 0.5px solid var(--v2-border-border-base);
-    background-color: var(--v2-overlay-simple-overlay-pressed);
-
-    [data-slot="preview-tab"] {
-      width: 22%;
-    }
-  }
-
   [data-slot="preview-rail"] {
     display: flex;
     width: 24%;

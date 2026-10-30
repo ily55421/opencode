@@ -2,6 +2,10 @@
 
 Release notes for OpenCode V2, newest first.
 
+## Unreleased
+
+- The desktop app no longer lists session tabs across the top of the window. The workspaces rail already groups sessions by project directory, so it is now the one place a session is switched, and the two switchers no longer show the same sessions twice. Its rows took over what the top strip carried: close on hover, rename in place, the delete confirmation, and the busy and unread marks. `Ctrl+Tab`, `Ctrl+Shift+Tab`, `Alt+up / Alt+down`, the unseen variants and `Cmd+1..9` still cycle sessions with no strip on screen. Settings → General → Interface names that mode **Workspaces** ("Sessions grouped by folder in the sidebar"); Side tabs and Inbox are unchanged.
+
 ## v2.2.0 — 2026-10-27
 
 ### Highlights

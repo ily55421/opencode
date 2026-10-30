@@ -822,8 +822,9 @@ export const dict = {
   "settings.appearance.row.tabs.horizontal": "Horizontal",
   "settings.appearance.row.tabs.vertical": "Vertical",
   "settings.general.row.interfaceMode.title": "Interface",
-  "settings.general.row.interfaceMode.top": "Top tabs",
-  "settings.general.row.interfaceMode.top.description": "Browser-style tabs across the top of the window.",
+  "settings.general.row.interfaceMode.workspaces": "Workspaces",
+  "settings.general.row.interfaceMode.workspaces.description":
+    "Sessions grouped by folder in the sidebar, which is the only place you switch between them.",
   "settings.general.row.interfaceMode.side": "Side tabs",
   "settings.general.row.interfaceMode.side.description": "Browser-style tabs in a sidebar.",
   "settings.general.row.interfaceMode.inbox": "Inbox",

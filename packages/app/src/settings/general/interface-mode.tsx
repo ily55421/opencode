@@ -4,7 +4,7 @@ import { type TabLayout, useSettings } from "@/settings/model"
 import "./interface-mode.css"
 
 const modes = [
-  { id: "top", layout: "horizontal" },
+  { id: "workspaces", layout: "horizontal" },
   { id: "side", layout: "vertical" },
   { id: "inbox", layout: "inbox" },
 ] as const satisfies { id: string; layout: TabLayout }[]
@@ -34,8 +34,8 @@ export function InterfaceModeSetting() {
             />
             <div data-slot="interface-mode-preview" data-mode={mode.id} aria-hidden="true">
               <Switch>
-                <Match when={mode.id === "top"}>
-                  <TopTabsPreview />
+                <Match when={mode.id === "workspaces"}>
+                  <WorkspacesPreview />
                 </Match>
                 <Match when={mode.id === "side"}>
                   <SideTabsPreview />
@@ -66,22 +66,45 @@ export function InterfaceModeSetting() {
   )
 }
 
-// The modes differ only in where sessions are listed, so every preview shares one workspace.
-function TopTabsPreview() {
+// The rail lists the same sessions the side tabs do, but headed by the folder each one lives in.
+const workspaceGroups = [
+  {
+    rows: [
+      { width: 70, active: true },
+      { width: 52, active: false },
+      { width: 64, active: false },
+    ],
+  },
+  {
+    rows: [
+      { width: 44, active: false },
+      { width: 58, active: false },
+    ],
+  },
+] as const
+
+function WorkspacesPreview() {
   return (
-    <>
-      <div data-slot="preview-tabs">
-        <For each={[60, 44, 52]}>
-          {(width, index) => (
-            <span data-slot="preview-tab" data-active={index() === 0 ? "" : undefined}>
-              <i />
-              <span style={{ width: `${width}%` }} />
-            </span>
+    <div data-slot="preview-body">
+      <div data-slot="preview-rail">
+        <For each={workspaceGroups}>
+          {(group) => (
+            <>
+              <span data-slot="preview-rail-heading" />
+              <For each={group.rows}>
+                {(row) => (
+                  <span data-slot="preview-tab" data-active={row.active ? "" : undefined}>
+                    <i />
+                    <span style={{ width: `${row.width}%` }} />
+                  </span>
+                )}
+              </For>
+            </>
           )}
         </For>
       </div>
       <PreviewWorkspace />
-    </>
+    </div>
   )
 }
 
