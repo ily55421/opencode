@@ -113,7 +113,9 @@ function storageEntries(input: SeedInput): [string, string, boolean][] {
           ),
         }
       : {}),
-    ...(input.settings ? { "settings.v3": input.settings } : {}),
+    // The app's default layout puts sessions in the workspaces rail, which has no tab strip to drive. Specs that
+    // switch or read tabs work against the side strip unless they seed a layout of their own.
+    "settings.v3": { appearance: { tabLayout: "vertical" }, ...(input.settings ?? {}) },
     ...(input.locale ? { "opencode.global.dat:language": { locale: input.locale } } : {}),
     ...(input.theme ? { "opencode-theme-id": input.theme.id, "opencode-color-scheme": input.theme.scheme } : {}),
     ...input.storage,

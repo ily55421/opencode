@@ -121,7 +121,7 @@ test("opens a directly linked nested subagent in its root session tab", async ({
 
   await expect(page.locator('[data-slot="session-title-parent"]')).toHaveText(childTitle)
   await expect(page.locator('[data-slot="session-title-child"]')).toHaveText(grandchildTitle)
-  const tabs = page.locator('[data-slot="titlebar-tabs"] [data-titlebar-tab-slot]')
+  const tabs = page.locator('[data-slot="vertical-tabs-sidebar"] [data-titlebar-tab-slot]')
   await expect(tabs.locator(`a[href="${sessionHref(grandchildID)}"]`)).toHaveCount(1)
   await expect(tabs).toHaveCount(1)
   await expect(tabs.locator('[data-slot="tab-title"]')).toHaveText(parentTitle)
@@ -144,7 +144,7 @@ test("shows the full ancestor path and navigates to an earlier subagent", async 
   await header.getByRole("button", { name: childTitle, exact: true }).click()
   await expect(page).toHaveURL(sessionHref(childID))
   await expect(page.locator("[data-session-title]").getByRole("heading", { name: childTitle })).toBeVisible()
-  await expect(page.locator('[data-slot="titlebar-tabs"] [data-titlebar-tab-slot]')).toHaveCount(1)
+  await expect(page.locator('[data-slot="vertical-tabs-sidebar"] [data-titlebar-tab-slot]')).toHaveCount(1)
 })
 
 test("keeps the active nested session visible in a narrow desktop header", async ({ page }) => {
@@ -285,7 +285,7 @@ test("keeps the parent tab selected while a loaded child session resolves", asyn
   const home = page.getByRole("button", { name: "Home" })
   await home.click()
   await expect(page).toHaveURL("/")
-  const childTab = page.locator(`[data-slot="titlebar-tabs"] a[href="${sessionHref(childID)}"]`)
+  const childTab = page.locator(`[data-slot="vertical-tabs-sidebar"] a[href="${sessionHref(childID)}"]`)
   await expect(childTab).toHaveCount(1)
   await childTab.click()
   await Promise.all([expect(page).toHaveURL(sessionHref(childID)), expectSessionTitle(page, taskDescription)])
