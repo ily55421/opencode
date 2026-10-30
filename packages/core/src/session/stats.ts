@@ -53,6 +53,12 @@ type ToolSummaryRow = {
   unfinished: number
 }
 
+/** One calendar day of the range, in the caller's timezone. */
+type Day = {
+  steps: number
+  tokens: number
+}
+
 type ModelAggregate = {
   model: Model.Ref
   steps: number
@@ -102,12 +108,13 @@ export const get = Effect.fn("SessionStats.get")(function* (input: Input = {}) {
   const toolMode = input.tools ?? "summary"
   const sessions = new Set<string>()
   const subagents = new Set<string>()
-  const activity = new Map<string, number>()
+  const activity = new Map<string, Day>()
   const models = new Map<string, ModelAggregate>()
   const tools = new Map<string, ToolAggregate>()
   const totals = {
     prompts: 0,
     steps: 0,
+    messages: 0,
     tokens: emptyTokens(),
     cost: 0,
   }
@@ -148,6 +155,7 @@ export const get = Effect.fn("SessionStats.get")(function* (input: Input = {}) {
           Effect.tap((rows) =>
             Effect.sync(() => {
               rows.forEach((row) => {
+                totals.messages++
                 if (row.parentID === null) sessions.add(row.sessionID)
                 else subagents.add(row.sessionID)
                 if (row.type === "user") {
@@ -160,7 +168,10 @@ export const get = Effect.fn("SessionStats.get")(function* (input: Input = {}) {
                 addTokens(totals.tokens, tokens)
                 totals.cost += row.cost ?? 0
                 const day = dateKey(row.timeCreated)
-                activity.set(day, (activity.get(day) ?? 0) + 1)
+                const entry = activity.get(day) ?? { steps: 0, tokens: 0 }
+                activity.set(day, entry)
+                entry.steps++
+                entry.tokens += TokenUsage.total(tokens)
                 if (!row.providerID || !row.modelID) return
                 const key = `${row.providerID}/${row.modelID}#${row.variant ?? ""}`
                 const model = models.get(key) ?? {
@@ -309,13 +320,35 @@ export const get = Effect.fn("SessionStats.get")(function* (input: Input = {}) {
     totals.cost += decoded.value.cost
   })
 
+  // A session's span runs from its first message to the moment it went idle; a session still running at the
+  // cut keeps growing, so it reports through `time_updated`. Overlap, not containment, is the range test: a
+  // session that started before the window and ran through it is the longest one inside it.
+  const longest = yield* db
+    .get<{ id: string; duration: number | null }>(
+      sql`
+      SELECT
+        session.id AS id,
+        coalesce(session.time_idle, session.time_updated) - session.time_created AS duration
+      FROM ${SessionTable} AS session
+      WHERE session.parent_id IS NULL
+        AND (session.fork_session_id IS NULL OR session.time_updated >= session.time_created)
+        AND coalesce(session.time_idle, session.time_updated) >= ${from}
+        AND session.time_created < ${to}
+        ${project}
+      ORDER BY duration DESC
+      LIMIT 1
+    `,
+    )
+    .pipe(Effect.orDie)
   const days = [...activity.entries()].sort(([a], [b]) => a.localeCompare(b))
+  const runs = streaks(days.map(([date]) => date))
   return {
     range: { from: DateTime.makeUnsafe(from), to: DateTime.makeUnsafe(to) },
     sessions: sessions.size,
     subagents: subagents.size,
     prompts: totals.prompts,
     steps: totals.steps,
+    messages: totals.messages,
     tokens: totals.tokens,
     cost: Money.USD.make(totals.cost),
     tools:
@@ -338,8 +371,13 @@ export const get = Effect.fn("SessionStats.get")(function* (input: Input = {}) {
                 })),
             },
     activeDays: days.length,
-    streak: longestStreak(days.map(([date]) => date)),
-    activity: days.map(([date, steps]) => ({ date, steps })),
+    streak: runs.longest,
+    currentStreak: runs.current,
+    longestSession:
+      longest && longest.duration !== null && longest.duration > 0
+        ? { sessionID: longest.id, duration: longest.duration }
+        : undefined,
+    activity: days.map(([date, day]) => ({ date, steps: day.steps, tokens: day.tokens })),
     models: [...models.values()]
       .sort((a, b) => TokenUsage.total(b.tokens) - TokenUsage.total(a.tokens))
       .map((model) => ({ ...model, cost: Money.USD.make(model.cost) })),
@@ -407,7 +445,8 @@ function makeDateKey(timezone = "UTC") {
   }
 }
 
-function longestStreak(days: string[]) {
+/** Both streaks in one pass: the longest run anywhere in the range, and the run ending at the last active day. */
+function streaks(days: string[]) {
   return days.reduce(
     (result, day, index) => {
       const previous = days[index - 1]
@@ -415,7 +454,7 @@ function longestStreak(days: string[]) {
       return { current, longest: Math.max(result.longest, current) }
     },
     { current: 0, longest: 0 },
-  ).longest
+  )
 }
 
 function dayOrdinal(value: string) {

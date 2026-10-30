@@ -199,11 +199,17 @@ describe("SessionStats", () => {
         totals: { calls: 3, succeeded: 1, failed: 1, unfinished: 1 },
       })
       expect(stats.activity).toEqual([
-        { date: "2026-01-02", steps: 1 },
-        { date: "2026-01-03", steps: 1 },
-        { date: "2026-01-05", steps: 1 },
+        { date: "2026-01-02", steps: 1, tokens: 22 },
+        { date: "2026-01-03", steps: 1, tokens: 44 },
+        { date: "2026-01-05", steps: 1, tokens: 22 },
       ])
       expect(stats.streak).toBe(2)
+      // The run ending on the last active day is its own number: 01-03 to 01-05 is a gap.
+      expect(stats.currentStreak).toBe(1)
+      expect(stats.messages).toBe(4)
+      // Every other session here was created and stamped in the same instant, so the fork — the one row with an
+      // explicit creation time apart from its update — is the only measurable span in this fixture.
+      expect(stats.longestSession?.sessionID).toBe("ses_stats_fork")
       expect(stats.models.map((model) => String(model.model.id))).toEqual(["large", "sonnet", "fork-new"])
       expect(stats.tools.mode).toBe("detail")
       if (stats.tools.mode !== "detail") throw new Error("Expected detailed tool statistics")
@@ -244,6 +250,80 @@ describe("SessionStats", () => {
 
       const future = yield* Effect.flip(SessionStats.get({ from: Number.MAX_SAFE_INTEGER, tools: "none" }))
       expect(future._tag).toBe("SessionStats.InvalidRangeError")
+    }),
+  )
+
+  it.effect("measures the longest session by its own span and lets one that started earlier overlap the range", () =>
+    Effect.gen(function* () {
+      const db = (yield* Database.Service).db
+      yield* db
+        .insert(ProjectTable)
+        .values({ id: projectID, worktree: AbsolutePath.make("/stats"), name: "stats", sandboxes: [] })
+        .run()
+        .pipe(Effect.orDie)
+      const day = 24 * 60 * 60 * 1_000
+      yield* db
+        .insert(SessionTable)
+        .values([
+          // Started before the window and kept going into it: the longest span the range contains.
+          {
+            id: Session.ID.make("ses_stats_overlap"),
+            project_id: projectID,
+            slug: "overlap",
+            directory: "/stats",
+            version: "test",
+            time_created: Date.UTC(2025, 11, 20),
+            time_updated: Date.UTC(2026, 0, 5),
+            time_idle: Date.UTC(2026, 0, 5),
+          },
+          // Still running at the cut, so it measures through time_updated.
+          {
+            id: Session.ID.make("ses_stats_running"),
+            project_id: projectID,
+            slug: "running",
+            directory: "/stats",
+            version: "test",
+            time_created: Date.UTC(2026, 0, 2),
+            time_updated: Date.UTC(2026, 0, 4),
+          },
+          // Longer than everything, but a subagent: the metric is about the session a person opened.
+          {
+            id: Session.ID.make("ses_stats_child"),
+            project_id: projectID,
+            parent_id: Session.ID.make("ses_stats_overlap"),
+            slug: "child",
+            directory: "/stats",
+            version: "test",
+            time_created: Date.UTC(2025, 10, 1),
+            time_updated: Date.UTC(2026, 0, 31),
+            time_idle: Date.UTC(2026, 0, 31),
+          },
+          // Finished before the window opened.
+          {
+            id: Session.ID.make("ses_stats_before"),
+            project_id: projectID,
+            slug: "before",
+            directory: "/stats",
+            version: "test",
+            time_created: Date.UTC(2025, 11, 1),
+            time_updated: Date.UTC(2025, 11, 2),
+            time_idle: Date.UTC(2025, 11, 2),
+          },
+        ])
+        .run()
+        .pipe(Effect.orDie)
+
+      const stats = yield* SessionStats.get({
+        from: Date.UTC(2026, 0, 1),
+        to: Date.UTC(2026, 1, 1),
+        timezone: "UTC",
+        tools: "none",
+      })
+
+      expect(stats.longestSession).toEqual({
+        sessionID: "ses_stats_overlap",
+        duration: 16 * day,
+      })
     }),
   )
 })

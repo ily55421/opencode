@@ -58,6 +58,7 @@ the same diff.
 | A permission action name, the evaluator, or the approval modes | `doc/permissions.md` |
 | The session rail, its fold, or the `vcs.commit` / `vcs.push` write path | `doc/session-rail.md` |
 | Which surface lists and switches sessions, or who owns an open tab's upkeep and shortcuts | `doc/session-switching.md` |
+| `session.stats` folding, or the usage settings page | `doc/usage-stats.md` |
 | Token estimation, compaction budgets or triggers, tool-output clipping | `doc/context-economics.md` |
 | A model-visible prompt or notice token the UI echoes verbatim | the topic doc that owns the mechanism, spelling the token out literally |
 | The HTTP contract (`protocol`, server handlers) | run `bun run generate` from `packages/client`; note it in `CHANGELOG.md` |

@@ -18,11 +18,13 @@ const stats: SessionStatsInfo = {
   tokens: { input: 10_000, output: 2_000, reasoning: 1_000, cache: { read: 5_000, write: 500 } },
   cost: 12.34,
   tools,
+  messages: 10,
+  currentStreak: 2,
   activeDays: 2,
   streak: 2,
   activity: [
-    { date: "2026-01-02", steps: 2 },
-    { date: "2026-01-03", steps: 4 },
+    { date: "2026-01-02", steps: 2, tokens: 20 },
+    { date: "2026-01-03", steps: 4, tokens: 40 },
   ],
   models: [
     {
@@ -53,7 +55,7 @@ describe("stats rendering", () => {
       {
         ...stats,
         range: { from: new Date(2026, 3, 29).getTime(), to: new Date(2026, 4, 20).getTime() },
-        activity: [{ date: "2026-04-29", steps: 1 }],
+        activity: [{ date: "2026-04-29", steps: 1, tokens: 10 }],
       },
       options(),
     )

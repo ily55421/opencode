@@ -9,8 +9,17 @@ import { TokenUsage } from "./token-usage.js"
 export const Activity = Schema.Struct({
   date: Schema.String,
   steps: NonNegativeInt,
+  /** Tokens produced by the assistant steps on that day. Compaction's recorded usage is in `tokens`, not here. */
+  tokens: NonNegativeInt,
 }).annotate({ identifier: "SessionStats.Activity" })
 export type Activity = typeof Activity.Type
+
+/** The session that stayed active longest inside the range, measured from its first message to going idle. */
+export const LongestSession = Schema.Struct({
+  sessionID: Schema.String,
+  duration: NonNegativeInt,
+}).annotate({ identifier: "SessionStats.LongestSession" })
+export type LongestSession = typeof LongestSession.Type
 
 export const ModelUsage = Schema.Struct({
   model: Model.Ref,
@@ -57,11 +66,17 @@ export const Info = Schema.Struct({
   subagents: NonNegativeInt,
   prompts: NonNegativeInt,
   steps: NonNegativeInt,
+  /** User and assistant messages inside the range, which is what a usage page calls "消息累计". */
+  messages: NonNegativeInt,
   tokens: TokenUsage.Info,
   cost: Money.USD,
   tools: Tools,
   activeDays: NonNegativeInt,
+  /** The longest run of consecutive active days anywhere in the range. */
   streak: NonNegativeInt,
+  /** The run of consecutive active days ending at the range's last active day. */
+  currentStreak: NonNegativeInt,
+  longestSession: optional(LongestSession),
   activity: Schema.Array(Activity),
   models: Schema.Array(ModelUsage),
 }).annotate({ identifier: "SessionStats.Info" })

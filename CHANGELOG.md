@@ -6,8 +6,9 @@ Release notes for OpenCode V2, newest first.
 
 - The desktop session view keeps a right-hand rail with the session's changed files and line counts, its branch and uncommitted count, the skills and MCP servers it used, and the pages it consulted.
 - New routes `POST /api/vcs/commit` and `POST /api/vcs/push` back the rail's two actions. A commit takes exactly the paths it is given (`git commit --only`), runs hooks, and returns the new commit; a push sends the checked-out branch with an explicit refspec and never forces. `bun run generate` was rerun in `packages/client`.
+- New settings page **Token 使用统计** (`/settings?tab=usage`): cumulative and single-day peak tokens, longest session, current and longest streaks, a selectable range (today through all time, plus a custom pair of dates), active days, daily average, session and message counts, the most-used model's share, a per-period usage trend, a 100-tick model ring, and an activity strip whose cells cover area proportional to the day's tokens.
+- `session.stats` gained the fields that page needs: `activity[].tokens`, `messages`, `currentStreak`, and an optional `longestSession {sessionID, duration}`. `streak` keeps its existing meaning, the longest run inside the range.
 - The desktop app no longer lists session tabs across the top of the window. The workspaces rail already groups sessions by project directory, so it is now the one place a session is switched, and the two switchers no longer show the same sessions twice. Its rows took over what the top strip carried: close on hover, rename in place, the delete confirmation, and the busy and unread marks. `Ctrl+Tab`, `Ctrl+Shift+Tab`, `Alt+↑ / Alt+↓`, the unseen variants and `Cmd+1..9` still cycle sessions with no strip on screen. Settings → General → Interface names that mode **Workspaces** ("Sessions grouped by folder in the sidebar"); Side tabs and Inbox are unchanged.
-
 
 ## v2.2.0 — 2026-10-27
 
