@@ -8,7 +8,7 @@
 export const SESSION_PANEL_WIDTH_MIN = 320
 
 /** The session rail's column. The chat panel reserves this much of the row while the rail is the right-hand pane. */
-export const SESSION_RAIL_WIDTH = 264
+export const SESSION_RAIL_WIDTH = 296
 
 const SIDE_PANE_WIDTH_MIN = 320
 
