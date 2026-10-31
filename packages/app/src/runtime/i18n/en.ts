@@ -785,6 +785,7 @@ export const dict = {
 
   "sidebar.settings": "Settings",
   "sidebar.help": "Help",
+  "sidebar.theme.toggle": "Switch theme",
   "sidebar.inbox.empty": "Sessions you work on will appear here",
   "sidebar.inbox.section.needsAttention": "Needs attention",
   "sidebar.inbox.section.unread": "Unread",

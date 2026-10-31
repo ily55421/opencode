@@ -9,6 +9,7 @@ import { Icon, type IconProps } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
 import { Menu } from "@opencode/ui/menu"
 import { Tooltip } from "@opencode/ui/tooltip"
+import { useTheme } from "@opencode/ui/theme"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { SessionProgressIndicatorV2 } from "@opencode/session-ui/v2/session-progress-indicator-v2"
 import { useQuery } from "@tanstack/solid-query"
@@ -44,6 +45,12 @@ type WorkspaceGroup = {
 }
 
 const GROUP_LIMIT = 5
+
+/**
+ * The rail toggles between the shipped default and the Indigo scheme only. The rest of the catalogue stays on the
+ * Settings page; a one-button quick switch has to name its two ends.
+ */
+const TOGGLE_THEMES = { default: "oc-2", indigo: "indigo" } as const
 
 type SidebarLabel = Parameters<ReturnType<typeof useLanguage>["t"]>[0]
 
@@ -85,6 +92,7 @@ export function WorkspaceSidebar() {
   const navigate = useNavigate()
   const location = useLocation()
   const settings = useSettingsSurface()
+  const theme = useTheme()
   const pickDirectory = useDirectoryPicker()
   const home = createHomeController()
 
@@ -231,6 +239,10 @@ export function WorkspaceSidebar() {
 
     return settings.active() && view.type === "root" ? view.tab : undefined
   })
+
+  // Any other theme the person picked in Settings still shows here as the default's counterpart, so the button never
+  // appears to do nothing.
+  const nextTheme = createMemo(() => (theme.themeId() === TOGGLE_THEMES.indigo ? TOGGLE_THEMES.default : TOGGLE_THEMES.indigo))
 
   const open = (record: HomeSessionRecord) => {
     const conn = home.server.focused()
@@ -454,13 +466,23 @@ export function WorkspaceSidebar() {
         </Menu>
       </div>
 
-      <div class="mt-1 grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1 border-t border-v2-border-border-base pt-1.5">
+      <div class="mt-1 grid shrink-0 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-1 border-t border-v2-border-border-base pt-1.5">
         <SidebarNavItem
           icon="settings-gear"
           label={language.t("sidebar.settings")}
           active={activePage() === "general"}
           onClick={() => settings.open()}
         />
+        <Tooltip value={`${language.t("sidebar.theme.toggle")} · ${theme.name(theme.themeId())}`} placement="top">
+          <IconButton
+            type="button"
+            variant="ghost-muted"
+            size="small"
+            icon={<Icon name="appearance" size="small" />}
+            aria-label={language.t("sidebar.theme.toggle")}
+            onClick={() => theme.setTheme(nextTheme())}
+          />
+        </Tooltip>
         <Tooltip value={language.t("sidebar.help")} placement="top">
           <IconButton
             type="button"

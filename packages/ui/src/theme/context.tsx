@@ -82,6 +82,7 @@ const names = new Map(
     gruvbox: "Gruvbox",
     kanagawa: "Kanagawa",
     "lucent-orng": "Lucent Orng",
+    indigo: "Indigo",
     material: "Material",
     matrix: "Matrix",
     mercury: "Mercury",

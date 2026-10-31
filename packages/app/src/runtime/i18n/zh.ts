@@ -412,6 +412,7 @@ export const dict = {
 
   "sidebar.settings": "设置",
   "sidebar.help": "帮助",
+  "sidebar.theme.toggle": "切换主题",
   "sidebar.project.recentSessions": "最近会话",
   "sidebar.project.clearNotifications": "清除通知",
 
