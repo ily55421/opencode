@@ -532,7 +532,7 @@ test("vertical tabs resize, scroll, show shortcut hints, and navigate", async ({
   const sidebar = page.locator('[data-slot="vertical-tabs-sidebar"]')
   const tabB = sidebar.locator(`[data-titlebar-tab-link][href="${sessionHref(b.id)}"]`)
   await expect(sidebar.locator("[data-titlebar-tab-slot]")).toHaveCount(26)
-  await expect(sidebar).toHaveCSS("width", "240px")
+  await expect(sidebar).toHaveCSS("width", "252px")
   await expect(page.locator('[data-slot="titlebar-tabs"]')).toHaveCount(0)
 
   // Actions and session rows share one icon lane, and the resize handle fills only the gap after the rows.
@@ -575,8 +575,8 @@ test("vertical tabs resize, scroll, show shortcut hints, and navigate", async ({
     await expect(sidebar).toHaveCSS("width", width)
   }
 
-  await resize(-44, "196px")
-  await resize(-40, "156px")
+  await resize(-80, "172px")
+  await resize(-20, "152px")
 
   for (const name of ["Home", "New session"]) {
     const label = sidebar.getByRole("button", { name, exact: true }).getByText(name, { exact: true })
