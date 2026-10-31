@@ -1271,6 +1271,7 @@ export const dict = {
   "workspace.sidebar.more": "{{count}} more",
   "workspace.sidebar.less": "Show less",
   "workspace.sidebar.empty": "No sessions yet",
+  "workspace.sidebar.moreNav": "More",
   "composer.status.local": "Local mode",
   "composer.status.noBranch": "No branch",
   "composer.permission.title": "Approval mode",

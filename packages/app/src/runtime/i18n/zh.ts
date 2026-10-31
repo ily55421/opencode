@@ -955,6 +955,7 @@ export const dict = {
   "workspace.sidebar.more": "还有 {{count}} 个",
   "workspace.sidebar.less": "收起",
   "workspace.sidebar.empty": "还没有会话",
+  "workspace.sidebar.moreNav": "更多",
   "composer.status.local": "本地模式",
   "composer.status.noBranch": "没有可用的本地分支",
   "composer.permission.title": "授权模式",

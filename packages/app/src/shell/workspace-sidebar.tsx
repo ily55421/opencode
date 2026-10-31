@@ -5,7 +5,7 @@ import {
   getProjectAvatarSource,
   getProjectAvatarVariant,
 } from "@opencode/ui/project-avatar"
-import { Icon } from "@opencode/ui/icon"
+import { Icon, type IconProps } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
 import { Menu } from "@opencode/ui/menu"
 import { Tooltip } from "@opencode/ui/tooltip"
@@ -30,7 +30,7 @@ import { useSessionTabAvatarState } from "@/shell/layout/project-avatar-state"
 import { DeleteSessionDialog, renameSessionTitle } from "@/shell/tabs/activity"
 import { EditableTitle } from "@/shell/editable-title"
 import { sessionLabel } from "@/session/title"
-import { useSettingsDialog } from "@/settings/command"
+import { useSettingsSurface, type SettingsRootTab } from "@/settings/surface"
 import { useCommand } from "@/shell/commands/command"
 import { homeProjectDirectories } from "@/shell/layout/helpers"
 import { draftHref, findSessionTab, useTabs } from "@/shell/tabs/tabs"
@@ -44,6 +44,31 @@ type WorkspaceGroup = {
 }
 
 const GROUP_LIMIT = 5
+
+type SidebarLabel = Parameters<ReturnType<typeof useLanguage>["t"]>[0]
+
+/**
+ * The bottom navigation's destinations. Each one is a Settings root page the host owns, so the rail never offers an
+ * entry that leads nowhere; the rest of those pages stay reachable through `More`.
+ */
+const NAV_PAGES = [
+  { tab: "usage", icon: "window-analytics", label: "settings.usage.title" },
+  { tab: "extensions", icon: "extensions", label: "settings.tab.extensions" },
+  { tab: "servers", icon: "server", label: "settings.tab.servers" },
+] as const satisfies readonly { tab: SettingsRootTab; icon: IconProps["name"]; label: SidebarLabel }[]
+
+const MORE_PAGES = [
+  { tab: "shortcuts", label: "settings.tab.shortcuts" },
+  { tab: "notifications", label: "settings.tab.notifications" },
+  { tab: "experimental", label: "settings.tab.experimental" },
+  { tab: "about", label: "settings.tab.about" },
+] as const satisfies readonly { tab: SettingsRootTab; label: SidebarLabel }[]
+
+// One row style for every sidebar destination, top nav and bottom nav alike.
+const NAV_ROW =
+  "flex h-8 w-full min-w-0 items-center gap-2 rounded-md px-1.5 text-start text-[13px] text-v2-text-text-base transition-colors hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-v2-border-border-focus"
+
+const NAV_ROW_ACTIVE = "bg-v2-background-bg-layer-02"
 
 /** The recent-session window is hours wide while the rail stays mounted for days, so the cutoff needs its own clock. */
 const RECENCY_TICK_MS = 5 * 60 * 1000
@@ -59,7 +84,7 @@ export function WorkspaceSidebar() {
   const tabs = useTabs()
   const navigate = useNavigate()
   const location = useLocation()
-  const settings = useSettingsDialog()
+  const settings = useSettingsSurface()
   const pickDirectory = useDirectoryPicker()
   const home = createHomeController()
 
@@ -200,6 +225,13 @@ export function WorkspaceSidebar() {
     return at >= 0 && segments[at + 1] === sessionID
   }
 
+  // The Settings tab currently on screen, so the bottom nav marks the row that owns it. A project page has no root tab.
+  const activePage = createMemo(() => {
+    const view = settings.view()
+
+    return settings.active() && view.type === "root" ? view.tab : undefined
+  })
+
   const open = (record: HomeSessionRecord) => {
     const conn = home.server.focused()
 
@@ -227,7 +259,7 @@ export function WorkspaceSidebar() {
   return (
     <aside
       data-slot="workspace-sidebar"
-      class="hidden w-[276px] shrink-0 flex-col bg-v2-background-bg-deep px-2.5 pb-2 pt-3 md:flex"
+      class="hidden w-[252px] shrink-0 flex-col border-e border-v2-border-border-base bg-v2-background-bg-deep px-2.5 pb-2 pt-3 md:flex"
     >
       <div class="flex h-8 shrink-0 items-center gap-2 px-1">
         <span class="flex size-6 shrink-0 items-center justify-center rounded-md bg-v2-background-bg-layer-02 text-v2-icon-icon-base">
@@ -244,12 +276,12 @@ export function WorkspaceSidebar() {
       </div>
 
       <div class="mt-2 flex shrink-0 flex-col gap-0.5">
-        <SidebarAction
+        <SidebarNavItem
           icon="plus"
           label={language.t("workspace.sidebar.newTask")}
           onClick={() => home.project.openNewSession()}
         />
-        <SidebarAction
+        <SidebarNavItem
           icon="magnifying-glass"
           label={language.t("workspace.sidebar.search")}
           onClick={() => command.trigger("command.palette")}
@@ -292,7 +324,7 @@ export function WorkspaceSidebar() {
 
                 return (
                   <div class="mb-1.5">
-                    <div class="group/workspace flex h-7 w-full min-w-0 items-center rounded-md text-[12px] font-[530] text-v2-text-text-muted transition-colors hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base">
+                    <div class="group/workspace flex h-7 w-full min-w-0 items-center rounded-lg text-[12.5px] font-[530] text-v2-text-text-muted transition-colors hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base">
                       <button
                         type="button"
                         class="flex h-full min-w-0 flex-1 items-center gap-1.5 ps-1.5 pe-1 text-start focus-visible:outline-none"
@@ -335,7 +367,7 @@ export function WorkspaceSidebar() {
                             <button
                               type="button"
                               aria-current={activeDraft() === draft.id ? "page" : undefined}
-                              class="flex h-7 w-full min-w-0 items-center gap-1.5 rounded-md px-1.5 text-start text-[12px] transition-colors focus-visible:outline-none"
+                              class="flex h-7 w-full min-w-0 items-center gap-1.5 rounded-lg px-1.5 text-start text-[12.5px] transition-colors focus-visible:outline-none"
                               classList={{
                                 "bg-v2-overlay-simple-overlay-pressed text-v2-text-text-base":
                                   activeDraft() === draft.id,
@@ -396,15 +428,39 @@ export function WorkspaceSidebar() {
 
       <ActivityStrip activity={activity} class="mt-2 shrink-0" />
 
-      <div class="mt-2 flex shrink-0 items-center gap-1 border-t border-v2-border-border-base px-1 pt-2">
-        <button
-          type="button"
-          class="flex h-7 min-w-0 flex-1 items-center gap-2 rounded-md px-1.5 text-[12px] text-v2-text-text-faint transition-colors hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-muted focus-visible:outline-none"
-          onClick={() => settings()}
-        >
-          <Icon name="settings-gear" size="small" class="shrink-0" />
-          <span class="truncate">{language.t("sidebar.settings")}</span>
-        </button>
+      <div class="mt-2 flex shrink-0 flex-col gap-0.5">
+        <For each={NAV_PAGES}>
+          {(page) => (
+            <SidebarNavItem
+              icon={page.icon}
+              label={language.t(page.label)}
+              active={activePage() === page.tab}
+              onClick={() => settings.open(page.tab)}
+            />
+          )}
+        </For>
+        <Menu appearance="standard" gutter={4} modal={false} placement="top-start">
+          <Menu.Trigger as="button" type="button" class={NAV_ROW}>
+            <Icon name="outline-dots" size="small" class="shrink-0 text-v2-icon-icon-muted" />
+            <span class="min-w-0 truncate">{language.t("workspace.sidebar.moreNav")}</span>
+          </Menu.Trigger>
+          <Menu.Portal>
+            <Menu.Content>
+              <For each={MORE_PAGES}>
+                {(page) => <Menu.Item onSelect={() => settings.open(page.tab)}>{language.t(page.label)}</Menu.Item>}
+              </For>
+            </Menu.Content>
+          </Menu.Portal>
+        </Menu>
+      </div>
+
+      <div class="mt-1 grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1 border-t border-v2-border-border-base pt-1.5">
+        <SidebarNavItem
+          icon="settings-gear"
+          label={language.t("sidebar.settings")}
+          active={activePage() === "general"}
+          onClick={() => settings.open()}
+        />
         <Tooltip value={language.t("sidebar.help")} placement="top">
           <IconButton
             type="button"
@@ -420,11 +476,21 @@ export function WorkspaceSidebar() {
   )
 }
 
-function SidebarAction(props: { icon: "plus" | "magnifying-glass"; label: string; onClick: () => void }) {
+/**
+ * One sidebar destination. Top nav and bottom nav share it, so a row never advertises itself as secondary by going
+ * small and faint; `active` is the only thing that sets a row apart.
+ */
+function SidebarNavItem(props: {
+  icon: IconProps["name"]
+  label: string
+  active?: boolean
+  onClick: () => void
+}) {
   return (
     <button
       type="button"
-      class="flex h-8 w-full items-center gap-2 rounded-md px-1.5 text-[13px] text-v2-text-text-base transition-colors hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none"
+      aria-current={props.active ? "page" : undefined}
+      class={props.active ? `${NAV_ROW} ${NAV_ROW_ACTIVE}` : NAV_ROW}
       onClick={props.onClick}
     >
       <Icon name={props.icon} size="small" class="shrink-0 text-v2-icon-icon-muted" />
@@ -483,7 +549,7 @@ function WorkspaceSessionRow(props: {
       ref={root}
       data-slot="workspace-session-row"
       data-session-id={props.record.session.id}
-      class="group/session flex h-7 w-full min-w-0 items-center gap-1.5 rounded-md pe-1 text-[12px] transition-colors"
+      class="group/session flex h-7 w-full min-w-0 items-center gap-1.5 rounded-lg pe-1 text-[12.5px] transition-colors"
       classList={{
         "bg-v2-overlay-simple-overlay-pressed text-v2-text-text-base": props.selected,
         "text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base":
@@ -563,7 +629,14 @@ function WorkspaceSessionRow(props: {
           type="button"
           variant="ghost-muted"
           size="small"
-          class="hover-reveal shrink-0 group-hover/session:opacity-100 focus-visible:opacity-100"
+          class="shrink-0 transition-opacity group-hover/session:pointer-events-auto group-hover/session:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
+          classList={{
+            // `hover-reveal` would force this visible on a touch display, where no hover ever happens to reveal it,
+            // so every listed tab grew a close button at once. Only the row you are on carries one; the rest wait for
+            // hover, and stay inert while hidden so an invisible control cannot be tapped.
+            "opacity-100": props.selected,
+            "pointer-events-none opacity-0": !props.selected,
+          }}
           icon={<Icon name="xmark-small" size="small" />}
           aria-label={language.t("common.closeTab")}
           onClick={(event: MouseEvent) => {
