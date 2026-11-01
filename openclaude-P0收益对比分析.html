@@ -1,0 +1,886 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>openclaude 对照 P0 收益对比分析 · 12 项</title>
+<style>
+  :root {
+    --bg: #f6f6f3;
+    --panel: #ffffff;
+    --ink: #1b1f23;
+    --muted: #5f676e;
+    --faint: #8a9298;
+    --line: #e3e3dd;
+    --line-strong: #cfd0c9;
+    --teal: #0f766e;
+    --teal-soft: #d9eeea;
+    --blue: #1d4ed8;
+    --blue-soft: #dde5fb;
+    --purple: #6d28d9;
+    --purple-soft: #e9e0fb;
+    --amber: #b45309;
+    --amber-soft: #f8e8d4;
+    --red: #b91c1c;
+    --red-soft: #f7dede;
+    --gray: #6b7280;
+    --gray-soft: #ececea;
+    --radius: 14px;
+    --shadow: 0 1px 2px rgba(20, 24, 28, .05), 0 10px 30px rgba(20, 24, 28, .05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111417;
+      --panel: #191d21;
+      --ink: #e8e6e1;
+      --muted: #a4abb1;
+      --faint: #7c848b;
+      --line: #2a2f34;
+      --line-strong: #3a4046;
+      --teal: #2dd4bf;
+      --teal-soft: #10322e;
+      --blue: #93b4ff;
+      --blue-soft: #17233f;
+      --purple: #c4b5fd;
+      --purple-soft: #241a3d;
+      --amber: #fbbf24;
+      --amber-soft: #35270f;
+      --red: #f87171;
+      --red-soft: #3a1717;
+      --gray: #9ca3af;
+      --gray-soft: #24282c;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .4);
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Segoe UI", system-ui, -apple-system, "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 28px; }
+  header.hero { padding: 64px 0 30px; border-bottom: 1px solid var(--line); }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--teal); font-weight: 700; }
+  h1 { font-size: clamp(30px, 4.4vw, 50px); line-height: 1.12; margin: 12px 0 14px; letter-spacing: -.02em; }
+  .lede { max-width: 860px; color: var(--muted); font-size: 16px; margin: 0; }
+  .lede strong { color: var(--ink); font-weight: 650; }
+  .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 30px 0 4px; }
+  .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); }
+  .kpi .v { font-size: 27px; font-weight: 720; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .kpi .k { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  section { padding: 46px 0 8px; }
+  .sec-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 8px; }
+  h2 { font-size: 24px; letter-spacing: -.01em; margin: 0; }
+  .sec-note { color: var(--muted); font-size: 13px; margin: 0 0 20px; max-width: 900px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+  .pad { padding: 20px 22px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 12px; color: var(--muted); margin-top: 12px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: 1px; }
+  .two-col { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(300px, .65fr); gap: 18px; align-items: start; }
+  @media (max-width: 940px) { .two-col { grid-template-columns: 1fr; } .kpis { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+  .weights { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .weights th, .weights td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .weights th { color: var(--muted); font-weight: 600; }
+  .weights td:last-child, .weights th:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+  .bar-list { display: flex; flex-direction: column; gap: 9px; }
+  .bar-row { display: grid; grid-template-columns: 58px 1fr 150px; gap: 12px; align-items: center; }
+  .bar-id { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .track { position: relative; height: 20px; background: var(--gray-soft); border-radius: 6px; overflow: hidden; }
+  .fill { height: 100%; border-radius: 6px; background: var(--teal); opacity: .82; }
+  .bar-meta { font-size: 12px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tag { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line-strong); color: var(--muted); white-space: nowrap; }
+  .tag.teal { color: var(--teal); border-color: color-mix(in srgb, var(--teal) 45%, transparent); background: var(--teal-soft); }
+  .tag.blue { color: var(--blue); border-color: color-mix(in srgb, var(--blue) 45%, transparent); background: var(--blue-soft); }
+  .tag.purple { color: var(--purple); border-color: color-mix(in srgb, var(--purple) 45%, transparent); background: var(--purple-soft); }
+  .tag.amber { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 45%, transparent); background: var(--amber-soft); }
+  .tag.red { color: var(--red); border-color: color-mix(in srgb, var(--red) 45%, transparent); background: var(--red-soft); }
+  .tag.gray { color: var(--gray); background: var(--gray-soft); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+  .chip { border: 1px solid var(--line-strong); background: transparent; color: var(--muted); border-radius: 999px; padding: 5px 12px; font-size: 12px; cursor: pointer; font-family: inherit; }
+  .chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .chip:hover { border-color: var(--ink); }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); box-shadow: var(--shadow); }
+  table.grid { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 900px; }
+  table.grid th, table.grid td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  table.grid thead th { position: sticky; top: 0; background: var(--panel); z-index: 1; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); cursor: pointer; user-select: none; white-space: nowrap; }
+  table.grid thead th:hover { color: var(--ink); }
+  table.grid tbody tr:hover { background: color-mix(in srgb, var(--teal) 5%, transparent); }
+  table.grid td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  table.grid td.what { color: var(--muted); min-width: 260px; }
+  .heat td.cell { text-align: center; font-weight: 650; font-variant-numeric: tabular-nums; border-radius: 5px; }
+  .heat td.h1 { background: color-mix(in srgb, var(--teal) 8%, transparent); }
+  .heat td.h2 { background: color-mix(in srgb, var(--teal) 20%, transparent); }
+  .heat td.h3 { background: color-mix(in srgb, var(--teal) 38%, transparent); }
+  .heat td.h4 { background: color-mix(in srgb, var(--teal) 58%, transparent); color: var(--panel); }
+  .heat td.h5 { background: color-mix(in srgb, var(--teal) 76%, transparent); color: var(--panel); }
+  @media (max-width: 720px) {
+    #heat-table { min-width: 0 !important; }
+    #heat-table th:nth-child(2), #heat-table td:nth-child(2) { display: none; }
+    #heat-table th, #heat-table td { padding: 8px 6px; }
+  }
+  .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  @media (max-width: 860px) { .cards { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow); }
+  .card h3 { margin: 0 0 4px; font-size: 17px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .card .one { color: var(--muted); font-size: 14px; margin: 0 0 12px; }
+  .card ul { margin: 0; padding-left: 18px; font-size: 13px; color: var(--muted); }
+  .card li { margin: 4px 0; }
+  .card li strong { color: var(--ink); font-weight: 620; }
+  .card .foot { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); font-size: 12px; color: var(--faint); display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .callout { border-left: 3px solid var(--amber); background: var(--amber-soft); padding: 14px 16px; border-radius: 0 10px 10px 0; font-size: 13px; color: var(--ink); margin: 16px 0; }
+  .callout.strong-border { border-left-color: var(--red); background: var(--red-soft); }
+  .callout strong { color: var(--amber); }
+  .callout.strong-border strong { color: var(--red); }
+  .mono { font-family: ui-monospace, SFMono-Regular, "Cascadia Code", Consolas, monospace; font-size: 12px; }
+  footer { margin-top: 48px; padding: 26px 0 50px; border-top: 1px solid var(--line); color: var(--faint); font-size: 12px; }
+  svg text { font-family: inherit; }
+  .chart-scroll { overflow-x: auto; overflow-y: hidden; }
+  .chart-scroll svg { min-width: 820px; }
+  .hint { font-size: 12px; color: var(--faint); margin: 10px 0 0; }
+  ol.checks { margin: 0; padding-left: 20px; color: var(--muted); font-size: 13px; }
+  ol.checks li { margin: 7px 0; }
+  ol.checks li strong { color: var(--ink); font-weight: 620; }
+  @media print {
+    body { background: #fff; }
+    .chip, .chips { display: none; }
+    section { break-inside: avoid; }
+    .panel, .card, .table-wrap { box-shadow: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <div class="eyebrow">openclaude 对照 P0 · 基线 2.2.0-fork.11 @ 51201b6445 · 2026-11-01 · OC-6 与 OC-8 已落地，本页已覆盖更新</div>
+  <h1>openclaude 对照 12 项：收益、成本与归口</h1>
+  <p class="lede">
+    第五轮跨仓库采矿（前四轮：ADM、kimi-code、codex、ZCode + dsh/Reasonix + OpenHands）。对象是
+    <strong>D:\code\github\openclaude</strong> v0.33.0，<code class="mono">src/</code> 93 万行 TS 的 Claude Code fork。
+    打分与权重完全沿用 <strong>P0-收益对比分析</strong> 与 <strong>借鉴 P0-收益对比分析</strong> 两页的五维与四预设，因此三页分数可比。
+    本轮有一项<strong>撤回</strong>（前提经实测不成立），有一项是复核时新抓到的<strong>当前未生效的门禁</strong>。
+    本页默认按 <strong>速度优先 · 花钱无所谓</strong> 打开，切换预设会重算全部图表。
+    <strong>2026-11-01 覆盖更新：</strong>OC-6 与 OC-8 已在本仓落地（分支 <span class="mono">loop-reliability-docs</span>），
+    状态、复核命令与归口结论按落地后现状改写；分数与工期保留原值，不因落地回填。
+  </p>
+  <div class="kpis">
+    <div class="kpi"><div class="v">12</div><div class="k">立项条目（另撤回 1 项）</div></div>
+    <div class="kpi"><div class="v">5</div><div class="k">先做集合 · 2.5 人日</div></div>
+    <div class="kpi"><div class="v">9.5<span style="font-size:14px;font-weight:600"> 人日</span></div><div class="k">全部（含规划与待量项）</div></div>
+    <div class="kpi"><div class="v">5</div><div class="k">与既有 38 项相撞归口</div></div>
+  </div>
+</header>
+
+<main>
+
+<section id="summary">
+  <div class="sec-head"><h2>P0 功能点清单</h2><span class="tag gray">一句话 + 落点 + 代价</span></div>
+  <p class="sec-note">
+    「落点」指本轮之后该由哪份文档长期持有这条规则；按 <span class="mono">agents.md</span> 的约定，新约定进 owning topic doc，索引行只留一条。
+    分数按「均衡」预设标注，随预设变的是排序与总分，不是理由。
+  </p>
+  <div class="table-wrap">
+    <table class="grid" id="summary-table">
+      <thead>
+        <tr>
+          <th>项</th><th>名称</th><th>状态</th><th style="text-align:right">工期</th>
+          <th>来源机制</th><th>落点文档</th><th>一句话</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <div class="callout strong-border" style="margin-top:18px">
+    <strong>本轮唯一"今天就存在、且一直在裸奔"的洞：</strong>根 ast-grep 规则包里那 6 条把
+    <span class="mono">agents.md</span> 硬性风格规定机器化的规则——
+    <span class="mono">no-star-import</span>、<span class="mono">no-import-alias</span>、
+    <span class="mono">no-drizzle-column-name</span>、<span class="mono">no-json-parse-cast</span>、
+    <span class="mono">no-effect-die-string</span>、<span class="mono">no-nested-effect-service-yield</span>——
+    以及它们的规则测试 <span class="mono">test:lint-rules</span>，<strong>在 <span class="mono">.github/</span> 下引用数为 0</strong>。
+    隔壁那包 <span class="mono">effect-simplifications</span> 却是扫描和规则测试双双进 CI。详见 OC-2。
+  </div>
+</section>
+
+<section id="evidence">
+  <div class="sec-head"><h2>本轮复核</h2><span class="tag teal">2026-11-01 在 51201b6445 重跑</span></div>
+  <p class="sec-note">
+    下面每一条都是我自己跑的，不是子代理转述。这一节存在的原因是：本轮推翻了台账里两条既有结论
+    （见「本轮更正的台账」），也撤回了本页草稿里的一项——不写清命令，下一轮又会把过期的当现状。
+  </p>
+  <div class="panel pad">
+    <ol class="checks">
+      <li><strong>权限升级只接在 shell 上。</strong><span class="mono">grep -rn "risk:" packages/core/src</span> → 命中一处：<span class="mono">tool/plugin/shell.ts:150</span>。而
+        <span class="mono">edit.ts:275</span>、<span class="mono">write.ts:78</span>、<span class="mono">patch.ts:219</span> 都调
+        <span class="mono">permission.assert</span> 但不传 <span class="mono">risk</span>。→ OC-1 成立。</li>
+      <li><strong>没有任何敏感路径名单。</strong><span class="mono">grep -rE ".ssh|authorized_keys|.git/|bashrc|zshrc|.github/workflows|sensitivePath|protectedPath" packages/core/src/tool packages/core/src/permission.ts packages/core/src/shell</span> → <strong>0 命中</strong>。→ OC-1 成立。</li>
+      <li><strong>"升级优先于 allow" 确实已实现</strong>（这条推翻旧台账）：<span class="mono">permission.ts:186</span> 为
+        <span class="mono">input.risk &amp;&amp; !opted ? "ask" : evaluate(...)</span>，<span class="mono">:210</span> 为
+        <span class="mono">save: input.risk ? [] : input.save</span>；<span class="mono">opted</span> 只读会话自身规则，注释写明读合并集会让默认 agent 的
+        <span class="mono">*/* allow</span> 把升级彻底消音。→ 旧「item 0 未修」作废。</li>
+      <li><strong>周期死循环断路器确实已实现</strong>（第二条推翻）：<span class="mono">session/runner/loop.ts</span> 有
+        <span class="mono">WINDOW 25 / MAX_PERIOD 5 / REPEAT_LIMIT 5</span> 与
+        <span class="mono">REJECT_LIMIT / DECLINE_LIMIT / MALFORMED_LIMIT</span>，且从 durable history 折叠；
+        <span class="mono">experimental.loop_guard</span> 在 <span class="mono">config/normalize.ts:506</span> 起、
+        <span class="mono">loop.ts:166</span> 读。→ 旧「无通用断路器」作废；对方 fork 的 <span class="mono">doomLoop.ts</span> 只数连续相同且状态在进程内。</li>
+      <li><strong>压缩原因在落盘那一刻被压平。</strong><span class="mono">session/compaction.ts:330</span> 为
+        <span class="mono">if (trigger.reason !== "manual") publish(Compaction.Started, { reason: "auto" })</span>——
+        <span class="mono">overflow</span> 与 <span class="mono">auto</span> 在内存里可分，进 durable 事件不可分。→ OC-3 成立，且这是本仓缺陷不是借鉴项。</li>
+      <li><strong>工具面没有任何按需加载。</strong><span class="mono">grep -rln "tool_search|toolSearch|defer_loading|deferLoading" packages/core/src</span> → 原为 <strong>0 命中</strong>，OC-8 因此成立（第二次独立印证，与 codex 那轮的 <span class="mono">tool_search</span> 合流）。
+        <strong>覆盖更新（2026-11-01）：该结论已失效</strong>——落地后同一命令命中 1 个文件：
+        <span class="mono">packages/core/src/session/tool-surface.ts</span>（含 <span class="mono">model-request.ts</span> 的接线与
+        <span class="mono">experimental.defer_tool_schemas</span> 的 schema/normalize）。→ OC-8 转入「已落地」。</li>
+      <li><strong>撤回项：生成物 drift 已经钉住了。</strong><span class="mono">packages/client/package.json</span> 的
+        <span class="mono">check:generated = bun run generate &amp;&amp; git diff --exit-code -- src/promise/generated src/effect/generated src/effect/api</span>，
+        <span class="mono">packages/protocol</span> 的同名脚本是 <span class="mono">generate-openapi.ts --check</span>，
+        两者都在 <span class="mono">check-test.yml:143/148</span> 跑。→ 草稿里的「生成物 drift 进 CI」<strong>不立项</strong>。</li>
+      <li><strong>未接入的 AST 规则包。</strong><span class="mono">bun run lint</span> 只扫
+        <span class="mono">-c script/ast-grep/gui-plugins/sgconfig.yml</span>；<span class="mono">lint:effect-patterns</span> 与
+        <span class="mono">test:lint-rules</span>（根 <span class="mono">sgconfig.yml</span> → <span class="mono">rules/</span> 那 6 条）在
+        <span class="mono">.github/</span> 全目录 grep 引用为 0；而 <span class="mono">lint:effect-simplifications</span> 与
+        <span class="mono">test:effect-simplification-rules</span> 都在 <span class="mono">check-test.yml</span>。→ OC-2 成立。</li>
+      <li><strong><span class="mono">any</span> 确实没人管。</strong><span class="mono">.oxlintrc.json</span> 里搜不到
+        <span class="mono">no-explicit-any</span>；<span class="mono">grep -rE ": any\b|as any" packages/core/src</span> 粗略 44 处（含注释，需按对方 lexer 口径复核）。→ OC-4 成立，但基数要先测准。</li>
+      <li><strong><span class="mono">AbortSignal.timeout</span> 有 27 处</strong>，跨 18 个文件（<span class="mono">core/src/aisdk.ts</span> ×2、
+        <span class="mono">core/src/plugin/provider/openai.ts</span>、<span class="mono">core/src/codemode/web.ts</span>、
+        <span class="mono">modal/models.ts</span>、<span class="mono">github-copilot/models.ts</span>、<span class="mono">cli/src/services/updater.ts</span> 等，其余多为 1–2 处的一次性路径）。
+        对方给的 2.4 KB/次 是<strong>他们的</strong>测量。→ OC-12 保持「先量」，默认不开。</li>
+      <li><strong>分片不是我们的缺口。</strong><span class="mono">check-test.yml</span> 已有 Playwright
+        <span class="mono">shard: 1/2 · 2/2</span> 与 <span class="mono">turbo --affected</span>，注释还写明「按 test 数而非时长切」。
+        → OC-11 从「看门狗 + 分片自证」<strong>收窄</strong>为「完成性验证」一条。</li>
+    </ol>
+  </div>
+  <div class="two-col" style="margin-top:18px">
+    <div class="panel pad">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:8px">本轮更正的台账（三处）</div>
+      <table class="weights">
+        <tbody>
+          <tr><td><span class="tag red">作废</span></td><td>「权限层没有 fail-closed，<span class="mono">findLast</span> 让 <span class="mono">bash *</span> 放行 <span class="mono">rm -rf /</span>」——升级机制已在，且危险审批不留可累积项；<strong>残余是形状而非顺序</strong>：只有 shell 传 <span class="mono">risk</span>。</td></tr>
+          <tr><td><span class="tag red">作废</span></td><td>「我们完全没有通用重复/空转断路器」——<span class="mono">loop.ts</span> 已随 <span class="mono">08aef689be</span> 落地，且在重复搜索能力上<strong>强于</strong>对方。</td></tr>
+          <tr><td><span class="tag red">作废</span></td><td>借鉴清单 D2「loop guard 三态，随 L1 卡（未开工）」——L1 与 D2 <strong>同批已落</strong>，该卡转入增补而非开工。</td></tr>
+        </tbody>
+      </table>
+      <p class="hint" style="margin-top:10px">这正是「记忆说 X 存在」和「X 现在仍然存在」的区别。施工前请重跑本节命令。</p>
+    </div>
+    <div class="panel pad">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:8px">证据分级</div>
+      <table class="weights">
+        <tbody>
+          <tr><td><span class="tag teal">本轮实测</span></td><td>本节 11 条命令逐条重跑</td></tr>
+          <tr><td><span class="tag blue">对方实测</span></td><td>openclaude 代码内写明的测量，我们未复现</td></tr>
+          <tr><td><span class="tag amber">子代理</span></td><td>八并行报告，行号未逐条复看</td></tr>
+          <tr><td><span class="tag gray">未成立</span></td><td>本轮复核后撤回</td></tr>
+        </tbody>
+      </table>
+      <div style="font-size:13px;color:var(--muted);margin:16px 0 8px">对方仓库的可用性边界</div>
+      <p class="hint" style="margin:0">
+        这是闭源 Claude Code 的<strong>重建</strong>，大量内部是空 stub（<span class="mono">daemon/main.ts</span>、
+        <span class="mono">server/*</span>、<span class="mono">self-hosted-runner</span>、
+        <span class="mono">environment-runner</span>、整个 <span class="mono">assistant/</span>、
+        <span class="mono">cachedMicrocompact</span>、<span class="mono">reactiveCompact</span>、
+        <span class="mono">skillSearch/*</span>）。它的 daemon/server 拓扑与 gRPC 会话服务<strong>无从评价</strong>。
+      </p>
+    </div>
+  </div>
+</section>
+
+<section id="model">
+  <div class="sec-head"><h2>评分模型</h2><span class="tag gray">工程判断，不是实测</span></div>
+  <p class="sec-note">
+    与前两页同一套：五个维度各 1–5 分，按显式权重加权后 ×20 映射到 100 分；工期是工程日，不含 review 往返。
+    唯一的实测数据是上一节的命令结果与证据等级。<strong>切换预设会重算象限、ROI、热力表总分与对比表。</strong>
+  </p>
+  <div class="chips" id="presets" style="margin:0 0 10px"></div>
+  <p class="hint" id="weight-line" style="margin:0 0 8px"></p>
+  <div class="callout" id="preset-note" style="margin-top:0"></div>
+  <p class="hint" id="preset-top" style="margin:8px 0 18px"></p>
+  <div class="two-col">
+    <div class="panel pad">
+      <p class="hint" style="margin:0 0 10px">下表是「均衡」预设的权重定义；切换预设后，生效权重显示在页面顶部。</p>
+      <table class="weights">
+        <thead><tr><th>维度</th><th>看什么</th><th>权重</th></tr></thead>
+        <tbody>
+          <tr><td>运行可靠性</td><td>死循环、空响应、进程残留、工具名幻觉、失败不可见</td><td>30%</td></tr>
+          <tr><td>成本 / 延迟</td><td>prompt cache 命中、指令块体积、重复推理、无效步骤</td><td>25%</td></tr>
+          <tr><td>安全 / 权限</td><td>破坏性执行、敏感路径写入、宽 allow 授权、审批不可撤销</td><td>20%</td></tr>
+          <tr><td>可审计性</td><td>门禁是否真生效、原因史、配置/生成物/文档一致</td><td>15%</td></tr>
+          <tr><td>用户可见体验</td><td>模型反馈措辞、诚实的 N/A、TUI 与用量页可解释性</td><td>10%</td></tr>
+        </tbody>
+      </table>
+      <div class="callout" style="margin-bottom:0">
+        <strong>读法：</strong>分数高不等于先做。<strong>OC-5 / OC-2 / OC-3</strong> 是"半天以内换确定收益"；
+        <strong>OC-1</strong> 安全分最高但只有 5 分项被权重放大时才显眼；
+        <strong>OC-8</strong> 是全场最贵（2 人日）且撞 L4/L32，必须先排归口再排实现；
+        <strong>OC-10/11/12</strong> 的收益栏在实测前只能算假设。
+      </div>
+    </div>
+    <div class="panel pad">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:10px">状态分组</div>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--gray)"></span>已落地（收档）</span>
+        <span><span class="dot" style="background:var(--teal)"></span>先做（W1）</span>
+        <span><span class="dot" style="background:var(--purple)"></span>规划（随后）</span>
+        <span><span class="dot" style="background:var(--blue)"></span>随卡（挂已落地卡）</span>
+        <span><span class="dot" style="background:var(--amber)"></span>先量（不开默认）</span>
+      </div>
+      <div style="font-size:13px;color:var(--muted);margin:18px 0 8px">与施工图的关系</div>
+      <p class="hint" style="margin:0">
+        本页 12 项中 <strong>5 项</strong>与前四份清单的 38 项相撞，须归口而不是另立卡；<strong>1 项</strong>因已存在而撤回；
+        其余 6 项是全新轴（写路径形状、门禁生效性、失败连击、按需 schema、输出冻结、诚实分类）。
+        ROI 排序不等于开工顺序——OC-8 的 ROI 两个预设下都是<strong>全场最低</strong>，但它是 token 上限问题的唯一解。
+      </p>
+    </div>
+  </div>
+</section>
+
+<section id="quadrant">
+  <div class="sec-head"><h2>投入产出象限</h2><span class="tag gray">横轴 = 人日 · 纵轴 = 收益分</span></div>
+  <p class="sec-note">
+    左上先做，右上是"贵但值得"（OC-8 / OC-9），右下是先量与待决（虚线圈）。同坐标点做了微小水平偏移以便区分。
+  </p>
+  <div class="panel pad">
+    <div class="chart-scroll">
+      <svg id="scatter" viewBox="0 0 980 500" role="img" aria-label="各项工期与收益分散点图" style="width:100%;height:auto;display:block"></svg>
+    </div>
+    <div class="legend" id="scatter-legend"></div>
+    <p class="hint">窄窗口下图表可横向滚动；桌面宽度一次显示全部。</p>
+  </div>
+</section>
+
+<section id="rank">
+  <div class="sec-head"><h2>按投入产出比排序</h2><span class="tag gray">收益分 ÷ 人日</span></div>
+  <p class="sec-note">
+    ROI 只回答"同样的时间先花在哪"。OC-5 与 OC-3 的 ROI 极高是因为它们真的很小；OC-12 的 ROI 建立在<strong>未复现</strong>的泄漏数字上，仅供参考。
+  </p>
+  <div class="panel pad">
+    <div class="bar-list" id="rank-bars"></div>
+  </div>
+</section>
+
+<section id="matrix">
+  <div class="sec-head"><h2>收益结构热力表</h2><span class="tag gray">1–5 分 · 颜色越深收益越大</span></div>
+  <p class="sec-note">同一总分可能来自完全不同的结构：OC-1 全靠安全，OC-3 靠审计与体验，OC-8 靠成本，OC-2 靠审计。决定"先做什么"要看结构。</p>
+  <div class="table-wrap">
+    <table class="grid heat" id="heat-table" style="min-width:760px">
+      <thead>
+        <tr>
+          <th>项</th><th>一句话</th>
+          <th style="text-align:center">可靠性<br><span style="font-weight:400;text-transform:none;letter-spacing:0">30%</span></th>
+          <th style="text-align:center">成本/延迟<br><span style="font-weight:400;text-transform:none;letter-spacing:0">25%</span></th>
+          <th style="text-align:center">安全<br><span style="font-weight:400;text-transform:none;letter-spacing:0">20%</span></th>
+          <th style="text-align:center">可审计<br><span style="font-weight:400;text-transform:none;letter-spacing:0">15%</span></th>
+          <th style="text-align:center">体验<br><span style="font-weight:400;text-transform:none;letter-spacing:0">10%</span></th>
+          <th style="text-align:right">总分</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<section id="table">
+  <div class="sec-head"><h2>完整对比表</h2><span class="tag gray">点表头排序 · 上方按轴筛选</span></div>
+  <div class="chips" id="filters"></div>
+  <div class="table-wrap">
+    <table class="grid" id="main-table">
+      <thead>
+        <tr>
+          <th data-sort="id">项</th>
+          <th data-sort="axis">轴</th>
+          <th data-sort="status">状态</th>
+          <th data-sort="evidence">证据</th>
+          <th data-sort="days" style="text-align:right">工期</th>
+          <th data-sort="score" style="text-align:right">收益分</th>
+          <th data-sort="roi" style="text-align:right">ROI</th>
+          <th data-sort="deps">归口 / 依赖</th>
+          <th>一句话</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<section id="collision">
+  <div class="sec-head"><h2>与既有 38 项的相撞与归口</h2><span class="tag gray">这一节决定开工顺序</span></div>
+  <p class="sec-note">
+    四条清单（施工图 17 + dsh/Reasonix 9 + OpenHands 12）已经覆盖了不少同一件事的不同侧面。撞车不是坏消息——撞车的项通常<strong>更便宜</strong>，
+    因为卡已存在。真正要避免的是三处各自做预算、互相不知道。
+  </p>
+  <div class="table-wrap">
+    <table class="grid" id="collide-table" style="min-width:840px">
+      <thead><tr><th>本页</th><th>撞上</th><th>关系</th><th>结论</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <div class="callout" style="margin-top:16px">
+    <strong>最容易打架的一处：</strong>L32（指令/技能预算，今天刚落地的 instruction pools）、L4（模型→工具路由）、OC-8（工具面按需 schema）
+    是同一条「模型表面体积」轴上的三个层次——裁文本 / 按模型过滤 / 按步加载。三件若各自设百分比，
+    最终预算归属会互相抵赖。<strong>覆盖更新：持有者已定——工具面预算归 <span class="mono">doc/context-economics.md</span>；
+    L32 的指令池保持只管指令块，L4 仍是纸面方案，落地时在本页 OC-8 的阈值（窗口 10%、下限 2 000 token）上游组合。</strong>
+  </div>
+</section>
+
+<section id="notes">
+  <div class="sec-head"><h2>重点项解读</h2><span class="tag gray">为什么这样排</span></div>
+  <p class="sec-note">解读卡上的分数按「均衡」预设标注；切换预设只改变排序与总分，不改变下面的理由。</p>
+  <div class="cards" id="note-cards"></div>
+</section>
+
+<section id="rejected">
+  <div class="sec-head"><h2>不进 P0（含理由）</h2><span class="tag gray">同样来自本轮 openclaude 复核</span></div>
+  <p class="sec-note">这一节和清单同等重要：上一轮就吃过"把已落地的当待办、把对方 stub 当实现"的亏。</p>
+  <div class="table-wrap">
+    <table class="grid" id="reject-table" style="min-width:840px">
+      <thead><tr><th>项</th><th>为什么不进</th><th>前置条件</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<section id="caveats">
+  <div class="sec-head"><h2>口径与限制</h2></div>
+  <div class="panel pad">
+    <ul style="margin:0;padding-left:18px;color:var(--muted);font-size:13px">
+      <li><strong style="color:var(--ink)">收益分不是实测。</strong>它是 1–5 分的工程判断；实测数据只有「本轮复核」那 11 条与证据等级。</li>
+      <li><strong style="color:var(--ink)">对方测量不等于我们测量。</strong>2.4 KB/timer、10.2 % cache_creation、Read→文件→Read 自环、5 GB 上限，都是 openclaude 代码注释里的数字。本页凡依赖这些数的一律压进「先量」。</li>
+      <li><strong style="color:var(--ink)">OC-9 与 OC-8 的成本被低估的风险最大。</strong>两者都要动 durable 事件的形状（冻结替换状态要进 transcript；已发现工具集要从历史重建），不是纯函数。</li>
+      <li><strong style="color:var(--ink)">repo map 未立项。</strong>我派了活但那一轮没读完，只拿到 <span class="mono">docs/repo-map.md</span> 的自述与目录存在性；它同时有 20–30 秒冷解析的代价。<strong>需要单独一轮再决定是否立项。</strong></li>
+      <li><strong style="color:var(--ink)">依赖会改变实际顺序。</strong>OC-6 已随 L1 落地；OC-8 的预算持有者已定为 <span class="mono">doc/context-economics.md</span>（阈值：窗口 10%、下限 2 000 token，opt-in 默认关）；OC-7/OC-10 仍待归口。ROI 排序不等于开工顺序。</li>
+      <li><strong style="color:var(--ink)">所有结论对应基线 <span class="mono">51201b6445</span>（<span class="mono">loop-reliability-docs</span>）。</strong>本页的撤回项和更正项说明这条基线有多容易过期——施工前请重跑「本轮复核」的命令。OC-6 与 OC-8 的结论已于 2026-11-01 按落地后现状覆盖更新。</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  来源：<span class="mono">D:\code\github\openclaude</span>（Twigpine/openclaude 0.33.0）· 八并行子代理 + 本轮逐条复核 ·
+  沿用 <span class="mono">P0-收益对比分析.html</span> 与 <span class="mono">借鉴P0-收益对比分析.html</span> 的权重与预设，三页可比 · 2026-11-01 ·
+  单文件、无外部依赖，可直接打印或归档。
+</footer>
+
+</div>
+
+<script>
+const PRESETS = {
+  "均衡": { rel: 0.30, cost: 0.25, sec: 0.20, audit: 0.15, ux: 0.10 },
+  "速度优先 · 花钱无所谓": { rel: 0.40, cost: 0.35, sec: 0.05, audit: 0.05, ux: 0.15 },
+  "安全可控": { rel: 0.25, cost: 0.10, sec: 0.45, audit: 0.15, ux: 0.05 },
+  "审计交付": { rel: 0.20, cost: 0.10, sec: 0.20, audit: 0.40, ux: 0.10 }
+};
+const PRESET_NOTE = {
+  "均衡": "默认视角：可靠性与成本各占一半权重，安全与审计保留下限。",
+  "速度优先 · 花钱无所谓": "目标＝工具执行快、完成效率高，钱不计。<strong>OC-8 与 OC-9 上升到前二</strong>（它们就是为省 token 和省无效步存在的）；OC-1 从 62 降到 53——安全在这个预设里只值 5%。<strong>但 OC-1 建议无视目标保留</strong>：它是本轮唯一「一条足够宽的 allow 就能写 <span class=\"mono\">.bashrc</span>」的真实洞，且只占一次性成本，不影响运行时开销。",
+  "安全可控": "目标＝不出事故。OC-1 稳坐第一（安全 5）；OC-10 的「审批绑定具体输入」与 OC-3 的原因史上升；纯性能项退居其次。",
+  "审计交付": "目标＝能向别人交代「为什么压缩了、门禁到底生没生效」。OC-2、OC-3、OC-4 上升——本页的可审计性轴几乎全是 openclaude 那批 guard test 的形状。"
+};
+let WEIGHTS = PRESETS["速度优先 · 花钱无所谓"];
+let PRESET = "速度优先 · 花钱无所谓";
+
+// scores: 1–5 engineering judgement; days: estimated person-days. land = owning doc, src = mechanism origin.
+const DATA = [
+  { id: "OC-1", name: "敏感路径写入门", axis: "写路径", status: "先做", evidence: "本轮实测", days: 0.75,
+    scores: { rel: 4, cost: 1, sec: 5, audit: 3, ux: 2 }, deps: "与 L2/R2/R3 同轴不同门",
+    land: "doc/permissions.md", src: "filesystem.ts checkPathSafetyForAutoEdit + kimi sensitive-file-access-ask",
+    what: "把 risk 接进 edit/write/patch；名单前置判断，危险 ask 不产生可保存项" },
+  { id: "OC-2", name: "未接入的 AST 规则 + 门禁自测", axis: "门禁", status: "先做", evidence: "本轮实测", days: 0.5,
+    scores: { rel: 3, cost: 1, sec: 2, audit: 5, ux: 1 }, deps: "无；自测可先于接入",
+    land: "doc/conventions.md", src: "scripts/ci-required-checks.test.ts",
+    what: "根规则包 6 条进 CI；再加一个把合并门禁当代码跑的元测试" },
+  { id: "OC-3", name: "压缩原因落 durable（含本仓缺陷）", axis: "上下文", status: "先做", evidence: "本轮实测", days: 0.5,
+    scores: { rel: 3, cost: 2, sec: 1, audit: 5, ux: 4 }, deps: "无",
+    land: "doc/context-economics.md", src: "CompactMetadata.autoCompactReason + /ctx",
+    what: "overflow 现在被硬编码成 auto；原因在已知处写入 durable 边界，旧数据记 not_recorded" },
+  { id: "OC-4", name: "any 预算单调闸", axis: "门禁", status: "先做", evidence: "本轮实测", days: 0.5,
+    scores: { rel: 2, cost: 1, sec: 1, audit: 4, ux: 1 }, deps: "先测准基数",
+    land: "doc/conventions.md", src: "any-usage-report.ts + stripNonCode lexer",
+    what: "五类计数对单一整数 baseline；把注释字符串抹成等长空格再计数" },
+  { id: "OC-5", name: "动态 import 精确集合钉版", axis: "门禁", status: "先做", evidence: "本轮实测", days: 0.25,
+    scores: { rel: 3, cost: 2, sec: 1, audit: 3, ux: 2 }, deps: "无",
+    land: "doc/conventions.md", src: "optionalRuntimeSpecifiers.test.ts",
+    what: "钉可选运行时的精确集合而非数量；一条 ast-grep 规则即可，不必写脚本" },
+  { id: "OC-6", name: "跨参数失败连击（L1 增补）", axis: "循环", status: "已落地", evidence: "本轮实测", days: 0.75,
+    scores: { rel: 4, cost: 4, sec: 1, audit: 3, ux: 3 }, deps: "已并入 L1 卡尾（loop.ts 第四计数器）",
+    land: "doc/session-loop.md", src: "query/toolFailureLoopGuard.ts",
+    what: "按 (工具,错误类别) 与归一化路径计数；该路径成功即清；threshold-1 先给 advisory" },
+  { id: "OC-7", name: "工具输出冻结替换状态", axis: "缓存", status: "规划", evidence: "子代理", days: 1.0,
+    scores: { rel: 3, cost: 4, sec: 1, audit: 2, ux: 2 }, deps: "撞 L30/L17 同不变式",
+    land: "doc/context-economics.md", src: "ContentReplacementState per tool_use_id",
+    what: "裁剪决定按 tool_use_id 冻结并进 transcript，resume 重放逐字节相同预览" },
+  { id: "OC-8", name: "工具面按需 schema", axis: "上下文", status: "已落地", evidence: "本轮实测", days: 2.0,
+    scores: { rel: 3, cost: 5, sec: 1, audit: 2, ux: 2 }, deps: "预算持有者已定：doc/context-economics.md；L4 未实现、L32 独立",
+    land: "doc/context-economics.md", src: "utils/toolSearch.ts tst / tst-auto 10%",
+    what: "超阈值才延迟；已发现集合从历史重建；schema 未发时错误里带「先加载」提示" },
+  { id: "OC-9", name: "缓存指标可靠性分层 + 破坏检测", axis: "缓存", status: "规划", evidence: "子代理", days: 1.25,
+    scores: { rel: 3, cost: 4, sec: 1, audit: 4, ux: 3 }, deps: "撞 OH-0/OH-9 家族",
+    land: "doc/usage-stats.md", src: "cacheMetrics.ts reliability + promptCacheBreakDetection.ts",
+    what: "reliable/advisory/unsupported 三档，缺数据显示 N/A 而非 0%；指纹突变按成因分类" },
+  { id: "OC-10", name: "审批绑定具体输入 + 逃生字段模型不可见", axis: "权限", status: "先量", evidence: "子代理", days: 0.75,
+    scores: { rel: 2, cost: 1, sec: 5, audit: 3, ux: 2 }, deps: "先核我方 hook 能否改写输入",
+    land: "doc/permissions.md", src: "samePermissionAskConstraint + _Approved .omit()",
+    what: "对被改写后的输入重跑阶梯；危险开关成对且都不进模型可见 schema" },
+  { id: "OC-11", name: "bun test 完成性验证", axis: "测试", status: "先量", evidence: "对方实测", days: 0.5,
+    scores: { rel: 3, cost: 1, sec: 1, audit: 3, ux: 1 }, deps: "前置＝本机复现 exit 0 未跑完",
+    land: "doc/conventions.md", src: "scripts/run-tests.ts + testReport.ts",
+    what: "要求完整 JUnit 报告（闭合且 failures=0）才算绿；分片我们已有，只补这一条" },
+  { id: "OC-12", name: "AbortSignal.timeout 封禁 + 合并信号", axis: "进程", status: "先量", evidence: "对方实测", days: 0.75,
+    scores: { rel: 3, cost: 2, sec: 1, audit: 2, ux: 1 }, deps: "先在我们钉的 Bun 上复现泄漏",
+    land: "doc/conventions.md", src: "combinedAbortSignal.ts + 封禁 guard test",
+    what: "27 处调用；用 setTimeout+clearTimeout 加显式 cleanup 替换，散文关键词式豁免" }
+];
+
+const STATUS_COLOR = { "已落地": "var(--gray)", "先做": "var(--teal)", "规划": "var(--purple)", "随卡": "var(--blue)", "先量": "var(--amber)" };
+const STATUS_TAG = { "已落地": "gray", "先做": "teal", "规划": "purple", "随卡": "blue", "先量": "amber" };
+const EVIDENCE_TAG = { "本轮实测": "teal", "对方实测": "blue", "子代理": "amber" };
+
+const COLLIDE = [
+  { id: "OC-6", hits: "L1 循环失控防护 · D2 loop guard observe 三态", rel: "同一张卡的<strong>增补</strong>：L1 与 D2 已随 08aef689be 落地（loop.ts + experimental.loop_guard），本页只是在既有的 durable fold 上加三个跨参数计数器。", verdict: "已并入 L1 卡尾：loop.ts 第四计数器 + failure-streak-advisory，不另立卡（已落地）" },
+  { id: "OC-7", hits: "L30 MCP schema 字节确定化 · L17 prompt cache 确定性纪律", rel: "同一条不变式（<strong>同一 turn 前缀逐字节可重放</strong>）在裁剪维的实例。L17 的字节恒等断言可以<strong>直接复用</strong>来测冻结重放，不必新写判据。", verdict: "随 L17 落地，共用其断言" },
+  { id: "OC-8", hits: "L4 模型→工具路由 · L32 指令 / 技能预算", rel: "同一条「模型表面体积」轴的三个层次：L32 裁文本、L4 按 provider/model 过滤、OC-8 按步加载。三者若各设百分比，预算归属会互相抵赖。", verdict: "持有者已定＝doc/context-economics.md（§The tool schema surface）；L32 池不动，L4 落地时在此阈值上游组合；已落地（opt-in defer_tool_schemas）" },
+  { id: "OC-9", hits: "OH-0 title 辅助调用成本落账 · OH-9 MCP 探测结果诚实分类", rel: "「诚实分类」家族第三个成员：N/A 而非 0%，与 OH-9 的「连上了但一个工具都没暴露」是同一条纪律，不是两件事。", verdict: "与 OH-0/OH-9 合成一批" },
+  { id: "OC-10", hits: "L31 审批落盘 + 回执 · D3 审批决定带依据事实", rel: "回执表已经要存 matched/posture；「审批绑定到具体输入」正是这些列要表达的<strong>语义</strong>，拆开做会得到一张记了依据却解释不了依据的表。", verdict: "与 L31/D3 同 PR 序列" },
+  { id: "撤回", hits: "L27 配置 codegen 接线", rel: "草稿里的「生成物 drift 进 CI」<strong>已经在跑</strong>：packages/client 与 packages/protocol 各自的 check:generated 都在 check-test.yml。这条不立项，只把范围问题留给 L27。", verdict: "不立项（已存在）" },
+  { id: "无对应", hits: "OC-1 · OC-2 · OC-3 · OC-4 · OC-5 · OC-11 · OC-12", rel: "既有 38 项里没有这几条轴：写路径形状门、门禁自身是否生效、压缩原因史、any 预算、可选运行时集合、套件完成性、Bun timer 泄漏。", verdict: "新轴，直接立项" }
+];
+
+const NOTES = {
+  "OC-1": { one: "本轮唯一「今天就能被利用、且我们完全没有防御」的洞。分数不高是因为它只吃安全与可靠两个维度。", pts: [
+    "<strong>收益：</strong>一条足够宽的 <span class=\"mono\">edit */**</span> 或一次「始终允许」，现在可以写 <span class=\"mono\">.bashrc</span> / <span class=\"mono\">.git/config</span> / <span class=\"mono\">.mcp.json</span> / <span class=\"mono\">authorized_keys</span> 而<strong>全程不碰 shell</strong>——绕过我们唯一装了警报的那扇门。",
+    "<strong>成本：</strong>机制已经在。<span class=\"mono\">permission.ts:186</span> 的升级优先与 <span class=\"mono\">:210</span> 的不累积都是现成的，活儿是给写类工具算出一个 risk 并传下去。",
+    "<strong>比清单更重要的四个属性：</strong>永远大小写不敏感（挡 <span class=\"mono\">.cLauDe/Settings.locaL.json</span>）；对<strong>原始与每个 symlink 解析后</strong>的形态都查；UNC 直接拒；permissive 档位只准放松文件名清单，目录/UNC/symlink 三道闸任何档位保留。",
+    "<strong>风险：</strong>名单会误伤常规编辑（<span class=\"mono\">.gitmodules</span> 是要改的）。所以是 ask 而不是 deny，且带档位可放松。"
+  ]},
+  "OC-2": { one: "性价比最高的一项，因为它同时是「一个已经存在的洞」和「洞的复发预防」。", pts: [
+    "<strong>实测事实：</strong>根规则包把 <span class=\"mono\">agents.md</span> 的六条硬规定机器化了（<span class=\"mono\">no-star-import</span>、<span class=\"mono\">no-import-alias</span>、<span class=\"mono\">no-drizzle-column-name</span>、<span class=\"mono\">no-json-parse-cast</span>、<span class=\"mono\">no-effect-die-string</span>、<span class=\"mono\">no-nested-effect-service-yield</span>），但 <span class=\"mono\">lint:effect-patterns</span> 与 <span class=\"mono\">test:lint-rules</span> 在 <span class=\"mono\">.github/</span> 引用为 0。<span class=\"mono\">bun run lint</span> 只扫 gui-plugins 那一包。",
+    "<strong>对照：</strong>隔壁 <span class=\"mono\">effect-simplifications</span> 包是扫描（<span class=\"mono\">check-test.yml:101</span>）与规则测试（<span class=\"mono\">test:effect-simplification-rules</span>）双双进 CI。<strong>两包规则，一包生效一包当装饰。</strong>",
+    "<strong>元测试：</strong>对方的 <span class=\"mono\">ci-required-checks.test.ts</span> 解析 workflow YAML、抽出内嵌门禁脚本、用合成 <span class=\"mono\">needs</span> JSON 跑遍组合，断言 <span class=\"mono\">if: always()</span>、无 <span class=\"mono\">paths-ignore</span>、门禁 <span class=\"mono\">needs</span> == 全部 job。约 100 行、零依赖。",
+    "<strong>为什么值得：</strong>接一个脚本进 CI 是五分钟；<strong>知道它有没有真的进</strong>是本轮这种 grep。元测试把后者变成 CI 自己会红的事。"
+  ]},
+  "OC-3": { one: "一半是本仓缺陷修复，一半是最便宜的「为什么」展示。", pts: [
+    "<strong>缺陷：</strong><span class=\"mono\">compaction.ts:330</span> 的 publish 把 <span class=\"mono\">overflow</span> 也写成 <span class=\"mono\">reason: \"auto\"</span>。内存里 <span class=\"mono\">Trigger</span> 分得清 auto/overflow/manual，一进 durable 就分不出——「被 413 逼压」和「到阈值自压」在事后完全同形。",
+    "<strong>借的形状：</strong>原因写在<strong>已知触发源的地方</strong>（不是事后反推），随 durable 边界一起存，于是 resume 后还在；对旧数据打 <span class=\"mono\">not_recorded</span> 而不是猜。",
+    "<strong>体验：</strong>「上下文为什么被改写了」是用户最容易慌的时刻。一行枚举换掉一整类疑问。",
+    "<strong>边界：</strong>向回走找最后一次边界时要跳过 <span class=\"mono\">preservedSegment</span> 前缀，否则会把部分压缩重放的旧边界当成最近一次——对方踩过。"
+  ]},
+  "OC-8": { one: "全场最贵（2 人日），也是 token 上限唯一结构性解；ROI 倒数不代表不值得。", pts: [
+    "<strong>现状：</strong><span class=\"mono\">grep -rln \"tool_search|defer_loading\" packages/core/src</span> → 0。每步都发全部 schema。<strong>codex 与 openclaude 两轮独立指认同一个洞。</strong>",
+    "<strong>让它安全而非坑人的两点：</strong>已发现集合<strong>从消息历史重建</strong>（不是可变状态，天然满足我们的 durable 折叠与重启正确性）；调用未加载的工具时，错误里<strong>追加面向模型的提示</strong>「先 select 再重试」，而不是让它撞上一个不存在的工具。",
+    "<strong>阈值形态：</strong>默认恒延迟，auto 模式只在「惰性工具成本 &gt; 窗口的 10%」时才启用，计量走真实 count API、降级用 2.5 chars/token。",
+    "<strong>风险：</strong>与 L4、L32 三处各自设预算 = 互相不知道。<strong>必须先定总持有者</strong>（见归口一节）。",
+    "<strong>落地（2026-11-01）：</strong><span class=\"mono\">experimental.defer_tool_schemas</span>（<strong>默认关</strong>，opt-in）；阈值＝窗口 10%、下限 2 000 token（未接 count API，沿用 <span class=\"mono\">Token.estimateWide</span>）；发现工具名 <span class=\"mono\">tool_search</span>，拒绝 token <span class=\"mono\">Load guard:</span>；轮内 append-only 保住 L17 前缀断言；compaction 中途吞掉发现属已知退化，多搜一次即恢复。"
+  ]},
+  "OC-9": { one: "把「用量页在撒谎」这件事一次性解决。", pts: [
+    "<strong>分层：</strong><span class=\"mono\">reliable / advisory / unsupported</span> 三档，逐 provider 读各自原生字段（OpenAI <span class=\"mono\">prompt_tokens_details.cached_tokens</span>、Kimi 顶层、DeepSeek hit/miss、Gemini <span class=\"mono\">cached_content_token_count</span>），并强制 <span class=\"mono\">read + created ≤ total</span> 不变式。",
+    "<strong>诚实优先：</strong>Copilot/Ollama 显示 <strong>N/A 而不是编造 0%</strong>。这与 OH-9「连上了但一个工具都没暴露」是同一条纪律——<strong>缺数据要显式承认，不能显示成零</strong>。",
+    "<strong>破坏检测：</strong>按 query source 指纹化 system / tools / cacheControl / 每个工具 schema / betas / model / effort，缓存读取降幅 &gt;5% <strong>且</strong>超过 token 下限才判破，分类成 8 种成因并写 diff。自成一体的诊断件，不依赖远端。",
+    "<strong>归属：</strong>归 <span class=\"mono\">doc/usage-stats.md</span>——那一节本来就规定「用量页能主张什么」。"
+  ]},
+  "OC-11": { one: "Bun 用户的共同地雷；对方的修法很笨但很有效，而我们只需要其中一条。", pts: [
+    "<strong>危害：</strong><span class=\"mono\">bun test</span> 可能在套件没跑完的情况下 <strong>exit 0</strong>（某个测试调了 <span class=\"mono\">process.exit(0)</span>）——绿了但没测。",
+    "<strong>他们的修法：</strong>要求一份<strong>完整</strong>的 JUnit 报告（<span class=\"mono\">&lt;testsuites&gt;</span> 闭合且 <span class=\"mono\">failures=\"0\"</span>）才算绿；外加对整个进程组的外部 per-shard 死线。",
+    "<strong>我们只需要一半：</strong>分片不是缺口——<span class=\"mono\">check-test.yml</span> 已有 <span class=\"mono\">shard: 1/2 · 2/2</span> 与 <span class=\"mono\">turbo --affected</span>，注释还写明「按 test 数而非时长切」。<strong>只补完成性验证。</strong>",
+    "<strong>前置：</strong>本机复现一次「exit 0 但未跑完」，否则不立项。这正是它排在「先量」的原因。"
+  ]},
+  "OC-12": { one: "唯一一条由别人的测量驱动的项目；因此默认不开，且先付复现的钱。", pts: [
+    "<strong>他们的说法：</strong>Bun 下 <span class=\"mono\">AbortSignal.timeout</span> 的 timer 惰性 finalize，在触发前一直占 native memory（注释标 <strong>~2.4 KB/次</strong>）。",
+    "<strong>我们的现状：</strong>27 处调用、18 个文件，绝大多数是 1–2 处的一次性路径（登录、健康探测、更新器、模型列表）。<strong>是不是热路径要逐条判断</strong>，不能凭一个别人的平均数下结论。",
+    "<strong>真正可复用的是形状：</strong>封禁 + 单一命名豁免 + <strong>散文关键词式豁免</strong>（注释必须含 <span class=\"mono\">avoid|leak|memory|must not</span> 才算合法），因此既无法被泛用 disable 注释静默，也无法被精确针对。这条<strong>用现成的 ast-grep 就能写</strong>，成本比对方低。",
+    "<strong>结论：</strong>先量，把 27 处分成「长跑服务热路径」和「一次性 CLI 路径」两类再决定要不要动。"
+  ]},
+  "OC-6": { one: "我们的断路器已经比对方强，缺的只是相邻的一根轴。", pts: [
+    "<strong>已经领先在哪：</strong><span class=\"mono\">loop.ts</span> 搜<strong>周期</strong>（<span class=\"mono\">WINDOW 25 / MAX_PERIOD 5 / REPEAT_LIMIT 5</span>），看得见 <span class=\"mono\">A B A B</span> 交替；从 durable history 折叠所以重启还在；还把溢出落盘的路径从身份里抹掉，免得同一次超大搜索每次都「像新信息」。对方 <span class=\"mono\">doomLoop.ts</span> 只有连续相同 + 进程内状态。",
+    "<strong>缺的那根轴：</strong>身份是 <span class=\"mono\">hash(tool + input)</span>，所以 <span class=\"mono\">read(a)</span>、<span class=\"mono\">read(b)</span>、<span class=\"mono\">read(c)</span> <strong>全失败也不会触发</strong>——参数在变，模型就是在原地打转但看起来一直在前进。",
+    "<strong>对方的三个计数器：</strong><span class=\"mono\">(toolName, errorCategory)</span> 跨参数连击、错误类别连击、归一化<strong>路径</strong>连击——且<strong>该路径成功即清</strong>，所以有产出的重试不会被算成循环。",
+    "<strong>三个细节：</strong>并行失败每键<strong>只计一次</strong>（让模型先看批量结果再调整，跨轮仍累积）；<span class=\"mono\">threshold-1</span> 先给 advisory 再触发；父查询的合成 abort 结果<strong>不计为工具失败</strong>，但工具超时故意计。",
+    "<strong>落地（2026-11-01）：</strong><span class=\"mono\">loop.ts</span> 第四计数器（<span class=\"mono\">FAILURE_STREAK_LIMIT = 6</span>，第 5 次 <span class=\"mono\">failure-streak-advisory</span> 合成消息先开口）；权限拒绝仍归 decline 计数器（保住 8 连拒契约）；随既有 <span class=\"mono\">experimental.loop_guard</span>，不新增开关。"
+  ]}
+};
+
+const REJECTED = [
+  { id: "文本 tool_call 恢复阶梯", why: "名字维已由 L13（幻觉工具名自愈）覆盖；参数/格式维在我们的 provider 面上<strong>没有一份真实失败样本</strong>。对方这套是正则方言汤，含 <span class=\"mono\">JSON_REPAIR_SUFFIXES</span> 在两处重复（漂移风险）与按精确 slug gating（改名即失效），搬过来是把别人的债也背上。", pre: "一条来自我们自己 session 的可复现失败轨迹" },
+  { id: "请求侧自愈删字段重试", why: "思路好（无目录的能力协商），但同样缺样本；且与 L13 同族，先合并看。", pre: "真实 400 错误分布" },
+  { id: "技能三件（路径门控惰性激活 / 字段默认自拒 / realpath 去重）", why: "「字段默认自拒」方向完全正确（新增字段默认要求权限），但我们技能规模还没到这个压力，且撞 D1 已归口的 L32 卡。", pre: "技能数量或冲突真实增长后随 L32" },
+  { id: "cache-aware fork（旁路提问复用父缓存参数）", why: "一个类型 + 一个不变量，很便宜，但要先确认 Effect 层能把父请求参数原样带到 fork——<strong>未验证</strong>。", pre: "一次 fork 路径的参数传递核实" },
+  { id: "Bun 下 chokidar 轮询 + debounce 阶梯", why: "前置是「我们要有 watch 驱动的技能失效」，而那条路本身还没开（codex 那轮已记为缺失）。先开路由再谈防死锁。", pre: "watch 驱动失效立项" },
+  { id: "权限阶梯整体重写", why: "对方是顺序阶梯 + deny/ask/allow 三集合；我们是 <span class=\"mono\">findLast</span> + 单一 escalation 层。把整套阶梯搬过来要动 <span class=\"mono\">evaluate</span> 的返回形状和每一个调用点，而 OC-1 用 0.75 天就拿到它最值钱的那一条（危险先于 allow、且不产生可保存项）。", pre: "不再重提，除非出现阶梯表达不了的规则形状" },
+  { id: "OS 沙箱栈 / bridge / gRPC / daemon", why: "沙箱与 codex 同一裁决（且 WSL1、原生 Windows 不支持，与我们用户平台冲突）；<span class=\"mono\">bridge/</span> 13k 行是 Anthropic 托管产品客户端，我们本地后台服务已承担该角色；gRPC 那条线是手写 proto + 运行时加载 + 内存 Map，比我们的生成客户端与 durable log <strong>严格更弱</strong>；daemon/server 在对方快照里全是 stub。", pre: "—（明确不学）" },
+  { id: "verify-clean-install / system-check / phone-home 类门", why: "内容好但分别 29KB / 52KB(<span class=\"mono\">@ts-nocheck</span>)；phone-home 那一族是「剥离 Anthropic 遥测」的 fork 专属需求。可移植的只是<strong>形状</strong>：对构建产物而不是源码断言禁用串缺席。", pre: "若我们开始发 npm 包再看" },
+  { id: "repo map（tree-sitter + PageRank 引用图）", why: "<strong>本轮没读完</strong>——只拿到它自述的机制与目录存在性。自述的代价很实在：2000+ 文件冷解析 20–30 秒、只给签名不给函数体、TS 引用漏普通函数调用因此排序偏向类型枢纽文件。它可能改善我们的探索成本，也可能只是把探索成本换成解析成本。", pre: "单独一轮实测：解析耗时、命中率、与现有 grep 优先工作流的关系" }
+];
+
+function recompute() {
+  for (const d of DATA) {
+    d.score = Math.round(20 * (d.scores.rel * WEIGHTS.rel + d.scores.cost * WEIGHTS.cost + d.scores.sec * WEIGHTS.sec + d.scores.audit * WEIGHTS.audit + d.scores.ux * WEIGHTS.ux));
+    d.roi = d.score / d.days;
+  }
+}
+
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
+const raw = (s) => String(s);
+const fmt = (n) => (Math.round(n * 10) / 10).toString();
+const fmtDays = (n) => (Math.round(n * 100) / 100).toString();
+
+/* ---------- summary ---------- */
+function renderSummary() {
+  const tbody = document.querySelector("#summary-table tbody");
+  const ordered = [...DATA].sort((a, b) => a.id.localeCompare(b.id, "en", { numeric: true }));
+  tbody.innerHTML = ordered.map((d) => `
+    <tr>
+      <td><strong>${esc(d.id)}</strong></td>
+      <td><strong>${esc(d.name)}</strong></td>
+      <td><span class="tag ${STATUS_TAG[d.status]}">${esc(d.status)}</span></td>
+      <td class="num" style="text-align:right">${fmtDays(d.days)}</td>
+      <td style="color:var(--faint);font-size:12px">${esc(d.src)}</td>
+      <td class="mono" style="color:var(--muted)">${esc(d.land)}</td>
+      <td class="what">${esc(d.what)}</td>
+    </tr>`).join("");
+}
+
+/* ---------- scatter ---------- */
+function renderScatter() {
+  const svg = document.getElementById("scatter");
+  svg.innerHTML = "";
+  const W = 980, H = 500, m = { l: 64, r: 26, t: 26, b: 58 };
+  const x0 = 0, x1 = 2.4, Y_BOT = 20, Y_MID = 60, Y_TOP = 100;
+  const px = (v) => m.l + ((v - x0) / (x1 - x0)) * (W - m.l - m.r);
+  const py = (v) => H - m.b - ((v - Y_BOT) / (Y_TOP - Y_BOT)) * (H - m.t - m.b);
+  const ns = "http://www.w3.org/2000/svg";
+  const el = (tag, attrs, text) => {
+    const n = document.createElementNS(ns, tag);
+    for (const [k, v] of Object.entries(attrs || {})) n.setAttribute(k, v);
+    if (text !== undefined) n.textContent = text;
+    svg.appendChild(n);
+    return n;
+  };
+
+  el("rect", { x: px(0), y: py(Y_TOP), width: px(1) - px(0), height: py(Y_MID) - py(Y_TOP), fill: "var(--teal)", "fill-opacity": 0.07 });
+  el("rect", { x: px(1), y: py(Y_TOP), width: px(2.4) - px(1), height: py(Y_MID) - py(Y_TOP), fill: "var(--purple)", "fill-opacity": 0.05 });
+  el("rect", { x: px(0), y: py(Y_MID), width: px(1) - px(0), height: py(Y_BOT) - py(Y_MID), fill: "var(--gray)", "fill-opacity": 0.05 });
+  el("rect", { x: px(1), y: py(Y_MID), width: px(2.4) - px(1), height: py(Y_BOT) - py(Y_MID), fill: "var(--amber)", "fill-opacity": 0.05 });
+
+  for (let v = x0; v <= x1 + 0.001; v += 0.5) {
+    el("line", { x1: px(v), x2: px(v), y1: py(Y_TOP), y2: py(Y_BOT), stroke: "var(--line)", "stroke-width": 1 });
+    el("text", { x: px(v), y: H - m.b + 22, "text-anchor": "middle", "font-size": 11, fill: "var(--faint)" }, (v === 0 ? "0" : fmt(v)) + " 天");
+  }
+  for (let v = Y_BOT; v <= Y_TOP; v += 20) {
+    el("line", { x1: px(0), x2: px(2.4), y1: py(v), y2: py(v), stroke: v === Y_MID ? "var(--line-strong)" : "var(--line)", "stroke-dasharray": v === Y_MID ? "4 4" : "none", "stroke-width": 1 });
+    el("text", { x: px(0) - 10, y: py(v) + 4, "text-anchor": "end", "font-size": 11, fill: "var(--faint)" }, String(v));
+  }
+  el("text", { x: px(0.5), y: py(Y_TOP) + 2, "text-anchor": "middle", "font-size": 11, fill: "var(--teal)", "font-weight": 700 }, "低投入 · 高收益");
+  el("text", { x: px(1.7), y: py(Y_TOP) + 2, "text-anchor": "middle", "font-size": 11, fill: "var(--purple)", "font-weight": 700 }, "高投入 · 高收益");
+  el("text", { x: px(0.5), y: py(Y_BOT) - 8, "text-anchor": "middle", "font-size": 11, fill: "var(--faint)", "font-weight": 700 }, "低投入 · 低收益");
+  el("text", { x: px(1.7), y: py(Y_BOT) - 8, "text-anchor": "middle", "font-size": 11, fill: "var(--amber)", "font-weight": 700 }, "先量 / 待复现");
+  el("text", { x: W - m.r, y: H - 10, "text-anchor": "end", "font-size": 11, fill: "var(--faint)" }, "← 工期（人日）");
+  el("text", { x: px(0) - 48, y: m.t + 2, "font-size": 11, fill: "var(--faint)" }, "收益分 ↑");
+
+  const seen = new Map();
+  for (const d of DATA) {
+    const base = d.days + "|" + d.score;
+    const n = seen.get(base) || 0;
+    seen.set(base, n + 1);
+    d._jx = n * 0.05 * (n % 2 ? -1 : 1);
+  }
+
+  for (const d of [...DATA].sort((a, b) => b.score - a.score)) {
+    const cx = px(d.days + (d._jx || 0));
+    const cy = py(d.score);
+    const color = STATUS_COLOR[d.status];
+    const g = el("g", {});
+    g.appendChild(el("title", {}, `${d.id} ${d.name}｜${d.score} 分｜${fmtDays(d.days)} 人日｜ROI ${fmt(d.roi)}｜${d.evidence}`));
+    if (d.status === "先量") {
+      el("circle", { cx, cy, r: 8, fill: "var(--panel)", stroke: color, "stroke-width": 2, "stroke-dasharray": "3 2" });
+    } else {
+      el("circle", { cx, cy, r: 7, fill: color, "fill-opacity": .9 });
+    }
+    const side = d._jx && d._jx < 0 ? -1 : 1;
+    el("text", { x: cx + side * 11, y: cy + 4, "text-anchor": side < 0 ? "end" : "start", "font-size": 11, "font-weight": 700, fill: "var(--ink)" }, d.id.replace("OC-", ""));
+  }
+
+  const legend = document.getElementById("scatter-legend");
+  legend.innerHTML = "";
+  for (const [label, color] of Object.entries(STATUS_COLOR)) {
+    const s = document.createElement("span");
+    s.innerHTML = `<span class="dot" style="background:${color}"></span>${label}`;
+    legend.appendChild(s);
+  }
+  const s = document.createElement("span");
+  s.innerHTML = `<span class="dot" style="background:var(--panel);border:2px dashed var(--amber)"></span>虚线 = 先量（收益未测）`;
+  legend.appendChild(s);
+}
+
+/* ---------- rank bars ---------- */
+function renderRank() {
+  const box = document.getElementById("rank-bars");
+  box.innerHTML = "";
+  const sorted = [...DATA].sort((a, b) => b.roi - a.roi);
+  const max = Math.max(...sorted.map((d) => d.roi));
+  for (const d of sorted) {
+    const row = document.createElement("div");
+    row.className = "bar-row";
+    row.innerHTML = `
+      <div class="bar-id">${esc(d.id)}</div>
+      <div class="track" title="${esc(d.name)}"><div class="fill" style="width:${(d.roi / max) * 100}%;background:${STATUS_COLOR[d.status]}"></div></div>
+      <div class="bar-meta">${d.score} 分 · ${fmtDays(d.days)}d · ROI ${fmt(d.roi)}</div>`;
+    box.appendChild(row);
+  }
+}
+
+/* ---------- heat map ---------- */
+function renderHeat() {
+  const tbody = document.querySelector("#heat-table tbody");
+  tbody.innerHTML = "";
+  for (const d of [...DATA].sort((a, b) => b.score - a.score)) {
+    const tr = document.createElement("tr");
+    const cells = ["rel", "cost", "sec", "audit", "ux"].map((k) => `<td class="cell h${d.scores[k]}">${d.scores[k]}</td>`).join("");
+    tr.innerHTML = `<td><strong>${esc(d.id)}</strong></td><td class="what">${esc(d.what)}</td>${cells}<td class="num" style="text-align:right"><strong>${d.score}</strong></td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+/* ---------- main table ---------- */
+let activeAxis = "全部";
+let sortKey = "score";
+let sortDir = -1;
+
+function drawTable() {
+  const tbody = document.querySelector("#main-table tbody");
+  const rows = DATA.filter((d) => activeAxis === "全部" || d.axis === activeAxis);
+  rows.sort((a, b) => {
+    const av = a[sortKey], bv = b[sortKey];
+    if (typeof av === "string") return av.localeCompare(bv, "en", { numeric: true }) * sortDir;
+    return (av - bv) * sortDir;
+  });
+  tbody.innerHTML = rows.map((d) => `
+    <tr>
+      <td><strong>${esc(d.id)}</strong><br><span style="color:var(--faint);font-size:12px">${esc(d.name)}</span></td>
+      <td>${esc(d.axis)}</td>
+      <td><span class="tag ${STATUS_TAG[d.status]}">${esc(d.status)}</span></td>
+      <td><span class="tag ${EVIDENCE_TAG[d.evidence]}">${esc(d.evidence)}</span></td>
+      <td class="num" style="text-align:right">${fmtDays(d.days)}</td>
+      <td class="num" style="text-align:right"><strong>${d.score}</strong></td>
+      <td class="num" style="text-align:right">${fmt(d.roi)}</td>
+      <td style="color:var(--muted)">${esc(d.deps)}</td>
+      <td class="what">${esc(d.what)}</td>
+    </tr>`).join("");
+}
+
+function buildFilters() {
+  const chips = document.getElementById("filters");
+  chips.innerHTML = "";
+  for (const axis of ["全部", ...Array.from(new Set(DATA.map((d) => d.axis)))]) {
+    const b = document.createElement("button");
+    b.className = "chip";
+    b.textContent = axis;
+    b.setAttribute("aria-pressed", axis === activeAxis ? "true" : "false");
+    b.addEventListener("click", () => {
+      activeAxis = axis;
+      for (const c of chips.children) c.setAttribute("aria-pressed", c.textContent === axis ? "true" : "false");
+      drawTable();
+    });
+    chips.appendChild(b);
+  }
+}
+
+document.querySelectorAll("#main-table thead th[data-sort]").forEach((th) => {
+  th.addEventListener("click", () => {
+    const key = th.dataset.sort;
+    if (sortKey === key) sortDir *= -1;
+    else { sortKey = key; sortDir = ["id", "axis", "status", "evidence", "deps"].includes(key) ? 1 : -1; }
+    drawTable();
+  });
+});
+
+/* ---------- collision ---------- */
+function renderCollide() {
+  const tbody = document.querySelector("#collide-table tbody");
+  tbody.innerHTML = COLLIDE.map((c) => {
+    const tag = c.id === "撤回" ? "gray" : c.id === "无对应" ? "blue" : STATUS_TAG[(DATA.find((d) => d.id === c.id) || {}).status] || "teal";
+    return `<tr>
+      <td><span class="tag ${tag}">${esc(c.id)}</span></td>
+      <td><strong>${esc(c.hits)}</strong></td>
+      <td class="what">${raw(c.rel)}</td>
+      <td style="color:var(--muted);font-size:12px">${esc(c.verdict)}</td>
+    </tr>`;
+  }).join("");
+}
+
+/* ---------- rejected ---------- */
+function renderRejected() {
+  const tbody = document.querySelector("#reject-table tbody");
+  tbody.innerHTML = REJECTED.map((r) => `
+    <tr>
+      <td><strong>${esc(r.id)}</strong></td>
+      <td class="what">${raw(r.why)}</td>
+      <td style="color:var(--faint);font-size:12px">${esc(r.pre)}</td>
+    </tr>`).join("");
+}
+
+/* ---------- notes ---------- */
+function renderNotes() {
+  const box = document.getElementById("note-cards");
+  box.innerHTML = "";
+  for (const [id, n] of Object.entries(NOTES)) {
+    const d = DATA.find((x) => x.id === id);
+    if (!d) continue;
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <h3>${esc(id)} ${esc(d.name)} <span class="tag ${STATUS_TAG[d.status]}">${d.score} 分 · ${fmtDays(d.days)}d</span></h3>
+      <p class="one">${esc(n.one)}</p>
+      <ul>${n.pts.map((p) => `<li>${raw(p)}</li>`).join("")}</ul>
+      <div class="foot"><span>轴：${esc(d.axis)}</span><span>落点：${esc(d.land)}</span><span>证据：${esc(d.evidence)}</span></div>`;
+    box.appendChild(card);
+  }
+}
+
+/* ---------- presets ---------- */
+function renderAll() {
+  recompute();
+  renderSummary();
+  renderScatter();
+  renderRank();
+  renderHeat();
+  drawTable();
+  const w = WEIGHTS;
+  document.getElementById("weight-line").textContent =
+    `当前预设：${PRESET} · 可靠性 ${(w.rel * 100).toFixed(0)}% / 时间 ${(w.cost * 100).toFixed(0)}% / 安全 ${(w.sec * 100).toFixed(0)}% / 审计 ${(w.audit * 100).toFixed(0)}% / 体验 ${(w.ux * 100).toFixed(0)}%`;
+  document.getElementById("preset-note").innerHTML = PRESET_NOTE[PRESET];
+  const top = [...DATA].sort((a, b) => b.roi - a.roi).slice(0, 5).map((d) => d.id).join(" → ");
+  document.getElementById("preset-top").textContent = `按 ROI 前五：${top}`;
+}
+
+function buildPresets() {
+  const box = document.getElementById("presets");
+  box.innerHTML = "";
+  for (const name of Object.keys(PRESETS)) {
+    const b = document.createElement("button");
+    b.className = "chip";
+    b.textContent = name;
+    b.setAttribute("aria-pressed", name === PRESET ? "true" : "false");
+    b.addEventListener("click", () => {
+      PRESET = name;
+      WEIGHTS = PRESETS[name];
+      for (const c of box.children) c.setAttribute("aria-pressed", c.textContent === name ? "true" : "false");
+      renderAll();
+    });
+    box.appendChild(b);
+  }
+}
+
+buildFilters();
+buildPresets();
+renderCollide();
+renderRejected();
+renderNotes();
+renderAll();
+</script>
+</body>
+</html>
