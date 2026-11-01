@@ -45,7 +45,7 @@ export function SessionPermissionPill(props: {
 
   return (
     <div data-component="session-permission-pill" class="flex min-w-0 shrink items-center">
-      <Menu gutter={8} placement={placement()}>
+      <Menu gutter={8} placement={placement()} appearance="standard">
         <Menu.Trigger
           as="button"
           type="button"
@@ -57,17 +57,20 @@ export function SessionPermissionPill(props: {
         >
           <Icon name={ICONS[selection()]} class="size-3.5 shrink-0" />
           <span class="min-w-0 truncate">{language.t(`composer.permission.${selection()}.title`)}</span>
+          <Icon name="chevron-down" size="small" class="shrink-0 text-v2-icon-icon-muted" />
         </Menu.Trigger>
         <Menu.Portal>
           <Menu.Content data-slot="session-permission-panel" aria-label={language.t("composer.permission.title")}>
             <Menu.RadioGroup value={selection()} onChange={choose}>
-              <For each={MODES}>
+              <For each={selection() === "custom" ? [...MODES, "custom" as const] : [...MODES]}>
                 {(mode) => (
                   <Menu.RadioItem
                     value={mode}
+                    disabled={mode === "custom"}
                     data-slot="session-permission-option"
                     data-mode={mode}
-                    class="flex w-full items-start gap-2"
+                    class="flex w-full items-start gap-2 py-1.5"
+                    classList={{ "bg-v2-overlay-simple-overlay-hover": mode === selection() }}
                   >
                     <Icon
                       name={ICONS[mode]}

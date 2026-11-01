@@ -1727,3 +1727,33 @@ test("auto approve keeps its risky actions as questions", async ({ page }) => {
       { action: "read", resource: "*.env*", effect: "ask" },
     ])
 })
+
+test("a ruleset this selector never wrote shows as the checked custom state", async ({ page }) => {
+  const view = await openSession(page, {
+    name: "ApprovalModeCustom",
+    sessions: [
+      {
+        id: "ses_approval_custom",
+        title: "Custom rules",
+        permissions: [{ action: "shell", resource: "*", effect: "allow" }],
+      },
+    ],
+  })
+  const trigger = page.locator('[data-slot="session-permission-trigger"]')
+
+  await expect(trigger).toHaveText("Custom rules")
+  await expect(trigger).toHaveAttribute("data-mode", "custom")
+
+  await trigger.click()
+  const options = page.locator('[data-slot="session-permission-option"]')
+  await expect(options).toHaveCount(4)
+  const custom = options.filter({ hasText: "Custom rules" })
+  await expect(custom).toHaveAttribute("data-mode", "custom")
+  await expect(custom).toHaveAttribute("data-checked", "")
+  await expect(custom).toBeDisabled()
+  await expect(custom).toContainText("Rules set by config or another client")
+
+  // The built-in modes stay selectable from a custom session and write over the foreign ruleset.
+  await options.filter({ hasText: "Ask every time" }).click()
+  await expect.poll(() => view.session.permissions).toEqual([{ action: "*", resource: "*", effect: "ask" }])
+})
