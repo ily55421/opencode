@@ -7,6 +7,7 @@ import { Context, Effect, Layer, Types } from "effect"
 import { Skill } from "@opencode/schema/skill"
 import { Bus } from "./bus.js"
 import { Permission } from "./permission.js"
+import { AbsolutePath } from "./schema.js"
 import { State } from "./state.js"
 
 export const DirectorySource = Skill.DirectorySource
@@ -93,15 +94,28 @@ export const prepare = Effect.fn("Skill.prepare")(function* (
   }
 })
 
+/**
+ * One skill ID defined in more than one place: `kept` is the path that loaded, the
+ * `shadowed` paths exist but were not loaded. Precedence is unchanged — this exists
+ * so the model and the user can see which file actually provides a listed skill.
+ */
+export type Conflict = {
+  readonly id: ID
+  readonly kept: AbsolutePath
+  readonly shadowed: ReadonlyArray<AbsolutePath>
+}
+
 export type Data = {
   skills: Map<ID, Types.DeepMutable<Info>>
   files: Map<ID, ReadonlyMap<string, string>>
+  conflicts: Map<ID, Conflict>
 }
 
 export type Editor = {
   list: () => readonly Types.DeepMutable<Info>[]
   get: (id: string) => Types.DeepMutable<Info> | undefined
-  add: (skill: Info, files?: Readonly<Record<string, string>>) => void
+  /** `files` carries the skill's extra files; `shadowed` names paths this skill displaced across sources. */
+  add: (skill: Info, files?: Readonly<Record<string, string>>, shadowed?: ReadonlyArray<AbsolutePath>) => void
   update: (id: string, update: (skill: Types.DeepMutable<Info>) => void) => void
   remove: (id: string) => void
 }
@@ -110,6 +124,7 @@ export interface Interface extends State.Transformable<Editor> {
   readonly get: (id: ID) => Effect.Effect<Info | undefined>
   readonly files: (id: ID) => Effect.Effect<ReadonlyMap<string, string> | undefined>
   readonly list: () => Effect.Effect<Info[]>
+  readonly conflicts: () => Effect.Effect<Conflict[]>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Skill") {}
@@ -121,11 +136,25 @@ const layer = Layer.effect(
 
     const state = State.create<Data, Editor>({
       name: "skill",
-      initial: () => ({ skills: new Map(), files: new Map() }),
+      initial: () => ({ skills: new Map(), files: new Map(), conflicts: new Map() }),
       editor: (editor) => ({
         list: () => Array.from(editor.skills.values()),
         get: (id) => editor.skills.get(ID.make(id)),
-        add: (skill, files) => {
+        add: (skill, files, shadowed) => {
+          const previous = editor.skills.get(skill.id)
+          // A rebuild replays every transform from empty, so a shadowing overwrite can be recorded
+          // directly: nothing stale survives into the next rebuild. The incoming skill wins, and the
+          // paths it displaced sit in front of the deeper chain the earlier winner displaced, so the
+          // direct predecessor reads first.
+          const paths = new Set(shadowed)
+          if (previous !== undefined && previous.path !== skill.path) paths.add(previous.path)
+          paths.delete(skill.path)
+          if (paths.size > 0) {
+            const deeper = (editor.conflicts.get(skill.id)?.shadowed ?? []).filter(
+              (path) => !paths.has(path) && path !== skill.path,
+            )
+            editor.conflicts.set(skill.id, { id: skill.id, kept: skill.path, shadowed: [...paths, ...deeper] })
+          }
           editor.skills.set(skill.id, { ...skill })
           const entries = files
             ? Object.entries(files)
@@ -172,6 +201,9 @@ const layer = Layer.effect(
       }),
       list: Effect.fn("Skill.list")(function* () {
         return Array.from(state.get().skills.values())
+      }),
+      conflicts: Effect.fn("Skill.conflicts")(function* () {
+        return Array.from(state.get().conflicts.values())
       }),
     })
   }),

@@ -16,7 +16,15 @@ import { PluginHooks } from "./plugin/hooks.js"
 import { SessionMessage } from "./session/message.js"
 import { SessionSchema } from "./session/schema.js"
 import { State } from "./state.js"
-import { definition, effectiveName, execute, normalizedName, normalizeContent } from "./tool/runtime.js"
+import {
+  availableTools,
+  definition,
+  effectiveName,
+  execute,
+  normalizedName,
+  normalizeContent,
+  recoverToolName,
+} from "./tool/runtime.js"
 import { Wildcard } from "./util/wildcard.js"
 
 export class RegistrationError extends Schema.TaggedError<RegistrationError>()("Tool.RegistrationError", {
@@ -304,18 +312,28 @@ const layer = Layer.effect(
                 id: Tool.CallID.make(input.call.id),
                 progress: input.progress ?? (() => Effect.void),
               }
-              const event = yield* beforeExecute(input.call.name, input.call.input, context)
+              // The request's own list is the only set a repair may land on, so a mangled name can
+              // never reach a tool this step did not advertise.
+              const advertised = input.definitions
+                ? Array.from(input.definitions.keys())
+                : [...direct.keys(), ...(codeModeTool ? [codeModeTool.name] : [])]
+              const called = advertised.includes(input.call.name)
+                ? input.call.name
+                : (recoverToolName(input.call.name, advertised) ?? input.call.name)
+              const event = yield* beforeExecute(called, input.call.input, context)
               const requested = input.definitions?.get(event.tool)
               // Preserve session context removal and alias resolution, now after the repair hook.
               if (!requested && input.definitions && (direct.has(event.tool) || codeModeTool?.name === event.tool))
-                return yield* new Tool.Error({ message: `Tool is not available for this request: ${event.tool}` })
+                return yield* new Tool.Error({
+                  message: `Tool is not available for this request: ${event.tool}.${availableTools(advertised)}`,
+                })
               const name = requested?.name ?? event.tool
               if (name === "execute" && codeModeTool)
                 return yield* executeTool(codeModeTool, name, event.input, context)
               const tool = direct.get(name)
               if (tool) return yield* executeTool(tool, name, event.input, context)
               return yield* new Tool.Error({
-                message: `No tool named "${name}" is currently available. Please use a tool from the available tool list.`,
+                message: `No tool named "${name}" is currently available.${availableTools(advertised)}`,
               })
             }),
           }

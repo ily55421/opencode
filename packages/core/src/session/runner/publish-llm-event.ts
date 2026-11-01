@@ -22,6 +22,8 @@ type Input = {
   readonly agent: Agent.ID
   readonly model: Model.Ref
   readonly providerMetadataKey: string
+  /** The tools this request advertised, so an unknown-tool reply can name the ones that exist. */
+  readonly advertised: ReadonlyArray<string>
   /** The start snapshot, awaited before `Step.Started` so its capture can overlap the provider request. */
   readonly pendingSnapshot?: Effect.Effect<Snapshot.ID | undefined>
   readonly started: number
@@ -60,6 +62,8 @@ const INPUT_FAILURES = {
 export interface StepRecord {
   /** The model produced visible output this attempt, which bars transparent retries and overflow recovery. */
   readonly outputStarted: boolean
+  /** A tool call settled successfully, so the step did work even when the model said nothing. */
+  readonly toolSucceeded: boolean
   readonly providerFailed: boolean
   /** The step's recorded assistant failure, if any. */
   readonly failure?: SessionError.Error
@@ -115,6 +119,7 @@ export const createLLMEventPublisher = (bus: Pick<Bus.Interface, "publish">, inp
   let stepStarted = false
   let providerFailed = false
   let outputStarted = false
+  let toolSucceeded = false
   let stepFailure: SessionError.Error | undefined
   let stepSettlement: StepRecord["finish"]
 
@@ -523,6 +528,7 @@ export const createLLMEventPublisher = (bus: Pick<Bus.Interface, "publish">, inp
           executed,
           native: native(event.providerMetadata),
         })
+        toolSucceeded = true
         return
       }
       case "step-finish":
@@ -575,6 +581,7 @@ export const createLLMEventPublisher = (bus: Pick<Bus.Interface, "publish">, inp
       ...(result.metadata === undefined ? {} : { metadata: result.metadata }),
       executed: tool.providerExecuted,
     })
+    toolSucceeded = true
   })
 
   return {
@@ -591,6 +598,7 @@ export const createLLMEventPublisher = (bus: Pick<Bus.Interface, "publish">, inp
     /** Immutable snapshot of everything recorded for this step so far. */
     record: (): StepRecord => ({
       outputStarted,
+      toolSucceeded,
       providerFailed,
       failure: stepFailure,
       finish: stepSettlement,

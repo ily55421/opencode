@@ -245,6 +245,13 @@ describe("ConfigSkillPlugin.Plugin", () => {
           ])
           expect((yield* skill.list()).find((item) => item.id === "deploy")?.description).toBe("Deploy")
           expect((yield* skill.list()).find((item) => item.id === "review")?.description).toBe("Second")
+          expect(yield* skill.conflicts()).toEqual([
+            {
+              id: Skill.ID.make("review"),
+              kept: AbsolutePath.make(path.join(second, "review", "SKILL.md")),
+              shadowed: [AbsolutePath.make(path.join(first, "review", "SKILL.md"))],
+            },
+          ])
           expect(pulls).toEqual(["https://example.test/skills/"])
         }),
       ),

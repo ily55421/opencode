@@ -32,6 +32,7 @@ const it = testEffect(
 const source = (name: string, read: Effect.Effect<string | Instructions.Unavailable | Instructions.Removed>) =>
   Instructions.make({
     key: Instructions.Key.make(name),
+    scope: "global",
     codec: Schema.toCodecJson(Schema.String),
     read,
     render: {

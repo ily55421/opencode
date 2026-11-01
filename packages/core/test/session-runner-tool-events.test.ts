@@ -65,6 +65,7 @@ const capture = (
         providerID: Provider.ID.opencode,
       },
       providerMetadataKey,
+      advertised: [],
       pendingSnapshot: options?.pendingSnapshot,
       started: 0,
       assistantMessageID: SessionMessage.ID.create(),
@@ -170,6 +171,7 @@ testEffect(
         agent: Agent.defaultID,
         model: { id: Model.ID.make("test-model"), providerID: Provider.ID.opencode },
         providerMetadataKey: "openai",
+        advertised: [],
         started: 0,
       },
     )

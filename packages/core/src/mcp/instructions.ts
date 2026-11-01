@@ -59,6 +59,7 @@ export const layer = Layer.effect(
         const source = (value: ReadonlyArray<Summary> | Instructions.Removed) =>
           Instructions.make<ReadonlyArray<Summary>>({
             key: Instructions.Key.make("core/mcp-guidance"),
+            scope: "global",
             codec: Schema.toCodecJson(Schema.Array(Summary)),
             read: Effect.succeed(value),
             render: {

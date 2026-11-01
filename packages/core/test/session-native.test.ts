@@ -126,6 +126,7 @@ const setup = Effect.gen(function* () {
   const state = { value: "initial instructions" }
   const instructions = Instructions.make({
     key: Instructions.Key.make("test/context"),
+    scope: "global",
     codec: Schema.toCodecJson(Schema.String),
     read: Effect.sync(() => state.value),
     render: { initial: String, changed: (_previous, value) => value, removed: () => "removed" },

@@ -26,9 +26,10 @@ export const Plugin = define({
     const global = yield* Global.Service
     const location = yield* Location.Service
     const watcher = yield* Watcher.Service
-    const loaded: { entries: Entry[]; skills: Skill.Info[] } = {
+    const loaded: { entries: Entry[]; skills: Skill.Info[]; conflicts: Skill.Conflict[] } = {
       entries: yield* config.entries(),
       skills: [],
+      conflicts: [],
     }
     const watches = yield* FiberMap.make<string>()
     const changes = yield* PubSub.sliding<string>(1)
@@ -150,11 +151,32 @@ export const Plugin = define({
       function* (file?: string) {
         yield* FiberMap.clear(watches)
         const skills = new Map<Skill.ID, Skill.Info>()
+        const shadowed = new Map<Skill.ID, Set<AbsolutePath>>()
         const current = sources()
         for (const source of current) {
-          for (const skill of yield* load(source)) skills.set(skill.id, skill)
+          for (const skill of yield* load(source)) {
+            const previous = skills.get(skill.id)
+            // Later sources win, and the precedence is unchanged. The displaced path is recorded so
+            // the model-visible disclosure can say which file actually provides a listed skill; the
+            // log line keeps an id that stopped loading findable in operational output.
+            if (previous !== undefined && previous.path !== skill.path) {
+              const paths = shadowed.get(skill.id)
+              if (paths === undefined) shadowed.set(skill.id, new Set([previous.path]))
+              else paths.add(previous.path)
+              yield* Effect.logWarning("skill id shadowed by a later source", {
+                id: skill.id,
+                kept: skill.path,
+                shadowed: previous.path,
+              })
+            }
+            skills.set(skill.id, skill)
+          }
         }
         loaded.skills = Array.from(skills.values())
+        loaded.conflicts = Array.from(shadowed).flatMap(([id, paths]) => {
+          const kept = skills.get(id)
+          return kept === undefined ? [] : [{ id, kept: kept.path, shadowed: [...paths] }]
+        })
         if (file) {
           yield* Effect.logInfo("skills rescanned", {
             file,
@@ -176,7 +198,8 @@ export const Plugin = define({
     )
     yield* refresh()
     yield* ctx.skill.transform((editor) => {
-      for (const skill of loaded.skills) editor.add(skill)
+      const displaced = new Map(loaded.conflicts.map((conflict) => [conflict.id, conflict.shadowed]))
+      for (const skill of loaded.skills) editor.add(skill, displaced.get(skill.id))
     })
     yield* ctx.event.subscribe({ types: ["config.updated"] }).pipe(
       Stream.runForEach(() =>

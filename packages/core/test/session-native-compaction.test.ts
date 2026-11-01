@@ -169,6 +169,7 @@ const setup = Effect.fnUntraced(function* (options: { endpoint?: boolean } = {})
   if (!session) return yield* Effect.die("Missing fixture session")
   const instructions = Instructions.make({
     key: Instructions.Key.make("test/native"),
+    scope: "global",
     codec: Schema.toCodecJson(Schema.String),
     read: Effect.succeed("Current instructions"),
     render: { initial: String, changed: (_previous, value) => value, removed: () => "removed" },

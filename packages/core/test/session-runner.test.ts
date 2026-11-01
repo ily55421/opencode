@@ -48,6 +48,7 @@ import { SessionProjector } from "@opencode/core/session/projector"
 import { SessionExecution } from "@opencode/core/session/execution"
 import { SessionRunCoordinator } from "@opencode/core/session/run-coordinator"
 import { SessionRunner } from "@opencode/core/session/runner/index"
+import { SessionRunnerEmpty } from "@opencode/core/session/runner/empty"
 import { SessionRunnerLLM } from "@opencode/core/session/runner/llm"
 import { SessionRunnerModel } from "@opencode/core/session/runner/model"
 import { SessionUsage } from "@opencode/core/session/usage"
@@ -357,6 +358,7 @@ const layer = Layer.unwrap(
         Effect.sync(() =>
           Instructions.make({
             key: systemContextKey,
+            scope: "global",
             codec: Schema.toCodecJson(Schema.String),
             read: state.systemLoadHook.pipe(
               Effect.andThen(
@@ -394,6 +396,7 @@ const layer = Layer.unwrap(
             ? Instructions.empty
             : Instructions.make({
                 key: Instructions.Key.make("test/skill-guidance"),
+                scope: "global",
                 codec: Schema.toCodecJson(Schema.String),
                 read: Effect.succeed(baseline),
                 render: {
@@ -720,6 +723,11 @@ const messageTexts = (request: LLMRequest, role: "user" | "system") =>
   )
 const userTexts = (request: LLMRequest) => messageTexts(request, "user")
 const systemTexts = (request: LLMRequest) => messageTexts(request, "system")
+
+// A closing response with visible output. A bare `TestLLM.stop()` settles with no content, which the
+// empty-response recovery reads as the model stalling and answers with a nudge; scenarios that mean
+// "the turn ends" end it with an answer.
+const closing = () => TestLLM.text("Done", "text-closing")
 const messageRoles = (request: LLMRequest | undefined) => request?.messages.map((message) => message.role)
 
 const recordedEventTypes = (id: Session.ID) =>
@@ -3678,8 +3686,8 @@ describe("SessionRunnerLLM", () => {
       TestLLM.failAfter(providerRejected({ message: "prompt too long", classification: "context-overflow" })),
       TestLLM.text("## Objective\n- Overflow summary", "overflow-summary"),
       TestLLM.text("Recovered", "overflow-recovered"),
-      TestLLM.stop(),
-      TestLLM.stop(),
+      closing(),
+      closing(),
     )
     const first = yield* s.llm.gate()
     const run = yield* s.resume.pipe(Effect.forkChild)
@@ -4486,7 +4494,7 @@ describe("SessionRunnerLLM", () => {
   scenario("steers an active step with newly recorded prompts", function* (s) {
     yield* s.admit("Start working")
 
-    yield* s.llm.push(TestLLM.stop(), TestLLM.stop())
+    yield* s.llm.push(closing(), closing())
 
     const first = yield* s.resumePaused
     yield* s.session.prompt({ sessionID, text: "Change direction" })
@@ -4521,7 +4529,7 @@ describe("SessionRunnerLLM", () => {
   scenario("keeps queued input parked when a steer is cancelled during preparation", function* (s) {
     const runner = yield* SessionRunner.Service
     yield* s.admit("A")
-    yield* s.llm.push(TestLLM.stop(), TestLLM.stop(), TestLLM.stop())
+    yield* s.llm.push(closing(), closing(), closing())
     const stream = yield* s.llm.gate()
     const run = yield* runner.drain({ sessionID, force: false }).pipe(Effect.forkChild)
     yield* stream.started
@@ -4545,7 +4553,7 @@ describe("SessionRunnerLLM", () => {
 
     const location = Location.Ref.make({ directory: AbsolutePath.make("/moved") })
     yield* s.admit("A")
-    yield* s.llm.push(TestLLM.stop(), TestLLM.stop())
+    yield* s.llm.push(closing(), closing())
     const stream = yield* s.llm.gate()
     const run = yield* runner.drain({ sessionID, force: false }).pipe(Effect.forkChild)
     yield* stream.started
@@ -4579,7 +4587,7 @@ describe("SessionRunnerLLM", () => {
   scenario("preserves durable queued input for a later wake after interruption", function* (s) {
     yield* s.admit("Interrupt current work")
 
-    yield* s.llm.push([], TestLLM.stop())
+    yield* s.llm.push([], closing())
     const stream = yield* s.llm.gate()
 
     const run = yield* s.resume.pipe(Effect.forkChild)
@@ -4606,7 +4614,7 @@ describe("SessionRunnerLLM", () => {
   scenario("preserves durable steering input for a later resume after interruption", function* (s) {
     yield* s.admit("Interrupt current work")
 
-    yield* s.llm.push([], TestLLM.stop())
+    yield* s.llm.push([], closing())
     const stream = yield* s.llm.gate()
 
     const run = yield* s.resume.pipe(Effect.forkChild)
@@ -4633,7 +4641,7 @@ describe("SessionRunnerLLM", () => {
   scenario("promotes queued inputs one at a time in FIFO order", function* (s) {
     yield* s.admit("Start working")
 
-    yield* s.llm.push(TestLLM.stop(), TestLLM.stop(), TestLLM.stop())
+    yield* s.llm.push(closing(), closing(), closing())
 
     const first = yield* s.resumePaused
     yield* s.session.prompt({ sessionID, text: "Queue first", delivery: "queue" })
@@ -4649,7 +4657,7 @@ describe("SessionRunnerLLM", () => {
   scenario("stops a steer-scoped drain before queued input", function* (s) {
     yield* s.session.prompt({ sessionID, text: "Queue for later", delivery: "queue", resume: false })
     yield* s.session.prompt({ sessionID, text: "Steer now", resume: false })
-    yield* s.llm.push(TestLLM.stop())
+    yield* s.llm.push(closing())
 
     const runner = yield* SessionRunner.Service
     yield* runner.drain({ sessionID, force: false, promotable: "steer" })
@@ -4707,7 +4715,7 @@ describe("SessionRunnerLLM", () => {
       resume: false,
     })
 
-    yield* s.llm.push(TestLLM.stop(), TestLLM.stop())
+    yield* s.llm.push(closing(), closing())
 
     yield* s.resume
 
@@ -4719,7 +4727,7 @@ describe("SessionRunnerLLM", () => {
   scenario("promotes steers before the next queued input", function* (s) {
     yield* s.admit("Start working")
 
-    yield* s.llm.push(TestLLM.stop(), TestLLM.stop(), TestLLM.stop(), TestLLM.stop())
+    yield* s.llm.push(closing(), closing(), closing(), closing())
     const firstStream = yield* s.llm.gate()
 
     const first = yield* s.resume.pipe(Effect.forkChild)
@@ -4762,7 +4770,7 @@ describe("SessionRunnerLLM", () => {
     const execution = yield* SessionExecution.Service
     yield* s.admit("Start working")
 
-    yield* s.llm.push(TestLLM.stop(), TestLLM.stop())
+    yield* s.llm.push(closing(), closing())
 
     const first = yield* s.resumePaused
     yield* s.session.prompt({ sessionID, text: "First steer" })
@@ -5330,8 +5338,7 @@ describe("SessionRunnerLLM", () => {
           {
             error: {
               type: "tool.execution",
-              message:
-                'No tool named "missing" is currently available. Please use a tool from the available tool list.',
+              message: expect.stringContaining('No tool named "missing" is currently available.'),
             },
           },
         ),
@@ -6744,7 +6751,7 @@ describe("SessionRunnerLLM", () => {
         LLMEvent.toolInputStart({ id: "call-incomplete", name: "echo" }),
         LLMEvent.toolInputDelta({ id: "call-incomplete", name: "echo", text: '{"text":"partial' }),
       ),
-      TestLLM.stop(),
+      closing(),
     )
 
     yield* s.runPrompt("Recover unfinished tool input")
@@ -6810,7 +6817,7 @@ describe("SessionRunnerLLM", () => {
             raw,
           }),
         ),
-        TestLLM.stop(),
+        closing(),
       )
 
       yield* s.runPrompt("Recover malformed tool input")
@@ -7016,7 +7023,7 @@ describe("SessionRunnerLLM", () => {
       malformed("call-first"),
       TestLLM.toolCall("call-valid-between", "echo", { text: "valid" }),
       malformed("call-second"),
-      TestLLM.stop(),
+      closing(),
     )
 
     yield* s.runPrompt("Keep producing malformed tools")
@@ -7024,6 +7031,44 @@ describe("SessionRunnerLLM", () => {
     expect(s.requests).toHaveLength(4)
     expect(s.executions).toEqual(["valid"])
     expect((yield* recordedEventTypes(sessionID)).filter((type) => type === "session.step.failed.1")).toHaveLength(0)
+  })
+
+  scenario("answers a settled empty response with one nudge and recovers", function* (s) {
+    yield* s.admit("Say something")
+
+    // A bare stop settles the step with no visible output, which is the model stalling.
+    yield* s.llm.push(TestLLM.stop(), closing())
+    yield* s.resume
+
+    expect(s.requests).toHaveLength(2)
+    const synthetic = (yield* s.context).filter((message) => message.type === "synthetic")
+    expect(synthetic).toMatchObject([{ metadata: { notice: SessionRunnerEmpty.NOTICE_EMPTY_RETRY } }])
+  })
+
+  scenario("stops after three empty responses and ends the turn with a notice", function* (s) {
+    yield* s.admit("Say something")
+
+    yield* s.llm.push(TestLLM.stop(), TestLLM.stop(), TestLLM.stop(), TestLLM.stop())
+    yield* s.resume
+
+    expect(s.requests).toHaveLength(4)
+    const synthetic = (yield* s.context).filter((message) => message.type === "synthetic")
+    expect(synthetic.map((message) => message.metadata?.notice)).toEqual([
+      SessionRunnerEmpty.NOTICE_EMPTY_RETRY,
+      SessionRunnerEmpty.NOTICE_EMPTY_RETRY,
+      SessionRunnerEmpty.NOTICE_EMPTY_RETRY,
+      SessionRunnerEmpty.NOTICE_EMPTY_STOPPED,
+    ])
+  })
+
+  scenario("treats a blank answer after a completed tool as a finished turn", function* (s) {
+    yield* s.admit("Run the tool then stop")
+
+    yield* s.llm.push(TestLLM.tool("call-echo", "echo", { text: "hi" }), TestLLM.stop())
+    yield* s.resume
+
+    expect(s.requests).toHaveLength(2)
+    expect((yield* s.context).filter((message) => message.type === "synthetic")).toEqual([])
   })
 
   scenario("does not continue malformed tool input past the agent step limit", function* (s) {
@@ -7442,5 +7487,77 @@ describe("SessionRunnerLLM", () => {
 
     expect(s.requests).toHaveLength(4)
     expect(yield* residueNotices(s)).toEqual([{ text: TODO_RESIDUE, notice: "todo-residue" }])
+  })
+
+  // The provider reuses its cached prefix only while the bytes ahead of the newest turn stay put, so
+  // this is the assertion model→tool routing and any cache keepalive are gated on. Wire bytes are
+  // compared with cache breakpoints off, because the final message moves its marker every step.
+  const wirePrefix = Effect.fnUntraced(function* (request: LLMRequest) {
+    const compiled = yield* compileRequest(LLMRequest.update(request, { cache: "none" }))
+    return Schema.decodeUnknownSync(Schema.Array(Schema.Unknown))(compiled.body.messages)
+  })
+
+  scenario("keeps the cached prefix byte-identical between the steps of one turn", function* (s) {
+    yield* s.llm.push(TestLLM.tool("call-prefix-step", "echo", { text: "once" }), TestLLM.text("Done", "prefix-step-done"))
+    yield* s.runPrompt("Echo once")
+
+    expect(s.requests).toHaveLength(2)
+    const first = s.requests[0]
+    const second = s.requests[1]
+    expect(second.messages.slice(0, first.messages.length)).toEqual([...first.messages])
+    expect(second.system).toEqual(first.system)
+    expect(second.tools).toEqual(first.tools)
+    expect(second.promptCacheKey).toBe(first.promptCacheKey)
+
+    const before = yield* wirePrefix(first)
+    const after = yield* wirePrefix(second)
+    expect(after.slice(0, before.length)).toEqual([...before])
+  })
+
+  scenario("catches a step that moved the cached prefix", function* (s) {
+    yield* s.llm.push(TestLLM.tool("call-prefix-drift", "echo", { text: "once" }), TestLLM.text("Done", "prefix-drift-done"))
+    yield* s.runPrompt("Echo once")
+
+    const first = s.requests[0]
+    const stamped = LLMRequest.update(s.requests[1], {
+      system: s.requests[1].system.map((part) => ({ ...part, text: `${part.text}#${new Date().toISOString()}` })),
+    })
+    const before = yield* wirePrefix(first)
+    const after = yield* wirePrefix(stamped)
+    expect(after.slice(0, before.length)).not.toEqual([...before])
+  })
+
+  const loopCalls = (count: number) =>
+    Array.from({ length: count }, (_, index) => TestLLM.tool(`call-loop-${index}`, "echo", { text: "again" }))
+
+  const loopGuardFailures = (s: Scenario) =>
+    Effect.map(s.context, (messages) =>
+      messages.flatMap((entry) =>
+        entry.type !== "assistant"
+          ? []
+          : entry.content.flatMap((part) =>
+              part.type === "tool" &&
+              part.state.status === "error" &&
+              part.state.error.message.startsWith("Loop guard:")
+                ? [part.state.error.message]
+                : [],
+            ),
+      ),
+    )
+
+  scenario("refuses a repeated tool call and closes the turn instead of looping", function* (s) {
+    yield* s.llm.push(...loopCalls(8), TestLLM.text("Wrapped up", "loop-stop"))
+    yield* s.runPrompt("Echo the same thing")
+
+    // Five identical calls trip the guard, three refusals of the same call close the turn, and the
+    // closing step is the text-only one, so the turn ends idle with an error-free record.
+    expect(s.requests).toHaveLength(9)
+    expect(yield* loopGuardFailures(s)).toHaveLength(3)
+    expect(s.requests[8]?.toolChoice).toMatchObject({ type: "none" })
+    expect(s.requests[8]?.messages.at(-1)).toMatchObject({
+      role: "assistant",
+      content: [{ type: "text", text: expect.stringContaining("Loop guard: automatic continuation stopped") }],
+    })
+    expect((yield* s.messages).some((entry) => entry.type === "assistant" && entry.error !== undefined)).toBe(false)
   })
 })

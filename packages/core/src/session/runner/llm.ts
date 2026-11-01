@@ -34,6 +34,8 @@ import { ToolOutput } from "../../tool-output.js"
 import { Plugin } from "../../plugin.js"
 import { PluginHooks } from "../../plugin/hooks.js"
 import { MAX_STEPS_PROMPT } from "./max-steps.js"
+import { SessionRunnerEmpty } from "./empty.js"
+import { SessionRunnerLoop } from "./loop.js"
 
 const CONTINUE_AFTER_INCOMPLETE_STREAM =
   "The previous response was interrupted. Continue from where you left off without repeating completed content."
@@ -288,6 +290,10 @@ const layer = Layer.effect(
         }
         yield* compaction.precompute(Effect.succeed(loaded), estimate)
         const stepLimitReached = loaded.agent.info.steps !== undefined && step >= loaded.agent.info.steps
+        // The guard is folded from durable history at every Step boundary, so a rejection the model
+        // has already eaten keeps counting after a restart.
+        const guard = SessionRunnerLoop.decide(loaded.messages, yield* SessionRunnerLoop.enabled)
+        const closing = guard.stop ?? (stepLimitReached ? MAX_STEPS_PROMPT : undefined)
         const transcript = SessionModelRequest.baseTranscript({
           agent: loaded.agent.info,
           model: loaded.model,
@@ -302,11 +308,10 @@ const layer = Layer.effect(
             model: loaded.model,
             tools: loaded.tools,
             system: transcript.system,
-            messages: stepLimitReached
-              ? [...transcript.messages, Message.assistant(MAX_STEPS_PROMPT)]
-              : transcript.messages,
+            messages:
+              closing === undefined ? transcript.messages : [...transcript.messages, Message.assistant(closing)],
             // Keep tool definitions on the final Step to preserve the provider's cached prefix.
-            toolChoice: stepLimitReached ? "none" : undefined,
+            toolChoice: closing === undefined ? undefined : "none",
             webSocket: "session",
             inputTokens: estimate,
           })
@@ -342,6 +347,7 @@ const layer = Layer.effect(
               retry: proposed,
             }),
           recoverContinuation,
+          blocked: guard.blocked,
           recoverOverflow: Effect.suspend(() =>
             recoverOverflow
               ? compaction
@@ -354,6 +360,20 @@ const layer = Layer.effect(
           Completed: Effect.fnUntraced(function* (outcome) {
             if (outcome.needsContinuation) return true
             const messages = yield* store.context(sessionID)
+            // An empty answer is answered first, and it owns this boundary: one turn gets one automatic
+            // notice, so the todo nudge below must not also speak over it.
+            if (outcome.empty) {
+              const empty = SessionRunnerEmpty.decide(messages)
+              if (empty) {
+                yield* bus.publish(SessionEvent.Synthetic, {
+                  sessionID,
+                  text: empty.text,
+                  description: empty.description,
+                  metadata: { notice: empty.notice },
+                })
+                return empty.continue
+              }
+            }
             // The model stopped without calling a tool, but its own todo list may still have open items.
             const nudge = SessionRunnerUnfinished.decide(messages)
             if (nudge) {

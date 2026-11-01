@@ -9,6 +9,7 @@ import { Database } from "../database/database.js"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { InstructionDiscovery } from "../instruction-discovery.js"
 import { Instructions } from "../instructions/index.js"
+import { InstructionBudget } from "../instructions/budget.js"
 import { InstructionBuiltIns } from "../instructions/builtins.js"
 import { Location } from "../location.js"
 import { McpInstructions } from "../mcp/instructions.js"
@@ -172,6 +173,7 @@ const layer = Layer.effect(
         selection.session.id,
         selection.instructions,
         model.ref,
+        InstructionBudget.forWindow(model.limit.context),
       )
       return {
         session: selection.session,

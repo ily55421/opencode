@@ -5,6 +5,7 @@ import { Effect, Option, Schema } from "effect"
 import type { Database } from "../database/database.js"
 import type { Bus } from "../bus.js"
 import { Instructions } from "../instructions/index.js"
+import { InstructionBudget } from "../instructions/budget.js"
 import { SessionEvent } from "./event.js"
 import { SessionSchema } from "./schema.js"
 import { InstructionBlobTable, InstructionStateTable } from "./sql.js"
@@ -156,16 +157,24 @@ export const rewind = Effect.fn("InstructionState.rewind")(function* (
     .pipe(Effect.orDie)
 })
 
-/** Renders the epoch baseline shown at the start of every model request. */
+/**
+ * Renders the epoch baseline shown at the start of every model request. The budget is a request-time
+ * decision, not a stored fact: nothing is trimmed in the fold, so a later request with a larger
+ * window gets the whole baseline back.
+ */
 export const initial = Effect.fn("InstructionState.initial")(function* (
   db: DatabaseService,
   sessionID: SessionSchema.ID,
   instructions: Instructions.List,
+  budget?: InstructionBudget.Pools,
 ) {
   const state = yield* find(db, sessionID)
   if (!state) return yield* Effect.die(new Error(`Instruction state not found during assembly: ${sessionID}`))
   const blobs = yield* loadBlobs(db, Object.values(state.initial_values))
-  return Instructions.renderInitial(instructions, dereference(state.initial_values, blobs))
+  const parts = Instructions.parts(instructions, dereference(state.initial_values, blobs))
+  return budget === undefined
+    ? Instructions.render(parts.map((part) => part.text))
+    : InstructionBudget.fit(parts, budget)
 })
 
 /** The current instruction values, used to seed a fork's baseline. */

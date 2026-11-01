@@ -295,3 +295,34 @@ export const effectiveName = (tool: Pick<Tool.Info, "name" | "options">) =>
 /** For `Effect.mapError`: keep a `ToolFailure` as is, wrap anything else with `message`. */
 export const toolFailure = (message: string) => (error: unknown) =>
   error instanceof ToolFailure ? error : new ToolFailure({ message, error })
+
+const MANGLED_PREFIXES = ["functions.", "developer.", "tools.", "tool."]
+
+// Models emit the shape they saw in other tools' documentation: a `functions.`/`developer.` prefix, or
+// the dotted namespace form, when the registry name replaced every separator with an underscore.
+const variants = (raw: string) => {
+  const stripped = MANGLED_PREFIXES.reduce(
+    (name, prefix) => (name.toLowerCase().startsWith(prefix) ? name.slice(prefix.length) : name),
+    raw,
+  )
+  const separated = (value: string) => value.replace(/[.:/\s-]+/g, "_")
+  return [raw, stripped, separated(raw), separated(stripped)]
+}
+
+/**
+ * Maps a hallucinated tool name onto the one advertised tool it can only mean. Nothing is invented:
+ * the candidates come from the caller's advertised set, so a repair can never resurrect a tool the
+ * request dropped, and an ambiguous match is left for the unknown-tool response to explain.
+ */
+export const recoverToolName = (raw: string, advertised: Iterable<string>) => {
+  const candidates = [...new Set(variants(raw).map((value) => value.toLowerCase()))]
+  const matches = Array.from(advertised).filter((name) => candidates.includes(name.toLowerCase()))
+  return matches.length === 1 ? matches[0] : undefined
+}
+
+/** The advertised tool names, bounded so one bad call cannot spend the whole reply on a listing. */
+export const availableTools = (advertised: Iterable<string>) => {
+  const names = Array.from(advertised).sort((left, right) => (left < right ? -1 : left > right ? 1 : 0))
+  const shown = names.slice(0, 50)
+  return ` Available tools: ${shown.join(", ")}${names.length > shown.length ? ` (and ${names.length - shown.length} more)` : ""}.`
+}

@@ -13,6 +13,7 @@ const source = (input: {
 }) =>
   Instructions.make({
     key: key(input.key),
+    scope: "global",
     codec: Schema.toCodecJson(Schema.String),
     read: Effect.succeed(input.value),
     render: {
@@ -28,6 +29,7 @@ describe("Instructions", () => {
       let reads = 0
       const instructions = Instructions.make({
         key: key("core/date"),
+        scope: "global",
         codec: Schema.toCodecJson(Schema.String),
         read: Effect.sync(() => {
           reads++
@@ -108,6 +110,7 @@ describe("Instructions", () => {
     Effect.gen(function* () {
       const instructions = Instructions.make<Schema.Json>({
         key: key("api/value"),
+        scope: "project",
         codec: Schema.toCodecJson(Schema.Json),
         read: Effect.succeed(null),
         render: {

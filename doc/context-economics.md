@@ -66,6 +66,59 @@ Consequences worth remembering:
 Settings live at `packages/core/src/config/plugin/compaction.ts` (`compaction.auto`, `compaction.buffer`,
 `compaction.keep.tokens`, `experimental.background_compaction`).
 
+## Injected block budget
+
+The instruction baseline — agent system prompt plus every `Instructions.Source` rendered for the Session — is budgeted
+at `core/src/instructions/budget.ts` when it is rendered for a request. Every source declares its `scope` on
+`Source.Definition`, and `InstructionBudget.forWindow` turns the model's context window into one pool per scope, each
+taking the smaller of `DEFAULT_BUDGET_TOKENS` (100 000) and `DEFAULT_WINDOW_SHARE` (25% of the window). The pools are
+spent independently: `InstructionBudget.fit` walks the parts in `combine` order, and each part spends against its own
+scope's remainder — a part that no longer fits is cut at a whole-line boundary by binary search, and a part whose first
+line does not fit is dropped. Both are named in the text the model reads:
+
+```
+[instructions budget: core/skill-guidance trimmed 1200 tokens, api/verbose dropped]
+```
+
+The scopes split what exists independent of the workspace from what the workspace owns. `global` carries the ambient
+catalog — the Code Mode listing, MCP server guidance, references, the skill listing and its conflict disclosure, the
+date and environment — and `project` carries the workspace's own instruction tree: discovered AGENTS.md files
+(`instruction-discovery`) and session-injected context (`api/*` entries). The project tree is the part with no ceiling
+of its own, which is exactly why it gets a pool that a large shared catalog cannot eat into, and the other way around.
+
+Costs are measured with `Token.estimateWide`, the same rule the compaction thresholds are calibrated against, so the
+budget and the trigger cannot disagree about what a block weighs.
+
+The skill listing is bounded before it reaches the budget: `core/src/skill/instructions.ts` caps each description at
+`MAX_DESCRIPTION_CHARS` (400) and says so in the text (`… (description truncated)`), because one verbose skill
+otherwise spends the ambient allowance of every other one.
+
+**Skill conflicts are disclosed, not resolved.** When one skill ID exists in more than one location — two configured
+directories, or a config skill over a bundled one — the later source still wins and the precedence is unchanged, but
+the loser is no longer silent: `Skill`'s state records `{ id, kept, shadowed }` (`ConfigSkillPlugin.refresh` reports
+its source-order chain through `Editor.add`'s `shadowed` argument; a cross-contributor overwrite is recorded from the
+displaced path directly), and `SkillInstructions.load` renders a `core/skill-conflicts` source:
+
+```
+Skill conflicts (visible, not auto-resolved):
+Each ID below is defined in more than one location. The first path is the one in effect; the shadowed paths are not loaded.
+- id "review": /repo/.opencode/skills/review/SKILL.md shadows /home/u/.config/opencode/skills/review/SKILL.md
+```
+
+## Prefix bytes
+
+Two rules keep the provider's cached prefix alive, and both are checked without a provider:
+
+- **Schema bytes.** `core/src/tool/schema-canonical.ts` rewrites an MCP `inputSchema` into the byte-identical form of
+  itself at the registration boundary: object keys sorted, `required` and each `dependentRequired` list sorted, and an
+  array `type` sorted. `enum` order and `oneOf` branch order are left alone, because those carry meaning. Without it a
+  server that reorders keys on reconnect or upgrade changes the serialized tool definition, and the whole prefix is
+  re-pushed at full price.
+- **Step-to-step bytes.** The cached-prefix cases in `packages/core/test/session-runner.test.ts` assert that the second
+  request of a turn replays the first request's `{system, tools, messages}` byte for byte, at the wire level through
+  `compileRequest`. Anything that varies the assembled request between steps — a per-request timestamp, a map iteration
+  order, a tool list that changes mid-turn — fails that test rather than costing money nobody attributes.
+
 ## When compaction runs
 
 - **auto** — `runStep` computes `estimatePrompt` and calls `compact` before building the request; a completed
@@ -168,6 +221,40 @@ refusing to run. Failure mode: a catalog gap turns into an unusable client. What
 a *known* window too small to hold the fixed request overhead has no explicit diagnosis, so the session fails as a
 provider rejection rather than as a stated configuration problem.
 
+**The instruction budget is spent at render time, never in the stored fold.** Rejected: trimming the baseline when
+`InstructionState` commits it. Failure mode: the trimmed text would become the durable fact, so switching to a model
+with a larger window, or raising the budget, could not give the instruction back — the loss would be permanent and
+invisible. Cost paid: the same parts are measured per request, which is one pass over text the request assembles
+anyway. A block that exceeds the budget is trimmed and named, not refused: refusing to send the request turns an
+oversized AGENTS.md into an unusable session, which is the failure this doc already rejects for an unknown window.
+
+**The scope split is declared per source, never inferred from the key.** Rejected: deriving the pool from the
+`Instructions.Key` prefix (`core/` vs `project/`). Failure mode: the prefix is a naming convention, not a fact — the
+project's own AGENTS.md lands under `core/instructions` keys historically, and a future source could key either way,
+so prefix arithmetic would budget the wrong pool while looking authoritative. Cost paid: every `Source.Definition`
+names its scope, which is one line per source and is checked by the compiler. The assignment follows content, not
+config origin: MCP server guidance is `global` even though servers are configured per workspace, because it is
+ambient tool-catalog text like the skill and reference listings, and the `project` pool is reserved for the
+workspace's own instruction tree.
+
+**Skill conflicts are disclosed, not auto-resolved.** Rejected: picking one source silently (the old behaviour) or
+merging same-ID skills. Failure mode: a user whose `~/.config` skill stopped loading sees the model follow the
+project's copy with no trace of why, and debugging means diffing directories by hand. Also rejected: changing the
+precedence to "newest wins" or interactive resolution — the listing is ambient context assembled before any request,
+so there is no user to ask. Cost paid: a model-visible block that says which file is in effect, plus a warning log;
+the model is told the fact, not given a decision to make.
+
+**Schema canonicalisation is bytes, not meaning.** Rejected: folding `oneOf` branches, sorting `enum`, or merging
+compositions. Failure mode: two schemas that validate differently would serialize the same, which turns a cache win
+into a correctness loss. The array-order half of the same problem was already solved by `Tool.snapshot` sorting
+definitions by name, so the only gap left was key order inside one schema — that is the whole scope of
+`ToolSchemaCanonical.canonicalize`.
+
+**The prefix assertion lives in the test layer.** Rejected: shipping `prompt-prefix.ts` in `core` for a check nothing
+in production calls. The wire bytes are already reachable from a test through `compileRequest`, which is a stricter
+seam than hashing the assembled `LLMRequest` — it compares what the provider actually reads. If a cache keepalive
+lands later, it will need the same comparison before it sends, and that is when the helper earns a production home.
+
 ## Tests
 
 `packages/core/test/session-compaction.test.ts` drives the real `SessionCompaction.node` against SQLite and a mock
@@ -177,3 +264,12 @@ also pins a Han conversation crossing the ceiling and the `compaction.stalled` g
 `tool-output.test.ts` covers the clip, `session-usage.test.ts` and `usage-limits.test.ts` cover the provider-side
 numbers, and compaction scenarios also run inside `session-runner.test.ts`. Run from `packages/core` with `bun run test`.
 `packages/util/src/token.test.ts` holds the estimator's own rules, including its parity with `estimate`.
+`instructions-budget.test.ts` covers the baseline budget's window share, its whole-line cuts and its named drops, and
+the pools' independence — a project cut leaves the global part intact and the other way around;
+`skill/conflicts.test.ts` covers the state-level shadowing chain (contributor order, explicit chains, rebuild
+freshness) and the `core/skill-conflicts` source's initial, changed, and removed renderings, and
+`config/skill.test.ts` asserts the disclosure end to end against two directories defining one ID;
+`mcp-schema-canonical.test.ts` proves two key-orderings of one schema serialize to the same tool definition and that
+the un-canonicalized bytes differ, which is the gap; the cached-prefix cases in `session-runner.test.ts` compare the
+wire bytes of consecutive steps through `compileRequest`, including a deliberately timestamped negative. Run from
+`packages/core` with `bun run test`.

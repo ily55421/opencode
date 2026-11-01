@@ -40,6 +40,10 @@ export class Info extends Schema.Class<Info>("ConfigExperimental.Info")({
   subagent_depth: NonNegativeInt.pipe(optional).annotate({
     description: "Maximum subagent nesting depth. Defaults to 1.",
   }),
+  loop_guard: Schema.Boolean.pipe(optional).annotate({
+    description:
+      "Stop a turn that keeps making the same tool calls with the same arguments and the same results, and count the calls the model cannot format. The counters fold the durable history, so a restart does not reset them. Defaults to true.",
+  }),
   location_idle_timeout: Schema.Union([Schema.DurationFromString, Schema.Literal(false)])
     .pipe(optional)
     .annotate({

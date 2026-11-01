@@ -101,6 +101,7 @@ const builtins = Layer.mock(InstructionBuiltIns.Service, {
     Effect.succeed(
       Instructions.make({
         key: Instructions.Key.make("test/context"),
+        scope: "global",
         codec: Schema.toCodecJson(Schema.String),
         read: Effect.sync(() => instruction),
         render: {

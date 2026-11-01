@@ -118,6 +118,7 @@ for (const fixture of [
           retry: (_cause, _error, retry) =>
             Effect.succeed(retry ? { retry: true, attempt: 2, delay: 0 } : { retry: false }),
           recoverContinuation: true,
+          blocked: new Map(),
           recoverOverflow: Effect.succeed(false),
         })
         .pipe(Effect.exit)
@@ -125,7 +126,7 @@ for (const fixture of [
       expect(executions).toBe(fixture.toolChoice === "none" ? 0 : 1)
       if (Exit.isSuccess(result))
         expect(result.value).toEqual(
-          SessionStep.Outcome.Completed({ needsContinuation: fixture.toolChoice !== "none" }),
+          SessionStep.Outcome.Completed({ needsContinuation: fixture.toolChoice !== "none", empty: false }),
         )
       expect(yield* llm.requests()).toHaveLength(1)
       expect(captures).toBe(2)
@@ -215,6 +216,7 @@ it.effect("records the cost the endpoint reports instead of the catalog price", 
       },
       retry: () => Effect.succeed({ retry: false }),
       recoverContinuation: true,
+      blocked: new Map(),
       recoverOverflow: Effect.succeed(false),
     })
 

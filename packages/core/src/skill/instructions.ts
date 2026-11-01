@@ -13,6 +13,24 @@ const Summary = Schema.Struct({
 })
 type Summary = typeof Summary.Type
 
+/** The disclosure travels as plain paths; the wire form is the same shape the state reports. */
+const Conflict = Schema.Struct({
+  id: Skill.ID,
+  kept: Schema.String,
+  shadowed: Schema.Array(Schema.String),
+})
+type Conflict = typeof Conflict.Type
+
+/**
+ * The listing is ambient context on every request, so one verbose skill cannot spend the whole
+ * budget. A truncated description says so rather than passing as the complete sentence.
+ */
+const MAX_DESCRIPTION_CHARS = 400
+const describe = (description: string) =>
+  description.length <= MAX_DESCRIPTION_CHARS
+    ? description
+    : `${description.slice(0, MAX_DESCRIPTION_CHARS - 1).trimEnd()}… (description truncated)`
+
 const entries = (skills: ReadonlyArray<Summary>) =>
   skills.flatMap((skill) => [
     "  <skill>",
@@ -45,8 +63,20 @@ const update = Instructions.listUpdate<Summary>({
   },
 })
 
+const renderConflicts = (conflicts: ReadonlyArray<Conflict>) =>
+  [
+    "Skill conflicts (visible, not auto-resolved):",
+    "Each ID below is defined in more than one location. The first path is the one in effect; the shadowed paths are not loaded.",
+    ...conflicts.map((conflict) => `- id "${conflict.id}": ${conflict.kept} shadows ${conflict.shadowed.join(", ")}`),
+  ].join("\n")
+
+const updateConflicts = (_previous: ReadonlyArray<Conflict>, current: ReadonlyArray<Conflict>) =>
+  ["The reported skill conflicts have changed. This list supersedes the previous one:", renderConflicts(current)].join(
+    "\n",
+  )
+
 export interface Interface {
-  /** Lists skills the given ruleset does not deny; callers pass the merged agent and Session permissions. */
+  /** Lists skills the given ruleset does not deny, plus the skill-conflict disclosure source. */
   readonly load: (permissions: Permission.Ruleset) => Effect.Effect<Instructions.List>
 }
 
@@ -63,19 +93,35 @@ const layer = Layer.effect(
           .flatMap((skill) =>
             skill.description === undefined || skill.autoinvoke === false
               ? []
-              : [{ id: skill.id, name: skill.name, description: skill.description }],
+              : [{ id: skill.id, name: skill.name, description: describe(skill.description) }],
           )
           .toSorted((a, b) => a.id.localeCompare(b.id))
-        return Instructions.make<ReadonlyArray<Summary>>({
-          key: Instructions.Key.make("core/skill-guidance"),
-          codec: Schema.toCodecJson(Schema.Array(Summary)),
-          read: Effect.succeed(available.length === 0 ? Instructions.removed : available),
-          render: {
-            initial: render,
-            changed: update,
-            removed: () => "Skill guidance is no longer available. Do not use any previously listed skill.",
-          },
-        })
+        // Sorted by id so identical conflicts render identical bytes, which is what keeps the prompt prefix stable.
+        const conflicts = (yield* skills.conflicts()).toSorted((a, b) => a.id.localeCompare(b.id))
+        return Instructions.combine([
+          Instructions.make<ReadonlyArray<Summary>>({
+            key: Instructions.Key.make("core/skill-guidance"),
+            scope: "global",
+            codec: Schema.toCodecJson(Schema.Array(Summary)),
+            read: Effect.succeed(available.length === 0 ? Instructions.removed : available),
+            render: {
+              initial: render,
+              changed: update,
+              removed: () => "Skill guidance is no longer available. Do not use any previously listed skill.",
+            },
+          }),
+          Instructions.make<ReadonlyArray<Conflict>>({
+            key: Instructions.Key.make("core/skill-conflicts"),
+            scope: "global",
+            codec: Schema.toCodecJson(Schema.Array(Conflict)),
+            read: Effect.succeed(conflicts.length === 0 ? Instructions.removed : conflicts),
+            render: {
+              initial: renderConflicts,
+              changed: updateConflicts,
+              removed: () => "The previously reported skill conflicts no longer apply.",
+            },
+          }),
+        ])
       }),
     })
   }),

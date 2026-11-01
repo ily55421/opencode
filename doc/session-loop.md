@@ -45,7 +45,7 @@ being finished.
 
 ## Stopping, continuing, and nudging
 
-Three mechanisms end or extend a loop without user input:
+Several mechanisms end or extend a loop without user input:
 
 | Mechanism | Trigger | Where |
 | --- | --- | --- |
@@ -53,6 +53,36 @@ Three mechanisms end or extend a loop without user input:
 | Interrupted stream | `Outcome.Continue` publishes the `CONTINUE_AFTER_INCOMPLETE_STREAM` text | `core/src/session/runner/llm.ts` |
 | Output limit | `Outcome.OutputLimit` publishes `CONTINUE_AFTER_OUTPUT_LIMIT`, and fails with the `output-limit` session error after two consecutive `finish: "length"` assistants | `core/src/session/runner/llm.ts` |
 | Unfinished work | `Outcome.Completed` without a tool call, while the todo list the model itself last wrote still has `pending` or `in_progress` items | `core/src/session/runner/unfinished.ts`, called by `runStep` |
+| Empty response | `Outcome.Completed` whose step settled with a non-error finish but no visible output, when no previous step of the turn completed a tool | `core/src/session/runner/empty.ts`, called by `runStep` |
+| Repeated identical call | The same (tool, arguments, result) made five times in a row, or a block of up to five calls repeating five times | `core/src/session/runner/loop.ts`, refused in `SessionStep.attempt`'s `executeTool` |
+| Repeated refusal | One exact call denied by the permission rules eight times in a row | `core/src/session/runner/loop.ts` |
+| Unformattable calls | Three tool calls in one turn that never parsed, when the step did not end at the output limit | `core/src/session/runner/loop.ts` |
+
+All three loop counters fold from the durable message history the same way `SessionRunnerUnfinished.decide`
+does, and all three close the turn the same way the step budget does: `runStep` appends the guard's notice as
+an assistant message and sends the final request with `toolChoice: "none"`. None of them is a session error —
+an error reads as a broken session when the truth is that the model is going in circles. A refusal is
+recorded as a failed tool call whose message starts with the token below, and the fold **excludes** its own
+refusals when it looks for a repeating block; leaving them in would break the pattern after one refusal and
+the guard would release itself.
+
+The refusal and closing texts are model-visible contract tokens, kept verbatim:
+
+```
+Loop guard: this exact tool call (same arguments, same result) has been made N times in
+a row. Repeating it will not help. Change the arguments to get new information, use a
+different approach, or ask the user.
+```
+
+```
+Loop guard: automatic continuation stopped because the same tool calls kept
+repeating. Tools are disabled for this closing step. Say what is stuck and ask the user how to proceed.
+```
+
+`experimental.loop_guard` turns the whole guard off; with it off the fold returns no decision and the loop
+behaves exactly as it did before. When a call is refused because tools are off for the closing step — for
+either the step budget or a loop guard — the model sees `Tools are disabled for this closing step.`, which is
+true for both, rather than a step-count message on a turn that stopped for repetition.
 
 `SessionRunnerUnfinished.decide` is the only task-level completion check in the loop, and it is fenced by
 `experimental.todo`: no todo tool means no list means nothing to detect. Its four constants are the whole contract —
@@ -65,6 +95,17 @@ Progress is a **real side effect**, not a claim: a completed `edit`, `write`, `p
 that leaves fewer open items than the list before it. Rewriting the same list is the model restating the task, so it
 does not reset the stall run. When both breakers are exhausted the turn publishes `TODO_RESIDUE_STOPPED` and goes idle —
 deliberately not a session error, because an error reads as a broken session when the truth is that work remains.
+
+An empty answer is answered before the todo nudge runs, and it owns the boundary: one turn gets one automatic notice,
+so the two mechanisms never speak over each other. `SessionRunnerEmpty.decide` nudges a step that **settled** — its
+assistant carries a finish that is not `error` — with no visible output, unless the previous step of the turn completed
+a tool, in which case the work happened and the blank reply is a finished turn. A step that never settled (a stream
+that ended without any event writes no assistant at all) or that failed stays with the retry and error machinery:
+"your previous response had no visible output" would be a lie, and spending the allowance on a transport anomaly turns
+a broken response into three wasted requests. `MAX_EMPTY_RESPONSE_RETRIES` (3) is the cap; the fourth empty answer
+publishes `EMPTY_RESPONSE_STOPPED` (`empty-response-stopped`) and goes idle, not a session error. The counters fold
+from the durable history — `NOTICE_EMPTY_RETRY` (`empty-response-retry`) synthetic messages are the counter, so a
+restart cannot hand the model a fresh allowance for the same silence.
 
 A nudge is published as `SessionEvent.Synthetic` — durable, model-visible, projected as a message that is not a user
 message (`to-llm-message.ts` renders it with the user role; `message-updater.ts` records it as synthetic). The
@@ -144,14 +185,48 @@ inspects the prompt for action verbs and fires when few tools ran. Failure mode:
 fix from an abandoned refactor, so it nudges correct answers, and its verb list would be a language-specific policy
 inside the loop. `doc/records/2026-10-todo-completion-nudge.md` keeps the full reasoning.
 
+**An empty response is a settled, non-failed answer, not any step without output.** Rejected: nudging every step that
+produced nothing visible. Failure mode: a provider stream that ends without a single event writes no assistant, and a
+failed step settles with the `error` finish — nudging either spends the retry allowance (and three requests) on a
+transport anomaly while telling the model its previous response "had no visible output" when none arrived. The
+empty-response nudge is for the model that answered with silence, which is the case the borrowed design measured; dead
+streams and provider failures already have machinery, and it does not include a nudge.
+
 **Turn scoping uses the `idle` marker, not the last user message.** Failure mode of the alternative: a steer mid-turn
 moves the boundary, the earlier nudges fall outside the window, and each steer hands the model a fresh nudge allowance
 inside one turn.
+
+**Loop counters fold from history; none of them is a process map.** Rejected: `Map<SessionID, number>` next to the
+runner. Failure mode: a location reload or a process restart clears it, and a bounded retry silently becomes an
+unbounded spend. The same reason covers the step budget, the output-limit streak, and the nudge counts.
+
+**The result participates in the loop key.** The borrowed write-ups all say a loop is the same call with the same
+"arguments and outcome", and every implementation that was read keys on name plus arguments only. Failure mode
+without the outcome: a status poll — same command, new information each time — is refused after the fifth check,
+which turns a working session into a stalled one. Cost paid: the digest must come from the persisted tool part, so a
+result that embeds a fresh spill path is folded to a placeholder before hashing — the
+`[showing … full output saved to …]` marker in `core/src/session/runner/loop.ts`.
+
+**Four causes, one closing move, and the guard's own refusals are not part of the pattern.** The counters answer
+different questions — repetition, no side effect, repeated refusal, unparseable calls — so each has its own limit and
+its own text; they share the step-budget shape (refuse the next call, then one `toolChoice: "none"` step) instead of
+each inventing an exit. Rejected: a warn-then-block ladder, because `execute.before` has only two outcomes and a
+ladder sends the same sentence twice. Rejected: a `DrainResult` variant for the close, for the same reason the nudge
+turns over to `Completed`. A refusal is the guard speaking, not the model moving, so the repetition search runs over
+the calls with refusals removed — keeping them in makes the pattern fail on the next step and the guard releases
+itself after one refusal.
 
 ## Tests
 
 `packages/core/test/session-runner.test.ts` drives full drain loops against a `TestLLM` and asserts on `DrainResult`
 and the event sequence; `session-step.test.ts` covers one step, `session-runner-tool-events.test.ts` covers tool
 settlement, `session-execution.test.ts` covers the coordinator, and `session-runner-unfinished.test.ts` covers the
-nudge decision on projected history directly. Run them from `packages/core` with `bun run test`; never from the
-repository root.
+nudge decision on projected history directly. `session-runner-loop.test.ts` covers the loop guard as a pure fold —
+repetition, alternating pairs, polls that must not trip it, refusal streaks, malformed counts, and the turn boundary —
+while `session-runner.test.ts` keeps two end-to-end cases for the refusal and the closing step. The empty response has
+the same two layers: `session-runner-empty.test.ts` folds constructed history, and three drain scenarios there cover
+the nudge, the three-strikes stop, and the blank-after-tool pass. Scenarios that mean "the turn ends" push a response
+with visible text (`closing()`), because a bare settled stop *is* an empty response and the recovery answers it. Note
+when adding turn-boundary cases there: the runner harness never writes the `idle` message a real terminal publishes,
+so boundary behaviour is asserted on constructed history, not on a second drain. Run them from `packages/core` with
+`bun run test`; never from the repository root.

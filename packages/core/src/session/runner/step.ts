@@ -24,11 +24,12 @@ import { SessionSchema } from "../schema.js"
 import { toSessionError } from "../to-session-error.js"
 import { SessionUsage } from "../usage.js"
 import { SessionRunnerModel } from "./model.js"
+import { callKey, LOOP_GUARD } from "./loop.js"
 import { createLLMEventPublisher } from "./publish-llm-event.js"
 import { SessionRunnerRetry } from "./retry.js"
 
 export type Outcome = Data.TaggedEnum<{
-  Completed: { readonly needsContinuation: boolean }
+  Completed: { readonly needsContinuation: boolean; readonly empty: boolean }
   Retry: { readonly error: SessionError.Error; readonly decision: SessionRunnerRetry.Decision }
   Continue: {
     readonly error: SessionError.Error
@@ -53,6 +54,8 @@ interface Input {
     retry: boolean,
   ) => Effect.Effect<{ readonly retry: false } | SessionRunnerRetry.Decision>
   readonly recoverContinuation: boolean
+  /** Calls the loop guard has already seen repeat; each is refused before it runs again. */
+  readonly blocked: ReadonlyMap<string, number>
   /** The runner owns compaction policy; the attempt invokes it only before durable output. */
   readonly recoverOverflow: Effect.Effect<boolean>
 }
@@ -84,6 +87,7 @@ export const make = Effect.gen(function* () {
       agent: input.agent,
       model: input.model.ref,
       providerMetadataKey: input.model.model.route.providerMetadataKey ?? input.model.model.provider,
+      advertised: input.prepared.request.tools.map((tool) => tool.name),
       pendingSnapshot: Fiber.join(pendingStartSnapshot),
       started,
     })
@@ -94,7 +98,9 @@ export const make = Effect.gen(function* () {
     const interruptTools = Effect.suspend(() => Fiber.interruptAll(toolRuns.map((run) => run.fiber)))
     const executeTool = (call: ToolCall) => {
       if (input.prepared.request.toolChoice?.type === "none")
-        return new Tool.Error({ message: "Tools are disabled after the maximum agent steps" })
+        return new Tool.Error({ message: "Tools are disabled for this closing step." })
+      const repeats = input.blocked.get(callKey(call.name, call.input))
+      if (repeats !== undefined) return new Tool.Error({ message: LOOP_GUARD(repeats) })
       return input.prepared.executeTool({
         sessionID: input.sessionID,
         agent: input.agent,
@@ -281,7 +287,7 @@ export const make = Effect.gen(function* () {
 
         if (Exit.isFailure(stream)) return yield* Effect.failCause(stream.cause)
         if (tools.declines.length > 0) {
-          if (input.isLocationClosed()) return Outcome.Completed({ needsContinuation: true })
+          if (input.isLocationClosed()) return Outcome.Completed({ needsContinuation: true, empty: false })
           return yield* Effect.interrupt
         }
         if (tools.interrupted && tools.failure) return yield* Effect.failCause(tools.failure)
@@ -289,7 +295,7 @@ export const make = Effect.gen(function* () {
         if (record.failure) return yield* new StepFailedError({ error: record.failure })
         const needsContinuation = input.prepared.request.toolChoice?.type !== "none" && record.needsContinuation
         if (record.finish?.finish === "length") return Outcome.OutputLimit({ needsContinuation })
-        return Outcome.Completed({ needsContinuation })
+        return Outcome.Completed({ needsContinuation, empty: !record.outputStarted && !record.toolSucceeded })
       }),
     )
   }, Effect.scoped)

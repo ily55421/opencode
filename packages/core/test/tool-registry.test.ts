@@ -634,9 +634,9 @@ describe("Tool", () => {
       const snapshot = yield* service.snapshot()
       expect(snapshot.definitions.map((tool) => tool.name)).toEqual(["healthy", "execute"])
       expect(codeModeListings(snapshot.codeModeCatalog!).map((tool) => tool.path)).toEqual(["codemode"])
-      expect((yield* snapshot.execute(call("phone_type")).pipe(Effect.flip)).message).toBe(
-        'No tool named "phone_type" is currently available. Please use a tool from the available tool list.',
-      )
+      const unknown = yield* snapshot.execute(call("phone_type")).pipe(Effect.flip)
+      expect(unknown.message).toContain('No tool named "phone_type" is currently available.')
+      expect(unknown.message).toContain("Available tools: execute, healthy.")
     }).pipe(Effect.provide(Logger.layer([logger])))
   })
 
@@ -847,7 +847,7 @@ describe("Tool", () => {
         status: "error",
         error: {
           type: "tool.execution",
-          message: 'No tool named "missing" is currently available. Please use a tool from the available tool list.',
+          message: 'No tool named "missing" is currently available. Available tools: execute, failed.',
         },
       })
 

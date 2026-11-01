@@ -14,6 +14,7 @@ import { Tool } from "../tool.js"
 import { ToolOutput } from "../tool-output.js"
 import { ReadToolFileSystem } from "./read-filesystem.js"
 import { effectiveName, normalizedName } from "./runtime.js"
+import { ToolSchemaCanonical } from "./schema-canonical.js"
 
 const decodeJson = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))
 
@@ -56,7 +57,11 @@ export const layer = Layer.effect(
                 name: tool.name,
                 options: { namespace: namespace(tool.server), codemode: tool.codemode !== false },
                 description: tool.description ?? "",
-                input: tool.inputSchema as JsonSchema.JsonSchema,
+                // A server may hand back the same schema with a different key order after a reconnect,
+                // which would change the serialized tool definition and drop the provider's cached prefix.
+                input: ToolSchemaCanonical.canonicalize(
+                  (tool.inputSchema ?? { type: "object", properties: {} }) as JsonSchema.JsonSchema,
+                ),
                 output: (tool.outputSchema ?? {}) as JsonSchema.JsonSchema,
                 execute: (input, context) =>
                   Effect.gen(function* () {

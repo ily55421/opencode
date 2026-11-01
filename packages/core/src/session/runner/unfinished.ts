@@ -95,7 +95,7 @@ const scan = (turn: ReadonlyArray<SessionMessage.Info>) => {
 }
 
 /** The steps of this turn: everything after the marker that put the Session idle, or all history on the first turn. */
-const currentTurn = (messages: ReadonlyArray<SessionMessage.Info>) =>
+export const currentTurn = (messages: ReadonlyArray<SessionMessage.Info>) =>
   messages.slice(messages.findLastIndex((message) => message.type === "idle") + 1)
 
 const decodeTodos = Schema.decodeUnknownOption(Schema.Array(TodoTool.Info))

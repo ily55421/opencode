@@ -9,6 +9,7 @@ import { MessageDecodeError } from "./error.js"
 import { SessionMessage } from "./message.js"
 import type { SessionSchema } from "./schema.js"
 import { Instructions } from "../instructions/index.js"
+import { InstructionBudget } from "../instructions/budget.js"
 import { InstructionState } from "./instruction-state.js"
 import { SessionBlob } from "./blob.js"
 import { SessionRecentText } from "./recent-text.js"
@@ -287,13 +288,14 @@ export const entriesForRunner = Effect.fn("SessionHistory.entriesForRunner")(fun
   sessionID: SessionSchema.ID,
   instructions: Instructions.List,
   boundary: Boundary,
+  budget?: InstructionBudget.Pools,
 ) {
   return yield* db
     .transaction(() =>
       Effect.gen(function* () {
         const messages = yield* messageEntries(db, sessionID, boundary)
         return {
-          initial: yield* InstructionState.initial(db, sessionID, instructions),
+          initial: yield* InstructionState.initial(db, sessionID, instructions, budget),
           entries: messages,
         }
       }),
