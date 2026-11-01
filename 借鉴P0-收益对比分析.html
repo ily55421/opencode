@@ -1,0 +1,826 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>借鉴新增 P0 清单 · dsh-superagent + Reasonix · 9 项</title>
+<style>
+  :root {
+    --bg: #f6f6f3;
+    --panel: #ffffff;
+    --ink: #1b1f23;
+    --muted: #5f676e;
+    --faint: #8a9298;
+    --line: #e3e3dd;
+    --line-strong: #cfd0c9;
+    --teal: #0f766e;
+    --teal-soft: #d9eeea;
+    --blue: #1d4ed8;
+    --blue-soft: #dde5fb;
+    --purple: #6d28d9;
+    --purple-soft: #e9e0fb;
+    --amber: #b45309;
+    --amber-soft: #f8e8d4;
+    --red: #b91c1c;
+    --red-soft: #f7dede;
+    --gray: #6b7280;
+    --gray-soft: #ececea;
+    --radius: 14px;
+    --shadow: 0 1px 2px rgba(20, 24, 28, .05), 0 10px 30px rgba(20, 24, 28, .05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111417;
+      --panel: #191d21;
+      --ink: #e8e6e1;
+      --muted: #a4abb1;
+      --faint: #7c848b;
+      --line: #2a2f34;
+      --line-strong: #3a4046;
+      --teal: #2dd4bf;
+      --teal-soft: #10322e;
+      --blue: #93b4ff;
+      --blue-soft: #17233f;
+      --purple: #c4b5fd;
+      --purple-soft: #241a3d;
+      --amber: #fbbf24;
+      --amber-soft: #35270f;
+      --red: #f87171;
+      --red-soft: #3a1717;
+      --gray: #9ca3af;
+      --gray-soft: #24282c;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .4);
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Segoe UI", system-ui, -apple-system, "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 28px; }
+  header.hero { padding: 64px 0 30px; border-bottom: 1px solid var(--line); }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--teal); font-weight: 700; }
+  h1 { font-size: clamp(30px, 4.4vw, 50px); line-height: 1.12; margin: 12px 0 14px; letter-spacing: -.02em; }
+  .lede { max-width: 840px; color: var(--muted); font-size: 16px; margin: 0; }
+  .lede strong { color: var(--ink); font-weight: 650; }
+  .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 30px 0 4px; }
+  .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); }
+  .kpi .v { font-size: 27px; font-weight: 720; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .kpi .k { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  section { padding: 46px 0 8px; }
+  .sec-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 8px; }
+  h2 { font-size: 24px; letter-spacing: -.01em; margin: 0; }
+  .sec-note { color: var(--muted); font-size: 13px; margin: 0 0 20px; max-width: 880px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+  .pad { padding: 20px 22px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 12px; color: var(--muted); margin-top: 12px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: 1px; }
+  .two-col { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(300px, .65fr); gap: 18px; align-items: start; }
+  @media (max-width: 940px) { .two-col { grid-template-columns: 1fr; } .kpis { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+  .weights { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .weights th, .weights td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--line); }
+  .weights th { color: var(--muted); font-weight: 600; }
+  .weights td:last-child, .weights th:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+  .bar-list { display: flex; flex-direction: column; gap: 9px; }
+  .bar-row { display: grid; grid-template-columns: 62px 1fr 168px; gap: 12px; align-items: center; }
+  .bar-id { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .track { position: relative; height: 20px; background: var(--gray-soft); border-radius: 6px; overflow: hidden; }
+  .fill { height: 100%; border-radius: 6px; background: var(--teal); opacity: .82; }
+  .bar-meta { font-size: 12px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tag { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line-strong); color: var(--muted); white-space: nowrap; }
+  .tag.teal { color: var(--teal); border-color: color-mix(in srgb, var(--teal) 45%, transparent); background: var(--teal-soft); }
+  .tag.blue { color: var(--blue); border-color: color-mix(in srgb, var(--blue) 45%, transparent); background: var(--blue-soft); }
+  .tag.purple { color: var(--purple); border-color: color-mix(in srgb, var(--purple) 45%, transparent); background: var(--purple-soft); }
+  .tag.amber { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 45%, transparent); background: var(--amber-soft); }
+  .tag.red { color: var(--red); border-color: color-mix(in srgb, var(--red) 45%, transparent); background: var(--red-soft); }
+  .tag.gray { color: var(--gray); background: var(--gray-soft); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+  .chip { border: 1px solid var(--line-strong); background: transparent; color: var(--muted); border-radius: 999px; padding: 5px 12px; font-size: 12px; cursor: pointer; font-family: inherit; }
+  .chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .chip:hover { border-color: var(--ink); }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); box-shadow: var(--shadow); }
+  table.grid { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 900px; }
+  table.grid th, table.grid td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  table.grid thead th { position: sticky; top: 0; background: var(--panel); z-index: 1; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); cursor: pointer; user-select: none; white-space: nowrap; }
+  table.grid thead th:hover { color: var(--ink); }
+  table.grid tbody tr:hover { background: color-mix(in srgb, var(--teal) 5%, transparent); }
+  table.grid td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  table.grid td.what { color: var(--muted); min-width: 260px; }
+  .heat td.cell { text-align: center; font-weight: 650; font-variant-numeric: tabular-nums; border-radius: 5px; }
+  .heat td.h1 { background: color-mix(in srgb, var(--teal) 8%, transparent); }
+  .heat td.h2 { background: color-mix(in srgb, var(--teal) 20%, transparent); }
+  .heat td.h3 { background: color-mix(in srgb, var(--teal) 38%, transparent); }
+  .heat td.h4 { background: color-mix(in srgb, var(--teal) 58%, transparent); color: var(--panel); }
+  .heat td.h5 { background: color-mix(in srgb, var(--teal) 76%, transparent); color: var(--panel); }
+  @media (max-width: 720px) {
+    #heat-table { min-width: 0 !important; }
+    #heat-table th:nth-child(2), #heat-table td:nth-child(2) { display: none; }
+    #heat-table th, #heat-table td { padding: 8px 6px; }
+  }
+  .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  @media (max-width: 860px) { .cards { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow); }
+  .card h3 { margin: 0 0 4px; font-size: 17px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .card .one { color: var(--muted); font-size: 14px; margin: 0 0 12px; }
+  .card ul { margin: 0; padding-left: 18px; font-size: 13px; color: var(--muted); }
+  .card li { margin: 4px 0; }
+  .card li strong { color: var(--ink); font-weight: 620; }
+  .card .foot { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); font-size: 12px; color: var(--faint); display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .callout { border-left: 3px solid var(--amber); background: var(--amber-soft); padding: 14px 16px; border-radius: 0 10px 10px 0; font-size: 13px; color: var(--ink); margin: 16px 0; }
+  .callout strong { color: var(--amber); }
+  .callout.red { border-left-color: var(--red); background: var(--red-soft); }
+  .callout.red strong { color: var(--red); }
+  .callout.teal { border-left-color: var(--teal); background: var(--teal-soft); }
+  .callout.teal strong { color: var(--teal); }
+  .mono { font-family: ui-monospace, SFMono-Regular, "Cascadia Code", Consolas, monospace; font-size: 12px; }
+  .ev { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .ev th, .ev td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .ev th { color: var(--muted); font-weight: 600; white-space: nowrap; }
+  .ev td.res { white-space: nowrap; font-weight: 650; }
+  .ev td.res.gap { color: var(--red); }
+  .ev td.res.gone { color: var(--teal); }
+  footer { margin-top: 48px; padding: 26px 0 50px; border-top: 1px solid var(--line); color: var(--faint); font-size: 12px; }
+  svg text { font-family: inherit; }
+  .chart-scroll { overflow-x: auto; overflow-y: hidden; }
+  .chart-scroll svg { min-width: 820px; }
+  .hint { font-size: 12px; color: var(--faint); margin: 10px 0 0; }
+  @media print {
+    body { background: #fff; }
+    .chip, .chips { display: none; }
+    section { break-inside: avoid; }
+    .panel, .card, .table-wrap { box-shadow: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <div class="eyebrow">借鉴新增 P0 · 基线 2.2.0-fork.10 @ 81738639df · 2026-11-01</div>
+  <h1>dsh-superagent 与 Reasonix 的 P0 功能点：9 项</h1>
+  <p class="lede">
+    两份借鉴方案（<strong>dsh-superagent 借鉴技术方案</strong> §3 P0、<strong>Reasonix 借鉴清单</strong> §二）合起来给出的 P0 级功能点，
+    放到与 <strong>P0-收益对比分析</strong> 相同的账上：同一套五维权重、同一套 ROI/象限/热力表口径，因此两页可直接对比先后。
+    本页所有「我方缺口」都在 <span class="mono">81738639df</span> 重新跑过复核命令（见第二节），不是转抄对方文档的结论。
+    评分预设沿用 <strong>速度优先 · 花钱无所谓</strong>。
+  </p>
+  <div class="kpis">
+    <div class="kpi"><div class="v">9</div><div class="k">P0 条目（dsh 3 + Reasonix 6）</div></div>
+    <div class="kpi"><div class="v">2.75<span style="font-size:14px;font-weight:600"> 人日</span></div><div class="k">先做集合（4 项，可独立合入）</div></div>
+    <div class="kpi"><div class="v">7.25<span style="font-size:14px;font-weight:600"> 人日</span></div><div class="k">全部 9 项</div></div>
+    <div class="kpi"><div class="v">3</div><div class="k">直接改写施工图既有卡（L1 / L31 / L32）</div></div>
+  </div>
+</header>
+
+<main>
+
+<section id="summary">
+  <div class="sec-head"><h2>P0 功能点清单</h2><span class="tag gray">一句话 + 落点 + 代价</span></div>
+  <p class="sec-note">
+    ID 前缀标来源：<span class="mono">D</span> = dsh-superagent 方案 §3，<span class="mono">R</span> = Reasonix 清单 §二。「归口」列是本清单最重要的一列——
+    三项是<strong>施工图未开工卡片的增量</strong>（边际成本接近 0，错过开工窗口就要返工），其余是可独立立项的新增面。
+  </p>
+  <div class="table-wrap">
+    <table class="grid" style="min-width:1020px">
+      <thead>
+        <tr><th>ID</th><th>P0 功能点</th><th>我方现状（本轮复核）</th><th>落点</th><th>归口</th><th style="text-align:right">人日</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>D1</strong></td>
+          <td><strong>模型表面契约测试</strong>：把「模型读到的承重句」变成有规则名、有存在理由的登记表，外加每角色字节预算与退役词表</td>
+          <td class="what"><span class="mono">packages/core/test/model-surface.test.ts</span> 不存在；承重 token（<span class="mono">MAX_STEPS_PROMPT</span>、<span class="mono">INPUT_FAILURES</span>）只存在于源码与 markdown</td>
+          <td class="what">新建一份测试，复用 <span class="mono">session-runner.test.ts</span> 的 <span class="mono">TestLLM</span> / <span class="mono">compileRequest</span> 组装真实请求；四类断言：承重句存在、退役词不再现、字节预算、prompt 提及工具名 ⊆ 注册工具名</td>
+          <td class="what">L32 的仓库级先行路径；L1/L3 落地时把 token 登记进来</td>
+          <td class="num">0.75</td>
+        </tr>
+        <tr>
+          <td><strong>D2</strong></td>
+          <td><strong>loop guard 三态 <span class="mono">off|observe|on</span>，默认 observe</strong>：判据照算但只写「我本会拦什么」的 durable 记录</td>
+          <td class="what"><span class="mono">loop_guard</span> 零命中 ⇒ L1 本身未开工，施工图把开关写成布尔且「默认开」缺数据支撑</td>
+          <td class="what">L1 的 <span class="mono">loop.ts</span> 折叠骨架不动，配置值由 bool 改三态；observe 分支写审计记录、不发拒绝</td>
+          <td class="what"><strong>改 L1 施工卡</strong>——开工前改是 0 成本，开工后改是返工</td>
+          <td class="num">0.25</td>
+        </tr>
+        <tr>
+          <td><strong>D3</strong></td>
+          <td><strong>审批决定带「依据事实」</strong>：<span class="mono">permission_decision</span> 加 <span class="mono">matched</span>（命中规则）与 <span class="mono">posture</span>（当时规则集形状指纹）</td>
+          <td class="what"><span class="mono">permission_decision</span> 表不存在 ⇒ L31 未开工；而 <span class="mono">permission.ts</span> 的 <span class="mono">findLast</span> 在判定点<strong>已经把命中规则返回了</strong>，只是没人存</td>
+          <td class="what">L31 的表 + <span class="mono">evaluate</span> 调用点透传两列；回执 builder 多一行「allowed by rule …（as configured then）」</td>
+          <td class="what"><strong>改 L31 施工卡</strong>的表结构（一次迁移，不是两次）</td>
+          <td class="num">0.25</td>
+        </tr>
+        <tr>
+          <td><strong>R1</strong></td>
+          <td><strong>看过才准覆盖</strong>：只有完整读取才刷新观察，写落盘前比对指纹；错误文本给模型可执行纠正</td>
+          <td class="what"><span class="mono">write.ts</span> 读当前内容<strong>只为了算 diff 预览</strong>，随后 <span class="mono">permission.assert</span> → 无条件 <span class="mono">writeTextPreservingBom</span>；<span class="mono">read.ts</span> 的 seen/staleness/mtime 零命中；且 <span class="mono">write</span> 的 execute <strong>没套</strong> <span class="mono">fileMutation.withLock</span>（edit/patch 都套了）</td>
+          <td class="what">Location 内一张 per-session 观察表（复用 <span class="mono">Environment.files</span>）+ 写前一处检查 + 把 write 放进 <span class="mono">withLock</span>；子代理各用一张表</td>
+          <td class="what">新立项目；顺手改写 <span class="mono">write.ts</span> / <span class="mono">file-mutation.ts</span> 的过期 TODO</td>
+          <td class="num">1.0</td>
+        </tr>
+        <tr>
+          <td><strong>R2</strong></td>
+          <td><strong>来源分档的权限门</strong>：project/content 档只能把 allow 收成 ask/deny，不得新增程序与参数</td>
+          <td class="what">加载顺序注释自己写着「project directories rank above them」；agent 权限是 <span class="mono">push(...)</span> 追加 + <span class="mono">evaluate</span> 用 <span class="mono">findLast</span> ⇒ <strong>clone 一个仓库就能把用户全局的 ask 静默改成 allow</strong></td>
+          <td class="what"><span class="mono">Rule</span> 加来源档或按档分桶后固定顺序求值；求值<strong>前</strong>加一道来源门，不改折叠顺序</td>
+          <td class="what">与已否决的「最严者胜折叠」无关；动之前先核 <span class="mono">config/plugin/mcp.ts</span> 与 <span class="mono">policy.ts</span></td>
+          <td class="num">2.0</td>
+        </tr>
+        <tr>
+          <td><strong>R3</strong></td>
+          <td><strong>破坏性目标在任何档位硬拒</strong>：把「目标形状」从 escalation 拆成不可取消的错误码</td>
+          <td class="what"><span class="mono">danger.ts</span> 已能识别 <span class="mono">dangerous</span>，但 <span class="mono">doc/permissions.md</span> 明写「The escape hatch is choosing <strong>Full access</strong>」，且「<span class="mono">--auto</span> path then answers」⇒ <span class="mono">rm -rf /</span> 存在放行路径</td>
+          <td class="what">一个门 + 一个 <span class="mono">shell.destructive_target</span> 形态错误码 + 改写文档 Decisions</td>
+          <td class="what"><span class="tag red">需用户拍板</span> 这是设计反转，不是顺手改的实现细节</td>
+          <td class="num">0.5</td>
+        </tr>
+        <tr>
+          <td><strong>R4</strong></td>
+          <td><strong>一步内并行写路径冲突即拒</strong>：落盘前预留解析后的真实路径集，相交就不动盘</td>
+          <td class="what"><span class="mono">step.ts</span> 用 <span class="mono">Effect.forkScoped</span> 并发起工具；序列化只在单路径粒度，<span class="mono">file-mutation.ts</span> 注释承认「external writes can still race」⇒ 同一步写同一路径 = 后写静默覆盖前写</td>
+          <td class="what"><span class="mono">Step</span> 内一张写路径集合 + 目录/子树相交语义；跨会话不在这里做</td>
+          <td class="what">与 R1 同一处代码、同一个 PR 序列；不上对方的调度器</td>
+          <td class="num">1.5</td>
+        </tr>
+        <tr>
+          <td><strong>R6</strong></td>
+          <td><strong>ACP 官方 schema 逐帧校验</strong>：把「符合协议」的定义权交给协议作者</td>
+          <td class="what">根与 <span class="mono">packages/cli/package.json</span> 无 <span class="mono">agent-client-protocol</span> / zed 依赖（零命中）；20 个手写 ACP 文件 + 14 个测试全在校验自己的翻译层</td>
+          <td class="what">一个 devDependency + <span class="mono">script/acp-conformance.ts</span>（固定场景写出的每条消息喂官方 schema）+ 假模型替掉真供应商</td>
+          <td class="what">独立、当天可验；与 <span class="mono">check:generated</span> 是同一思路的补集</td>
+          <td class="num">0.5</td>
+        </tr>
+        <tr>
+          <td><strong>R10a</strong></td>
+          <td><strong>把「这次为什么不能回退」发布成字段</strong>，而不是留空让客户端猜</td>
+          <td class="what"><span class="mono">snapshot.ts</span> 要求 <span class="mono">location.vcs?.type === "git"</span>，非仓库直接失败；<span class="mono">capture()</span> 在 disabled/best-effort 失败时返回 <span class="mono">undefined</span> ⇒ 客户端看到的是「没有这个信息」</td>
+          <td class="what"><span class="mono">Step.Ended</span> 加一个原因字段（disabled / 非 git 项目 / capture 失败），rail 与 TUI 各说一句人话</td>
+          <td class="what">只做 (a) 这一半；非 git 目录建孤立库是 (b)，不在 P0</td>
+          <td class="num">0.5</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="hint">工期只含实现与自带测试，不含 review 往返与返工；D2/D3 是<strong>边际工期</strong>（宿主卡片 L1 = 1.25d、L31 = 2.5d 另计，已在施工图 W1 里）。</p>
+</section>
+
+<section id="evidence">
+  <div class="sec-head"><h2>本轮复核</h2><span class="tag teal">2026-11-01 在 81738639df 重跑</span></div>
+  <p class="sec-note">
+    借鉴文档的「对方实测」我未重跑（不在本仓）；这一节只核<strong>我方缺口是否仍然成立</strong>。结论：9 项全部成立，其中 R2 与 R6 的关键前提是 grep 零命中。
+  </p>
+  <div class="panel pad">
+    <table class="ev">
+      <thead><tr><th>命令</th><th>结果</th><th>支撑的条目</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">grep -n withLock packages/core/src/tool/plugin/*.ts</td><td class="res gap">只有 edit.ts:315、patch.ts:304 ⇒ write 无锁</td><td>R1, R4</td></tr>
+        <tr><td class="mono">grep -nE "seen|staleness|mtime" …/tool/plugin/read.ts</td><td class="res gap">零命中 ⇒ 观察状态确实不存在</td><td>R1</td></tr>
+        <tr><td class="mono">grep -n "rank above" packages/core/src/config.ts</td><td class="res gap">L298 注释确认项目档在上</td><td>R2</td></tr>
+        <tr><td class="mono">grep -n findLast packages/core/src/permission.ts</td><td class="res gap">L87 后匹配胜出 ⇒ 追加即扩权</td><td>R2, D3</td></tr>
+        <tr><td class="mono">grep -nE "escape hatch|Full access|--auto" doc/permissions.md</td><td class="res gap">L93「escape hatch is Full access」/ L134「--auto path then answers」</td><td>R3</td></tr>
+        <tr><td class="mono">grep -nE "agent-client-protocol|zed-industries" package.json packages/cli/package.json</td><td class="res gap">零命中 ⇒ 无权威校验器</td><td>R6</td></tr>
+        <tr><td class="mono">grep -nE "not a Git repository|vcs?.type" packages/core/src/snapshot.ts</td><td class="res gap">L93 / L114 ⇒ 回退前提是 git</td><td>R10a</td></tr>
+        <tr><td class="mono">ls packages/core/test/model-surface.test.ts</td><td class="res gap">absent；MAX_STEPS_PROMPT / INPUT_FAILURES 确在</td><td>D1</td></tr>
+        <tr><td class="mono">grep -rnE "loop_guard" packages/core/src --include=*.ts</td><td class="res gone">零命中 ⇒ L1 未开工，可改卡</td><td>D2</td></tr>
+        <tr><td class="mono">grep -rnE "permission_decision" packages/core/src --include=*.ts</td><td class="res gone">零命中 ⇒ L31 未开工，可改卡</td><td>D3</td></tr>
+      </tbody>
+    </table>
+    <p class="hint"><span class="tag teal">缺口</span> 红色 = 缺口确实存在，条目成立；<span class="tag gray">未开工</span> 绿色 = 宿主卡片尚未落地，因此 D2/D3 按「改卡」而非「返工」计价。</p>
+  </div>
+</section>
+
+<section id="model">
+  <div class="sec-head"><h2>评分模型</h2><span class="tag gray">工程判断，不是实测</span></div>
+  <p class="sec-note">
+    与 16 项那页同口径：五个维度各 1–5 分，加权后 ×20 映射到 100 分。实测数据只有工期与证据等级。
+    <strong>切换预设会重算象限、ROI、热力表总分与对比表</strong>；两页用同一组权重，因此「D1 71 分」和「L1 84 分」是可比的。
+  </p>
+  <div class="chips" id="presets" style="margin:0 0 10px"></div>
+  <p class="hint" id="weight-line" style="margin:0 0 8px"></p>
+  <div class="callout" id="preset-note" style="margin-top:0"></div>
+  <p class="hint" id="preset-top" style="margin:8px 0 18px"></p>
+  <div class="two-col">
+    <div class="panel pad">
+      <p class="hint" style="margin:0 0 10px">下表是「均衡」预设的权重定义；切换预设后，生效权重显示在页面顶部。</p>
+      <table class="weights">
+        <thead><tr><th>维度</th><th>看什么</th><th>权重</th></tr></thead>
+        <tbody>
+          <tr><td>运行可靠性</td><td>静默覆盖、并发写互踩、回退不可用而不自知、契约被悄悄删除</td><td>30%</td></tr>
+          <tr><td>成本 / 延迟</td><td>无效步、重复整读、prompt 体积悄悄变大、省掉的重试</td><td>25%</td></tr>
+          <tr><td>安全 / 权限</td><td>项目配置扩权、破坏性目标可放行、并行写越界</td><td>20%</td></tr>
+          <tr><td>可审计性</td><td>命中规则落盘、决定史带依据、协议帧与回退前提可交代</td><td>15%</td></tr>
+          <tr><td>用户可见体验</td><td>给模型的可执行纠正文案、客户端一句话说明</td><td>10%</td></tr>
+        </tbody>
+      </table>
+      <div class="callout" style="margin-bottom:0">
+        <strong>读法：</strong>D1 是「半天换一条永久 CI 红线」；R1 是唯一直接防用户数据丢失的一项；
+        <strong>R2 价值最高但必须先把规则结构读干净</strong>；R3 只有 0.5 天，卡点不在工期而在一个需要用户拍板的设计反转；
+        D2/D3 现在改是设计，L1/L31 合入后再改是迁移。
+      </div>
+    </div>
+    <div class="panel pad">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:10px">状态分组</div>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--teal)"></span>先做（独立可合入）</span>
+        <span><span class="dot" style="background:var(--blue)"></span>随卡（改既有卡）</span>
+        <span><span class="dot" style="background:var(--purple)"></span>规划（需设计）</span>
+        <span><span class="dot" style="background:var(--red)"></span>需决策（设计反转）</span>
+      </div>
+      <div style="font-size:13px;color:var(--muted);margin:18px 0 8px">证据分级</div>
+      <table class="weights">
+        <tbody>
+          <tr><td><span class="tag teal">本轮实测</span></td><td>本次在 81738639df 重跑复核命令</td></tr>
+          <tr><td><span class="tag blue">对方实测</span></td><td>借鉴文档作者在对方树上读码核实</td></tr>
+          <tr><td><span class="tag amber">待验证</span></td><td>动手前必须逐行复核的语义</td></tr>
+        </tbody>
+      </table>
+      <div style="font-size:13px;color:var(--muted);margin:18px 0 8px">来源</div>
+      <table class="weights">
+        <tbody>
+          <tr><td>dsh-superagent</td><td class="num">3 项 · 1.25d</td></tr>
+          <tr><td>Reasonix</td><td class="num">6 项 · 6.0d</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="quadrant">
+  <div class="sec-head"><h2>投入产出象限</h2><span class="tag gray">横轴 = 人日 · 纵轴 = 收益分</span></div>
+  <p class="sec-note">
+    左上先做集合是 D1/R6/R10a；R2 单独落在最右侧——它是这 9 项里唯一「价值最高、也最贵」的，排在最后不是因为不重要，
+    是因为规则数据结构动了就会牵动所有写入方。D2/D3 贴左轴（边际工期 0.25d）。
+  </p>
+  <div class="panel pad">
+    <div class="chart-scroll">
+      <svg id="scatter" viewBox="0 0 980 500" role="img" aria-label="9 项借鉴 P0 的工期与收益分散点图" style="width:100%;height:auto;display:block"></svg>
+    </div>
+    <div class="legend" id="scatter-legend"></div>
+    <p class="hint">虚线 = 需决策 / 待验证；窄窗口可横向滚动。</p>
+  </div>
+</section>
+
+<section id="rank">
+  <div class="sec-head"><h2>按投入产出比排序</h2><span class="tag gray">收益分 ÷ 人日</span></div>
+  <p class="sec-note">
+    <strong>D2/D3 的 ROI 有系统性夸大</strong>：它们只按边际工期计价，宿主卡 L1（1.25d）与 L31（2.5d）本来就在 W1 账上。
+    这两条的正确读法是「改卡几乎免费，不改卡将来要迁移」。R2 的 ROI 垫底同理反方向——它的 2 天是真实总成本。
+  </p>
+  <div class="panel pad">
+    <div class="bar-list" id="rank-bars"></div>
+  </div>
+</section>
+
+<section id="matrix">
+  <div class="sec-head"><h2>收益结构热力表</h2><span class="tag gray">1–5 分 · 颜色越深收益越大</span></div>
+  <p class="sec-note">同分不同结构：D1 靠可靠性 + 成本 + 审计三轴均衡；R2/R3 几乎全靠安全；D3/R6 是纯审计项；R10a 是唯一体验与审计并列的。</p>
+  <div class="table-wrap">
+    <table class="grid heat" id="heat-table" style="min-width:760px">
+      <thead>
+        <tr>
+          <th>项</th><th>一句话</th>
+          <th style="text-align:center">可靠性<br><span style="font-weight:400;text-transform:none;letter-spacing:0">30%</span></th>
+          <th style="text-align:center">成本/延迟<br><span style="font-weight:400;text-transform:none;letter-spacing:0">25%</span></th>
+          <th style="text-align:center">安全<br><span style="font-weight:400;text-transform:none;letter-spacing:0">20%</span></th>
+          <th style="text-align:center">可审计<br><span style="font-weight:400;text-transform:none;letter-spacing:0">15%</span></th>
+          <th style="text-align:center">体验<br><span style="font-weight:400;text-transform:none;letter-spacing:0">10%</span></th>
+          <th style="text-align:right">总分</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<section id="table">
+  <div class="sec-head"><h2>完整对比表</h2><span class="tag gray">点表头排序 · 上方按来源/轴筛选</span></div>
+  <div class="chips" id="filters"></div>
+  <div class="table-wrap">
+    <table class="grid" id="main-table">
+      <thead>
+        <tr>
+          <th data-sort="id">项</th>
+          <th data-sort="axis">轴</th>
+          <th data-sort="status">状态</th>
+          <th data-sort="evidence">证据</th>
+          <th data-sort="days" style="text-align:right">工期</th>
+          <th data-sort="score" style="text-align:right">收益分</th>
+          <th data-sort="roi" style="text-align:right">ROI</th>
+          <th data-sort="deps">归口 / 依赖</th>
+          <th>一句话</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<section id="collision">
+  <div class="sec-head"><h2>与施工图 16 项的相撞与归口</h2><span class="tag gray">这一节决定开工顺序</span></div>
+  <p class="sec-note">借鉴新增不是平行的一张新清单：三项要并进既有卡片的同一次改动里，否则要么重复写断言，要么做两次迁移。</p>
+  <div class="cards">
+    <div class="card">
+      <h3>D2 → L1 循环失控防护 <span class="tag blue">改卡 · 0.25d 边际</span></h3>
+      <p class="one">L1 的开关从布尔改成三态，判据与收束语义一个字不动。</p>
+      <ul>
+        <li><strong>为什么现在改：</strong><span class="mono">loop_guard</span> 与 <span class="mono">loop.ts</span> 都还不存在，配置形状尚未定稿。</li>
+        <li><strong>收益：</strong>「默认开」从前提变成数据；observe 记录就是 §5.2「先量再定默认」协议的仪器。</li>
+        <li><strong>边界：</strong>记录必须 durable（进程内 Map 已被 <span class="mono">doc/records/2026-10-todo-completion-nudge.md</span> 否决），且不进 <span class="mono">doc/usage-stats.md</span> 的日聚合。</li>
+      </ul>
+      <div class="foot"><span>轴：循环</span><span>落点：doc/session-loop.md 不变</span></div>
+    </div>
+    <div class="card">
+      <h3>D3 → L31 审批落盘 <span class="tag blue">改卡 · 0.25d 边际</span></h3>
+      <p class="one">表少写一次迁移，就靠这两列现在加。</p>
+      <ul>
+        <li><strong>成本侧：</strong><span class="mono">evaluate()</span> 已经返回命中的 <span class="mono">Permission.Rule</span>，纯透传，不是重设计。</li>
+        <li><strong>不借的部分：</strong>对方那套全局 <span class="mono">policyVersion</span> 盖章——我方权限规则集是会话级的，全局版本号是过度设计。</li>
+        <li><strong>反例：</strong>合入后再补 = 一次迁移 + 一次历史数据语义解释（"缺数据"要记 <span class="mono">not_recorded</span>，不能回填空值）。</li>
+      </ul>
+      <div class="foot"><span>轴：权限</span><span>与 L37 同批的约定不变</span></div>
+    </div>
+    <div class="card">
+      <h3>D1 → L32 指令预算 <span class="tag teal">先行 · 非替代</span></h3>
+      <p class="one">一个管 CI 就红，一个管运行时裁剪，两件事都要。</p>
+      <ul>
+        <li><strong>分工：</strong>L32 = 超了怎么裁；D1 = 悄悄变大的提交进不了 main。</li>
+        <li><strong>先量再钉：</strong>字节预算取基线 +5%，与对方 "5% above baseline" 同法；数字不许拍脑袋（同 L25/L1 纪律）。</li>
+        <li><strong>归口：</strong>L1 卡里已有的契约 token 断言落地时从自己测试里删掉重复份，集中进这张有规则名、有存在理由的表。</li>
+      </ul>
+      <div class="foot"><span>轴：模型表面</span><span>证据：本轮实测（测试文件不存在）</span></div>
+    </div>
+    <div class="card">
+      <h3>R1 + R4 → 同一个 PR 序列 <span class="tag teal">写落盘前两道门</span></h3>
+      <p class="one">都发生在「即将动盘」的那一处，拆开做会写两遍准入逻辑。</p>
+      <ul>
+        <li><strong>顺序：</strong>R1（看过才准覆盖）先行，R4（本轮路径集预留）复用它的路径解析与观察表。</li>
+        <li><strong>顺手：</strong><span class="mono">edit.ts</span> / <span class="mono">write.ts</span> / <span class="mono">file-mutation.ts</span> 三条已过期 TODO 一并改写——本仓会话级回退其实已经存在。</li>
+        <li><strong>不做：</strong>跨会话租约（那是 adm 轮 / L11 的既有议题）、对方的 all-or-nothing 调度器。</li>
+      </ul>
+      <div class="foot"><span>轴：写路径</span><span>直接防用户数据丢失</span></div>
+    </div>
+    <div class="card">
+      <h3>R2 vs 已否决的「最严者胜折叠」 <span class="tag purple">必须分清</span></h3>
+      <p class="one">这条容易被误读成翻案 <span class="mono">doc/records/2026-10-permission-fold-ordering.md</span>。</p>
+      <ul>
+        <li><strong>那条否决的是：</strong>把 never &gt; always &gt; ask 折成单值——语义错了。</li>
+        <li><strong>本条要的是：</strong>折叠<strong>之前</strong>加一道来源门，project 档没有资格写 allow。折叠顺序不动。</li>
+        <li><strong>前置核实：</strong><span class="mono">config/plugin/mcp.ts</span> 是否已有「内置不被替换」级保护、<span class="mono">policy.ts</span> 是否覆盖同一位置——这条本轮仍是待验证。</li>
+      </ul>
+      <div class="foot"><span>轴：权限</span><span>影响面最大，最后动</span></div>
+    </div>
+    <div class="card">
+      <h3>R3 → 推翻一条写下的决定 <span class="tag red">需决策</span></h3>
+      <p class="one">工期 0.5 天，卡点是产品立场。</p>
+      <ul>
+        <li><strong>现状是有意为之：</strong><span class="mono">doc/permissions.md</span> 明写 Full access 是唯一 escape hatch，"always allow" 故意不算代答。</li>
+        <li><strong>要回答的问题：</strong>愿不愿意让 Full access 与 <span class="mono">--auto</span> 出现一个「不管怎么配都不放行」的洞。</li>
+        <li><strong>验收形状：</strong>Full access + <span class="mono">--auto</span> 跑 <span class="mono">rm -rf ~</span> 必须失败；<span class="mono">rm -rf ./dist</span> 照常；bash 与 PowerShell 两条解析路径结论一致。</li>
+      </ul>
+      <div class="foot"><span>轴：权限</span><span>证据：本轮实测（文档 + danger.ts）</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="notes">
+  <div class="sec-head"><h2>重点项解读</h2><span class="tag gray">为什么这样排</span></div>
+  <p class="sec-note">卡片上的分数按当前预设标注；切换预设只改变排序与总分，不改变理由。</p>
+  <div class="cards" id="note-cards"></div>
+</section>
+
+<section id="rejected">
+  <div class="sec-head"><h2>不进 P0（含理由）</h2><span class="tag gray">同样来自这两份文档</span></div>
+  <div class="panel pad">
+    <table class="weights">
+      <thead><tr><th>项</th><th>来源</th><th>不进 P0 的理由</th></tr></thead>
+      <tbody>
+        <tr><td>R5 语料防自欺双守卫</td><td>Reasonix §二.5</td><td>代价小但<strong>前置不存在</strong>：本仓还没有 agent 行为语料。它是 gemini G4 / L28 的实现细节，随语料计划同批写，不单独开工。</td></tr>
+        <tr><td>R7 价格代际 + pricecheck</td><td>Reasonix §二.7</td><td>纪律可取（<span class="mono">checkedOn</span> / <span class="mono">source</span>、unread ≠ agreed、故意不进 CI），但收益薄：它只影响 usage 页一个数字的可信度。</td></tr>
+        <tr><td>R8 辅助调用并入预算</td><td>Reasonix §二.8</td><td>我方 compaction/title <strong>已经在付账</strong>（<span class="mono">UsageRecorded</span> → <span class="mono">applyUsage</span>），它踩过的坑我们没有。真正的差在强制侧，归 goose turn-budget / codex M4。</td></tr>
+        <tr><td>R9 多端能力债务矩阵</td><td>Reasonix §二.9</td><td>代价中：要能解析七个消费面的调用图。价值真实但非紧急，且只该做那一条（以 protocol 操作为分母），不抄 25 条 lint。</td></tr>
+        <tr><td>R10b 非 git 目录建孤立库</td><td>Reasonix §二.10</td><td>同一卡片的另一半，代价中。(a) 只是把一个已有事实说出去，(b) 是新能力——先只做 (a)。</td></tr>
+        <tr><td>dsh §4.1 持久化效果队列</td><td>dsh §4.1</td><td>形状值得整块搬（coalesce / generation / <span class="mono">Later</span> 不计失败 / per-kind health），但我方当前<strong>零适用点</strong>：<span class="mono">class Later</span> / Outbox 本轮仍 0 命中。随 cline §6 定时任务立项时落地。</td></tr>
+        <tr><td>dsh §4.2 覆盖升级漂移检测</td><td>dsh §4.2</td><td>问题真实（本 fork 定期合上游，用户覆盖会无声基于过时假设），但存储位置未定——config.json 是用户手写文件，需先核 <span class="mono">config/normalize.ts</span> 的写入路径。</td></tr>
+        <tr><td>dsh §5 全部、Reasonix §三/§四 全部</td><td>两文明确列出</td><td>admission / mandate / Source、108 万行 Go 单体的租约栅栏体系、sidecar full-trust、marketplace 签名安装、<span class="mono">/doctor</span> 双可见性——两文档已逐条写下否决理由，本页不重复推荐。</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="order">
+  <div class="sec-head"><h2>建议动手顺序</h2><span class="tag teal">合并两份文档的顺序 + 本页权重</span></div>
+  <div class="panel pad">
+    <ol style="margin:0;padding-left:20px;font-size:13.5px;color:var(--muted)">
+      <li style="margin:5px 0"><strong style="color:var(--ink)">D1 模型表面契约测试</strong>（0.75d）——独立、无设计争议、永久 CI 红线；预算基线一次量完，后面 L1/L3/L31 的 token 都往这张表里登记。</li>
+      <li style="margin:5px 0"><strong style="color:var(--ink)">R1 看过才准覆盖 + R4 路径冲突</strong>（2.5d）——唯一直接防用户数据丢失的一组；顺手把 write 补进 <span class="mono">withLock</span>，改写三条过期 TODO。</li>
+      <li style="margin:5px 0"><strong style="color:var(--ink)">D2 / D3 改 L1、L31 施工卡</strong>（0.5d 边际）——趁两张卡还没开工，随卡走，不另排期。</li>
+      <li style="margin:5px 0"><strong style="color:var(--ink)">R10a 回退原因字段 + R6 ACP schema 校验</strong>（1.0d）——各自独立、当天可验，适合当填充位。</li>
+      <li style="margin:5px 0"><strong style="color:var(--ink)">R3 破坏性目标硬拒</strong>（0.5d）——先由用户拍板是否推翻 Full access 立场，拍完就是一处门 + 一个错误码。</li>
+      <li style="margin:5px 0"><strong style="color:var(--ink)">R2 来源分档权限</strong>（2.0d）——价值最高、影响面最大，放在最后：动手前把 <span class="mono">permission.ts</span> 规则结构与 <span class="mono">mcp.ts</span>/<span class="mono">policy.ts</span> 现状一次读干净。</li>
+    </ol>
+    <div class="callout teal" style="margin-bottom:0">
+      <strong>与 16 项的关系：</strong>本清单不改变 <span class="mono">P0-收益对比分析</span> 里 W1 的既有顺序，只在其中插两次「改卡」动作（D2 进 L1、D3 进 L31）
+      并把 D1 提到 L32 之前。合计新增工期 <strong>约 6.5 人日</strong>（7.25 减去随卡的 D2/D3 与已在 W1 账上的重复部分）。
+    </div>
+  </div>
+</section>
+
+<section id="caveats">
+  <div class="sec-head"><h2>口径与限制</h2></div>
+  <div class="panel pad">
+    <ul style="margin:0;padding-left:18px;color:var(--muted);font-size:13px">
+      <li><strong style="color:var(--ink)">收益分不是实测。</strong>1–5 分的工程判断；实测的只有工期与第二节的重跑证据。</li>
+      <li><strong style="color:var(--ink)">对方的机制语义有两档没升级。</strong>Reasonix §六自列了一批「只核到符号在、行为靠转述」的项；本页 R4 的目录/子树相交语义、D1 的字节预算数字<strong>都要我们自己定</strong>，不依赖对方细节。</li>
+      <li><strong style="color:var(--ink)">D2/D3 的边际工期会失效。</strong>一旦 L1 / L31 合入，这两条从「改卡」变成「加迁移 + 数据回填策略」，价格要重算。</li>
+      <li><strong style="color:var(--ink)">R2 与 R3 都在动权限，但方向不同。</strong>R2 限制谁能写规则，R3 限制什么目标永不被放行；合成一项会让验收含混。</li>
+      <li><strong style="color:var(--ink)">工期不含 review 往返与返工</strong>，与 16 项那页同一保守口径。</li>
+      <li><strong style="color:var(--ink)">所有结论对应基线 <span class="mono">81738639df</span>。</strong>代码若已变化，先重跑第二节命令，再动施工卡。</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  来源：<span class="mono">dsh-superagent-借鉴技术方案.md</span>（第 7 轮 §3 P0）与 <span class="mono">reasonix-借鉴清单.md</span>（§二 可借鉴项）·
+  口径复用 <span class="mono">P0-收益对比分析.html</span> · 2026-11-01 · 单文件、无外部依赖，可直接打印或归档。
+</footer>
+
+</div>
+
+<script>
+const PRESETS = {
+  "均衡": { rel: 0.30, cost: 0.25, sec: 0.20, audit: 0.15, ux: 0.10 },
+  "速度优先 · 花钱无所谓": { rel: 0.40, cost: 0.35, sec: 0.05, audit: 0.05, ux: 0.15 },
+  "安全可控": { rel: 0.25, cost: 0.10, sec: 0.45, audit: 0.15, ux: 0.05 },
+  "审计交付": { rel: 0.20, cost: 0.10, sec: 0.20, audit: 0.40, ux: 0.10 }
+};
+const PRESET_NOTE = {
+  "均衡": "默认视角：可靠性与成本各占一半权重，安全与审计保留下限。",
+  "速度优先 · 花钱无所谓": "目标＝工具执行快、完成效率高，钱不计。<strong>D1 升到第一</strong>（它同时钉住 prompt 体积与幻觉工具名两条无效路径）；R1/R4 因为「省掉重做与被覆盖的写」上升。R2、R3 的安全权重被压掉——<strong>建议无视预设保留 R2</strong>：它挡的是「clone 仓库即可取消问一次」，不占运行时开销，且越晚动越贵。",
+  "安全可控": "目标＝不出事故。R2、R3 升到前列，R1 是数据完整性而非安全，仍在第一梯队；D1/R6 这类结构性项后退。",
+  "审计交付": "目标＝能向别人交代「谁批准的、依据什么、这次能不能回退」。D3 72 分升到第一，R2、D2 并列其后，R10a 与 R3 上升；R6 虽然也是审计项，但四个维度里只占审计一轴，仍是末位——它靠工期短取胜，不靠权重。"
+};
+let WEIGHTS = PRESETS["速度优先 · 花钱无所谓"];
+let PRESET = "速度优先 · 花钱无所谓";
+
+// scores: 1-5 engineering judgement; days: person-days (D2/D3 = marginal over the host card).
+const DATA = [
+  { id: "D1", name: "模型表面契约测试", src: "dsh", axis: "模型表面", status: "先做", evidence: "本轮实测", days: 0.75, scores: { rel: 4, cost: 4, sec: 1, audit: 4, ux: 2 }, deps: "L32 先行；归口 L1/L3 token", what: "承重句登记表 + 每角色字节预算 + 退役词表 + 工具名对账" },
+  { id: "R1", name: "看过才准覆盖", src: "reasonix", axis: "写路径", status: "先做", evidence: "本轮实测", days: 1.0, scores: { rel: 4, cost: 2, sec: 2, audit: 2, ux: 3 }, deps: "与 R4 同 PR", what: "完整读取才刷新观察；写前比指纹；write 补进 withLock" },
+  { id: "R4", name: "一步内写路径冲突即拒", src: "reasonix", axis: "写路径", status: "规划", evidence: "本轮实测", days: 1.5, scores: { rel: 4, cost: 2, sec: 3, audit: 2, ux: 3 }, deps: "R1 的路径解析", what: "本轮预留解析后的真实路径集，相交就不动盘并回报冲突" },
+  { id: "R2", name: "来源分档权限门", src: "reasonix", axis: "权限", status: "规划", evidence: "本轮实测", days: 2.0, scores: { rel: 2, cost: 1, sec: 5, audit: 4, ux: 3 }, deps: "先核 mcp.ts / policy.ts", what: "project/content 档只能收紧，不得新增程序与参数" },
+  { id: "R3", name: "破坏性目标全档位硬拒", src: "reasonix", axis: "权限", status: "需决策", evidence: "本轮实测", days: 0.5, scores: { rel: 2, cost: 1, sec: 5, audit: 3, ux: 2 }, deps: "用户拍板设计反转", what: "目标形状从 escalation 拆成不可取消的错误码" },
+  { id: "D2", name: "loop guard observe 三态", src: "dsh", axis: "循环", status: "随卡", evidence: "本轮实测", days: 0.25, scores: { rel: 3, cost: 2, sec: 2, audit: 5, ux: 2 }, deps: "随 L1（未开工）", what: "off|observe|on，默认 observe；触发只写 would-block 审计记录" },
+  { id: "D3", name: "审批决定带依据事实", src: "dsh", axis: "权限", status: "随卡", evidence: "本轮实测", days: 0.25, scores: { rel: 2, cost: 1, sec: 4, audit: 5, ux: 3 }, deps: "随 L31（未开工）", what: "permission_decision 加 matched / posture 两列，evaluate 透传" },
+  { id: "R6", name: "ACP 官方 schema 逐帧校验", src: "reasonix", axis: "外部契约", status: "先做", evidence: "本轮实测", days: 0.5, scores: { rel: 3, cost: 1, sec: 1, audit: 4, ux: 1 }, deps: "无", what: "官方 SDK + schema.json 编译校验器，我方发出的每帧 wireProblems 必须为空" },
+  { id: "R10a", name: "回退不可用的原因发布", src: "reasonix", axis: "回退", status: "先做", evidence: "本轮实测", days: 0.5, scores: { rel: 3, cost: 1, sec: 1, audit: 4, ux: 4 }, deps: "无", what: "Step.Ended 带原因字段，客户端说「本次不可回退：非 Git 项目」而不是留空" }
+];
+
+const STATUS_COLOR = { "先做": "var(--teal)", "规划": "var(--purple)", "随卡": "var(--blue)", "需决策": "var(--red)" };
+const STATUS_TAG = { "先做": "teal", "规划": "purple", "随卡": "blue", "需决策": "red" };
+
+const NOTES = {
+  "D1": { one: "9 项里唯一「一次投入、永久红线」的结构性收益。", pts: ["<strong>收益：</strong>prompt 悄悄变大、契约句被重构删掉、幻觉工具名从我方自己的文案里长出来——三类都会在 CI 变红。", "<strong>成本：</strong>一个测试文件；难点只在「先量再钉」：预算基线要用施工图 §5.2 的协议量一次。", "<strong>风险：</strong>登记表若没有「这条规则为什么存在」那一列，半年后没人敢删。"] },
+  "R1": { one: "当前真实存在的数据丢失洞：预览之后、落盘之前，盘可以被人改。", pts: ["<strong>收益：</strong>把「模型没看过这个文件就整写」变成硬失败，且错误文本自带补救动作。", "<strong>成本：</strong>一张 per-session 观察表 + 一处检查 + 一行 pipe；不搬对方的 sha256-per-file 结构。", "<strong>风险：</strong>被拒后反复整读大文件 → 必须留「超限文件不纳入强制门」的豁免。"] },
+  "R4": { one: "并发工具是性能目标，同一步互踩是它的账单。", pts: ["<strong>收益：</strong>两个工具写同一路径从「后写静默覆盖」变成「第二个明确失败」。", "<strong>成本：</strong>要定义目录与子树的相交语义——这正是对方 <span class='mono'>OpaqueWrite</span> 卡住的地方。", "<strong>边界：</strong>只做同一步内；跨会话是 adm 轮 / L11 的议题。"] },
+  "R2": { one: "本清单价值最高、也最贵的一条：项目配置今天能取消「问一次」。", pts: ["<strong>收益：</strong>clone 即扩权这条路被结构性堵住；与「escalation outranks every allow」互补而非重复。", "<strong>成本：</strong>规则数据结构加来源档 + 所有写入方；所以排在最后动。", "<strong>澄清：</strong>这是求值前的来源门，不是被否决的「最严者胜折叠」。"] },
+  "R3": { one: "0.5 天的活，卡在一个立场问题上。", pts: ["<strong>收益：</strong><span class='mono'>rm -rf /</span> 在 Reasonix 不存在放行路径，在本仓可被 Full access 或 <span class='mono'>--auto</span> 放过去。", "<strong>成本：</strong>一处门 + 一个错误码 + 改写 <span class='mono'>doc/permissions.md</span> 一条 Decisions。", "<strong>前置：</strong>用户是否接受「不管怎么配都不放行」的洞。"] },
+  "D2": { one: "把 L1「默认开」从前提变成数据。", pts: ["<strong>收益：</strong>would-block 次数与误伤候选第一次可数。", "<strong>成本：</strong>随卡；判据与收束语义不动。", "<strong>边界：</strong>记录必须 durable，且不进 usage 日聚合。"] },
+  "D3": { one: "「为什么放行了它」从日志升级成一等数据。", pts: ["<strong>收益：</strong><span class='mono'>evaluate()</span> 已经把命中规则返回了，纯透传。", "<strong>成本：</strong>随卡；一次迁移而不是两次。", "<strong>不借：</strong>全局 policyVersion 盖章——我方规则集是会话级的。"] },
+  "R6": { one: "把「符合协议」的定义权交给协议作者。", pts: ["<strong>收益：</strong>我方 ACP 测试目前只证明「和我们的翻译层一致」，不证明「和协议一致」。", "<strong>成本：</strong>一个 devDependency + 一个 harness + 一个假模型；当天可验。", "<strong>同族：</strong>与 <span class='mono'>check:generated</span> 是同一思路，只是这一侧我们是手写镜像。"] },
+  "R10a": { one: "只做「把一个已有事实说出去」这一半。", pts: ["<strong>收益：</strong>客户端不再用「没有这个信息」表达「这次改动不可回退」。", "<strong>成本：</strong>一个原因字段 + rail/TUI 各一句话 + 一段文档。", "<strong>不做：</strong>非 git 目录建孤立库（R10b），那是新能力。"] }
+};
+
+function recompute() {
+  for (const d of DATA) {
+    d.score = Math.round(20 * (d.scores.rel * WEIGHTS.rel + d.scores.cost * WEIGHTS.cost + d.scores.sec * WEIGHTS.sec + d.scores.audit * WEIGHTS.audit + d.scores.ux * WEIGHTS.ux));
+    d.roi = d.score / d.days;
+  }
+}
+
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
+const fmt = (n) => (Math.round(n * 10) / 10).toString();
+const fmtDays = (n) => (Math.round(n * 100) / 100).toString();
+
+/* ---------- scatter ---------- */
+function renderScatter() {
+  const svg = document.getElementById("scatter");
+  svg.innerHTML = "";
+  const W = 980, H = 500, m = { l: 64, r: 26, t: 26, b: 58 };
+  const x0 = 0, x1 = 2.3, Y_BOT = 20, Y_MID = 60, Y_TOP = 100;
+  const px = (v) => m.l + ((v - x0) / (x1 - x0)) * (W - m.l - m.r);
+  const py = (v) => H - m.b - ((v - Y_BOT) / (Y_TOP - Y_BOT)) * (H - m.t - m.b);
+  const ns = "http://www.w3.org/2000/svg";
+  const el = (tag, attrs, text) => {
+    const n = document.createElementNS(ns, tag);
+    for (const [k, v] of Object.entries(attrs || {})) n.setAttribute(k, v);
+    if (text !== undefined) n.textContent = text;
+    svg.appendChild(n);
+    return n;
+  };
+
+  el("rect", { x: px(0), y: py(Y_TOP), width: px(1) - px(0), height: py(Y_MID) - py(Y_TOP), fill: "var(--teal)", "fill-opacity": 0.07 });
+  el("rect", { x: px(1), y: py(Y_TOP), width: px(2.3) - px(1), height: py(Y_MID) - py(Y_TOP), fill: "var(--purple)", "fill-opacity": 0.05 });
+  el("rect", { x: px(0), y: py(Y_MID), width: px(1) - px(0), height: py(Y_BOT) - py(Y_MID), fill: "var(--gray)", "fill-opacity": 0.05 });
+  el("rect", { x: px(1), y: py(Y_MID), width: px(2.3) - px(1), height: py(Y_BOT) - py(Y_MID), fill: "var(--amber)", "fill-opacity": 0.05 });
+
+  for (let v = x0; v <= x1 + 0.001; v += 0.5) {
+    el("line", { x1: px(v), x2: px(v), y1: py(Y_TOP), y2: py(Y_BOT), stroke: "var(--line)", "stroke-width": 1 });
+    el("text", { x: px(v), y: H - m.b + 22, "text-anchor": "middle", "font-size": 11, fill: "var(--faint)" }, (v === 0 ? "0" : fmt(v)) + " 天");
+  }
+  for (let v = Y_BOT; v <= Y_TOP; v += 20) {
+    el("line", { x1: px(0), x2: px(2.3), y1: py(v), y2: py(v), stroke: v === Y_MID ? "var(--line-strong)" : "var(--line)", "stroke-dasharray": v === Y_MID ? "4 4" : "none", "stroke-width": 1 });
+    el("text", { x: px(0) - 10, y: py(v) + 4, "text-anchor": "end", "font-size": 11, fill: "var(--faint)" }, String(v));
+  }
+  el("text", { x: px(0.5), y: py(Y_TOP) + 2, "text-anchor": "middle", "font-size": 11, fill: "var(--teal)", "font-weight": 700 }, "低投入 · 高收益");
+  el("text", { x: px(1.65), y: py(Y_TOP) + 2, "text-anchor": "middle", "font-size": 11, fill: "var(--purple)", "font-weight": 700 }, "高投入 · 高收益");
+  el("text", { x: px(0.5), y: py(Y_BOT) - 8, "text-anchor": "middle", "font-size": 11, fill: "var(--faint)", "font-weight": 700 }, "低投入 · 低收益");
+  el("text", { x: px(1.65), y: py(Y_BOT) - 8, "text-anchor": "middle", "font-size": 11, fill: "var(--amber)", "font-weight": 700 }, "高投入 · 后置");
+  el("text", { x: W - m.r, y: H - 10, "text-anchor": "end", "font-size": 11, fill: "var(--faint)" }, "← 工期（人日；D2/D3 为边际）");
+  el("text", { x: px(0) - 48, y: m.t + 2, "font-size": 11, fill: "var(--faint)" }, "收益分 ↑");
+
+  const seen = new Map();
+  for (const d of DATA) {
+    const base = d.days + "|" + d.score;
+    const n = seen.get(base) || 0;
+    seen.set(base, n + 1);
+    d._jx = n * 0.05 * (n % 2 ? -1 : 1);
+  }
+
+  for (const d of [...DATA].sort((a, b) => b.score - a.score)) {
+    const cx = px(d.days + (d._jx || 0));
+    const cy = py(d.score);
+    const color = STATUS_COLOR[d.status];
+    const g = el("g", {});
+    g.appendChild(el("title", {}, `${d.id} ${d.name}｜${d.score} 分｜${fmtDays(d.days)} 人日｜ROI ${fmt(d.roi)}｜${d.evidence}｜来源 ${d.src}`));
+    if (d.status === "需决策") {
+      el("circle", { cx, cy, r: 8, fill: "var(--panel)", stroke: color, "stroke-width": 2, "stroke-dasharray": "3 2" });
+    } else {
+      el("circle", { cx, cy, r: 7, fill: color, "fill-opacity": .9 });
+    }
+    const side = d.labelSide ?? (d.id === "R2" ? -1 : 1);
+    el("text", { x: cx + side * 11, y: cy + 4, "text-anchor": side < 0 ? "end" : "start", "font-size": 11, "font-weight": 700, fill: "var(--ink)" }, d.id);
+  }
+
+  const legend = document.getElementById("scatter-legend");
+  legend.innerHTML = "";
+  for (const [label, color] of Object.entries(STATUS_COLOR)) {
+    const s = document.createElement("span");
+    s.innerHTML = label === "需决策"
+      ? `<span class="dot" style="background:var(--panel);border:2px dashed ${color}"></span>${label}`
+      : `<span class="dot" style="background:${color}"></span>${label}`;
+    legend.appendChild(s);
+  }
+}
+
+/* ---------- rank bars ---------- */
+function renderRank() {
+  const box = document.getElementById("rank-bars");
+  box.innerHTML = "";
+  const sorted = [...DATA].sort((a, b) => b.roi - a.roi);
+  const max = Math.max(...sorted.map((d) => d.roi));
+  for (const d of sorted) {
+    const row = document.createElement("div");
+    row.className = "bar-row";
+    row.innerHTML = `
+      <div class="bar-id">${esc(d.id)}</div>
+      <div class="track" title="${esc(d.name)}"><div class="fill" style="width:${(d.roi / max) * 100}%;background:${STATUS_COLOR[d.status]}"></div></div>
+      <div class="bar-meta">${d.score} 分 · ${fmtDays(d.days)}d · ROI ${fmt(d.roi)}</div>`;
+    box.appendChild(row);
+  }
+}
+
+/* ---------- heat map ---------- */
+function renderHeat() {
+  const tbody = document.querySelector("#heat-table tbody");
+  tbody.innerHTML = "";
+  const cols = ["rel", "cost", "sec", "audit", "ux"];
+  for (const d of [...DATA].sort((a, b) => b.score - a.score)) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td><strong>${esc(d.id)}</strong></td><td class="what">${esc(d.what)}</td>` +
+      cols.map((k) => `<td class="cell h${d.scores[k]}">${d.scores[k]}</td>`).join("") +
+      `<td class="num" style="text-align:right"><strong>${d.score}</strong></td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+/* ---------- main table ---------- */
+let activeFilter = "全部";
+let sortKey = "score";
+let sortDir = -1;
+
+function drawTable() {
+  const rows = DATA.filter((d) =>
+    activeFilter === "全部" || d.axis === activeFilter || d.src === activeFilter || d.status === activeFilter);
+  rows.sort((a, b) => {
+    const av = a[sortKey], bv = b[sortKey];
+    if (typeof av === "string") return av.localeCompare(bv, "en", { numeric: true }) * sortDir;
+    return (av - bv) * sortDir;
+  });
+  document.querySelector("#main-table tbody").innerHTML = rows.map((d) => `
+    <tr>
+      <td><strong>${esc(d.id)}</strong><br><span style="color:var(--faint);font-size:12px">${esc(d.name)}</span></td>
+      <td>${esc(d.axis)}</td>
+      <td><span class="tag ${STATUS_TAG[d.status]}">${esc(d.status)}</span></td>
+      <td><span class="tag ${d.evidence === "本轮实测" ? "teal" : d.evidence === "待验证" ? "amber" : "blue"}">${esc(d.evidence)}</span></td>
+      <td class="num" style="text-align:right">${fmtDays(d.days)}</td>
+      <td class="num" style="text-align:right"><strong>${d.score}</strong></td>
+      <td class="num" style="text-align:right">${fmt(d.roi)}</td>
+      <td style="color:var(--muted)">${esc(d.deps)}</td>
+      <td class="what">${esc(d.what)}</td>
+    </tr>`).join("");
+}
+
+function buildFilters() {
+  const chips = document.getElementById("filters");
+  chips.innerHTML = "";
+  const opts = ["全部", "dsh", "reasonix", ...Array.from(new Set(DATA.map((d) => d.axis))), ...Object.keys(STATUS_COLOR)];
+  for (const label of opts) {
+    const b = document.createElement("button");
+    b.className = "chip";
+    b.textContent = label;
+    b.setAttribute("aria-pressed", label === activeFilter ? "true" : "false");
+    b.addEventListener("click", () => {
+      activeFilter = label;
+      for (const c of chips.children) c.setAttribute("aria-pressed", c.textContent === label ? "true" : "false");
+      drawTable();
+    });
+    chips.appendChild(b);
+  }
+}
+
+document.querySelectorAll("#main-table thead th[data-sort]").forEach((th) => {
+  th.addEventListener("click", () => {
+    const key = th.dataset.sort;
+    if (sortKey === key) sortDir *= -1;
+    else { sortKey = key; sortDir = ["id", "axis", "status", "evidence", "deps"].includes(key) ? 1 : -1; }
+    drawTable();
+  });
+});
+
+/* ---------- interpretation cards ---------- */
+function renderNotes() {
+  const box = document.getElementById("note-cards");
+  box.innerHTML = "";
+  for (const d of [...DATA].sort((a, b) => b.score - a.score)) {
+    const n = NOTES[d.id];
+    if (!n) continue;
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <h3>${esc(d.id)} ${esc(d.name)} <span class="tag ${STATUS_TAG[d.status]}">${d.score} 分 · ${fmtDays(d.days)}d</span></h3>
+      <p class="one">${n.one}</p>
+      <ul>${n.pts.map((p) => `<li>${p}</li>`).join("")}</ul>
+      <div class="foot"><span>轴：${esc(d.axis)} · 来源：${esc(d.src)}</span><span>${esc(d.evidence)}</span></div>`;
+    box.appendChild(card);
+  }
+}
+
+function renderAll() {
+  recompute();
+  renderScatter();
+  renderRank();
+  renderHeat();
+  drawTable();
+  renderNotes();
+  const w = WEIGHTS;
+  document.getElementById("weight-line").textContent =
+    `当前预设：${PRESET} · 可靠性 ${(w.rel * 100).toFixed(0)}% / 成本·时间 ${(w.cost * 100).toFixed(0)}% / 安全 ${(w.sec * 100).toFixed(0)}% / 审计 ${(w.audit * 100).toFixed(0)}% / 体验 ${(w.ux * 100).toFixed(0)}%`;
+  document.getElementById("preset-note").innerHTML = PRESET_NOTE[PRESET];
+  document.getElementById("preset-top").textContent = `按 ROI 前五：${[...DATA].sort((a, b) => b.roi - a.roi).slice(0, 5).map((d) => d.id).join(" → ")}`;
+}
+
+function buildPresets() {
+  const box = document.getElementById("presets");
+  box.innerHTML = "";
+  for (const name of Object.keys(PRESETS)) {
+    const b = document.createElement("button");
+    b.className = "chip";
+    b.textContent = name;
+    b.setAttribute("aria-pressed", name === PRESET ? "true" : "false");
+    b.addEventListener("click", () => {
+      PRESET = name;
+      WEIGHTS = PRESETS[name];
+      for (const c of box.children) c.setAttribute("aria-pressed", c.textContent === name ? "true" : "false");
+      renderAll();
+    });
+    box.appendChild(b);
+  }
+}
+
+buildFilters();
+buildPresets();
+renderAll();
+</script>
+</body>
+</html>

@@ -1,0 +1,665 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>P0 收益对比分析 · 16 项可靠性改造</title>
+<style>
+  :root {
+    --bg: #f6f6f3;
+    --panel: #ffffff;
+    --ink: #1b1f23;
+    --muted: #5f676e;
+    --faint: #8a9298;
+    --line: #e3e3dd;
+    --line-strong: #cfd0c9;
+    --teal: #0f766e;
+    --teal-soft: #d9eeea;
+    --blue: #1d4ed8;
+    --blue-soft: #dde5fb;
+    --purple: #6d28d9;
+    --purple-soft: #e9e0fb;
+    --amber: #b45309;
+    --amber-soft: #f8e8d4;
+    --gray: #6b7280;
+    --gray-soft: #ececea;
+    --radius: 14px;
+    --shadow: 0 1px 2px rgba(20, 24, 28, .05), 0 10px 30px rgba(20, 24, 28, .05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111417;
+      --panel: #191d21;
+      --ink: #e8e6e1;
+      --muted: #a4abb1;
+      --faint: #7c848b;
+      --line: #2a2f34;
+      --line-strong: #3a4046;
+      --teal: #2dd4bf;
+      --teal-soft: #10322e;
+      --blue: #93b4ff;
+      --blue-soft: #17233f;
+      --purple: #c4b5fd;
+      --purple-soft: #241a3d;
+      --amber: #fbbf24;
+      --amber-soft: #35270f;
+      --gray: #9ca3af;
+      --gray-soft: #24282c;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .4);
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Segoe UI", system-ui, -apple-system, "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 28px; }
+  header.hero { padding: 64px 0 30px; border-bottom: 1px solid var(--line); }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--teal); font-weight: 700; }
+  h1 { font-size: clamp(30px, 4.4vw, 50px); line-height: 1.12; margin: 12px 0 14px; letter-spacing: -.02em; }
+  .lede { max-width: 820px; color: var(--muted); font-size: 16px; margin: 0; }
+  .lede strong { color: var(--ink); font-weight: 650; }
+  .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 30px 0 4px; }
+  .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); }
+  .kpi .v { font-size: 27px; font-weight: 720; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .kpi .k { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  section { padding: 46px 0 8px; }
+  .sec-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 8px; }
+  h2 { font-size: 24px; letter-spacing: -.01em; margin: 0; }
+  .sec-note { color: var(--muted); font-size: 13px; margin: 0 0 20px; max-width: 860px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+  .pad { padding: 20px 22px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 12px; color: var(--muted); margin-top: 12px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: 1px; }
+  .two-col { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(300px, .65fr); gap: 18px; align-items: start; }
+  @media (max-width: 940px) { .two-col { grid-template-columns: 1fr; } .kpis { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+  .weights { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .weights th, .weights td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--line); }
+  .weights th { color: var(--muted); font-weight: 600; }
+  .weights td:last-child, .weights th:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+  .bar-list { display: flex; flex-direction: column; gap: 9px; }
+  .bar-row { display: grid; grid-template-columns: 58px 1fr 150px; gap: 12px; align-items: center; }
+  .bar-id { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .track { position: relative; height: 20px; background: var(--gray-soft); border-radius: 6px; overflow: hidden; }
+  .fill { height: 100%; border-radius: 6px; background: var(--teal); opacity: .82; }
+  .bar-meta { font-size: 12px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tag { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line-strong); color: var(--muted); white-space: nowrap; }
+  .tag.teal { color: var(--teal); border-color: color-mix(in srgb, var(--teal) 45%, transparent); background: var(--teal-soft); }
+  .tag.blue { color: var(--blue); border-color: color-mix(in srgb, var(--blue) 45%, transparent); background: var(--blue-soft); }
+  .tag.purple { color: var(--purple); border-color: color-mix(in srgb, var(--purple) 45%, transparent); background: var(--purple-soft); }
+  .tag.amber { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 45%, transparent); background: var(--amber-soft); }
+  .tag.gray { color: var(--gray); background: var(--gray-soft); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+  .chip { border: 1px solid var(--line-strong); background: transparent; color: var(--muted); border-radius: 999px; padding: 5px 12px; font-size: 12px; cursor: pointer; font-family: inherit; }
+  .chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .chip:hover { border-color: var(--ink); }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); box-shadow: var(--shadow); }
+  table.grid { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 900px; }
+  table.grid th, table.grid td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  table.grid thead th { position: sticky; top: 0; background: var(--panel); z-index: 1; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); cursor: pointer; user-select: none; white-space: nowrap; }
+  table.grid thead th:hover { color: var(--ink); }
+  table.grid tbody tr:hover { background: color-mix(in srgb, var(--teal) 5%, transparent); }
+  table.grid td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  table.grid td.what { color: var(--muted); min-width: 280px; }
+  .heat td.cell { text-align: center; font-weight: 650; font-variant-numeric: tabular-nums; border-radius: 5px; }
+  .heat td.h1 { background: color-mix(in srgb, var(--teal) 8%, transparent); }
+  .heat td.h2 { background: color-mix(in srgb, var(--teal) 20%, transparent); }
+  .heat td.h3 { background: color-mix(in srgb, var(--teal) 38%, transparent); }
+  .heat td.h4 { background: color-mix(in srgb, var(--teal) 58%, transparent); color: var(--panel); }
+  .heat td.h5 { background: color-mix(in srgb, var(--teal) 76%, transparent); color: var(--panel); }
+  @media (max-width: 720px) {
+    #heat-table { min-width: 0 !important; }
+    #heat-table th:nth-child(2), #heat-table td:nth-child(2) { display: none; }
+    #heat-table th, #heat-table td { padding: 8px 6px; }
+  }
+  .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  @media (max-width: 860px) { .cards { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow); }
+  .card h3 { margin: 0 0 4px; font-size: 17px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .card .one { color: var(--muted); font-size: 14px; margin: 0 0 12px; }
+  .card ul { margin: 0; padding-left: 18px; font-size: 13px; color: var(--muted); }
+  .card li { margin: 4px 0; }
+  .card li strong { color: var(--ink); font-weight: 620; }
+  .card .foot { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); font-size: 12px; color: var(--faint); display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .callout { border-left: 3px solid var(--amber); background: var(--amber-soft); padding: 14px 16px; border-radius: 0 10px 10px 0; font-size: 13px; color: var(--ink); margin: 16px 0; }
+  .callout strong { color: var(--amber); }
+  .mono { font-family: ui-monospace, SFMono-Regular, "Cascadia Code", Consolas, monospace; font-size: 12px; }
+  footer { margin-top: 48px; padding: 26px 0 50px; border-top: 1px solid var(--line); color: var(--faint); font-size: 12px; }
+  svg text { font-family: inherit; }
+  .chart-scroll { overflow-x: auto; overflow-y: hidden; }
+  .chart-scroll svg { min-width: 820px; }
+  .hint { font-size: 12px; color: var(--faint); margin: 10px 0 0; }
+  @media print {
+    body { background: #fff; }
+    .chip, .chips { display: none; }
+    section { break-inside: avoid; }
+    .panel, .card, .table-wrap { box-shadow: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <div class="eyebrow">P0 收益对比分析 · 基线 2.2.0-fork.10 · 2026-11-01</div>
+  <h1>16 项可靠性改造：收益、成本与先后</h1>
+  <p class="lede">
+    把 <strong>P0-可执行技术方案</strong> 里的 16 项放到同一张账上：收益按五个维度打分（可靠性、成本/延迟、安全、可审计性、用户可见体验），
+    成本取方案里的工程日估算，证据强度沿用本轮代码实测。目的不是给每项贴一个"好/坏"，而是回答
+    <strong>先做哪些、哪些必须做但不便宜、哪些要先量再决定</strong>。
+    本页默认按 <strong>速度优先 · 花钱无所谓</strong> 打开（目标：工具执行快、完成效率高，token 费用不计），切换预设会重算全部图表。
+  </p>
+  <div class="kpis">
+    <div class="kpi"><div class="v">17</div><div class="k">条目（16 项 P0，L26 拆 a/b）</div></div>
+    <div class="kpi"><div class="v">16</div><div class="k">独立 PR 粒度</div></div>
+    <div class="kpi"><div class="v">11.5<span style="font-size:14px;font-weight:600"> 人日</span></div><div class="k">W1 先做集合</div></div>
+    <div class="kpi"><div class="v">16.5<span style="font-size:14px;font-weight:600"> 人日</span></div><div class="k">全部（含条件项）</div></div>
+  </div>
+</header>
+
+<main>
+
+<section id="model">
+  <div class="sec-head"><h2>评分模型</h2><span class="tag gray">工程判断，不是实测</span></div>
+  <p class="sec-note">
+    唯一的实测数据是工期与证据等级；收益分是显式权重下的工程判断，可复核、可改权重重算。单个维度 1–5 分，加权后 ×20 映射到 100 分。
+    这样做的理由：P0 的收益大多不是"功能有没有"，而是"出错时少付多少钱、少走多少弯路"，直接给总收入数字会假装精确。
+    <strong>切换下面的目标预设，象限、ROI、热力表总分、对比表会全部重算。</strong>
+  </p>
+  <div class="chips" id="presets" style="margin:0 0 10px"></div>
+  <p class="hint" id="weight-line" style="margin:0 0 8px"></p>
+  <div class="callout" id="preset-note" style="margin-top:0"></div>
+  <p class="hint" id="preset-top" style="margin:8px 0 18px"></p>
+  <div class="two-col">
+    <div class="panel pad">
+      <p class="hint" style="margin:0 0 10px">下表是「均衡」预设的权重定义；切换预设后，生效权重显示在页面顶部。</p>
+      <table class="weights">
+        <thead><tr><th>维度</th><th>看什么</th><th>权重</th></tr></thead>
+        <tbody>
+          <tr><td>运行可靠性</td><td>死循环、空响应、进程残留、工具名幻觉、失败不可见</td><td>30%</td></tr>
+          <tr><td>成本 / 延迟</td><td>prompt cache 命中、指令块体积、重复推理、无效步骤</td><td>25%</td></tr>
+          <tr><td>安全 / 权限</td><td>Plan 模式破坏性执行、MCP env 注入、进程树治理</td><td>20%</td></tr>
+          <tr><td>可审计性</td><td>审批决定史、回执、配置漂移、文档/schema 一致</td><td>15%</td></tr>
+          <tr><td>用户可见体验</td><td>模型反馈措辞、TUI、工具报错可理解性</td><td>10%</td></tr>
+        </tbody>
+      </table>
+      <div class="callout" style="margin-bottom:0">
+        <strong>读法：</strong>分数高不等于先做。<strong>L1</strong> 分数最高但不便宜；<strong>L30/L13/L14/L26a</strong> 是"半天换确定收益"；
+        <strong>L31</strong> 战略价值高、短期 ROI 低；<strong>L25</strong> 的收益一栏在实测前只能算假设。
+      </div>
+    </div>
+    <div class="panel pad">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:10px">状态分组</div>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--teal)"></span>先做（W1）</span>
+        <span><span class="dot" style="background:var(--blue)"></span>规划（随后）</span>
+        <span><span class="dot" style="background:var(--purple)"></span>战略（审计闭环）</span>
+        <span><span class="dot" style="background:var(--amber)"></span>先量（不开默认）</span>
+        <span><span class="dot" style="background:var(--gray)"></span>条件立项 / 已存在</span>
+      </div>
+      <div style="font-size:13px;color:var(--muted);margin:18px 0 8px">证据分级</div>
+      <table class="weights">
+        <tbody>
+          <tr><td><span class="tag teal">本轮实测</span></td><td>本次在 HEAD 重跑/重读</td></tr>
+          <tr><td><span class="tag blue">摘要实测</span></td><td>同一基线，待施工前复核</td></tr>
+          <tr><td><span class="tag amber">待验证</span></td><td>结论未定，先定生死</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="quadrant">
+  <div class="sec-head"><h2>投入产出象限</h2><span class="tag gray">横轴 = 人日 · 纵轴 = 收益分</span></div>
+  <p class="sec-note">
+    右上"高投入高收益"不是坏位置：L1 是行为基线，省不掉；左上"低投入高收益"是先做集合；右下"高投入低短期收益"要先问值不值；
+    同坐标的点做了微小水平偏移以便区分。
+  </p>
+  <div class="panel pad">
+    <div class="chart-scroll">
+      <svg id="scatter" viewBox="0 0 980 500" role="img" aria-label="各 P0 项的工期与收益分散点图" style="width:100%;height:auto;display:block"></svg>
+    </div>
+    <div class="legend" id="scatter-legend"></div>
+    <p class="hint">窄窗口下图表可横向滚动；桌面宽度一次显示全部。</p>
+  </div>
+</section>
+
+<section id="rank">
+  <div class="sec-head"><h2>按投入产出比排序</h2><span class="tag gray">收益分 ÷ 人日</span></div>
+  <p class="sec-note">
+    ROI 只回答"同样的时间先花在哪"，不回答"值不值得做"。L5 的 ROI 具有误导性：剪贴板与终端标题已存在，剩余工作量很小；
+    L25 的收益未测，ROI 仅供参考。
+  </p>
+  <div class="panel pad">
+    <div class="bar-list" id="rank-bars"></div>
+  </div>
+</section>
+
+<section id="matrix">
+  <div class="sec-head"><h2>收益结构热力表</h2><span class="tag gray">1–5 分 · 颜色越深收益越大</span></div>
+  <p class="sec-note">同一总分可能来自完全不同的结构：L1 靠可靠性与成本，L2 靠安全，L31 靠可审计性，L5 只有体验。决定"先做什么"时要看结构，不只看总分。</p>
+  <div class="table-wrap">
+    <table class="grid heat" id="heat-table" style="min-width:760px">
+      <thead>
+        <tr>
+          <th>项</th><th>一句话</th>
+          <th style="text-align:center">可靠性<br><span style="font-weight:400;text-transform:none;letter-spacing:0">30%</span></th>
+          <th style="text-align:center">成本/延迟<br><span style="font-weight:400;text-transform:none;letter-spacing:0">25%</span></th>
+          <th style="text-align:center">安全<br><span style="font-weight:400;text-transform:none;letter-spacing:0">20%</span></th>
+          <th style="text-align:center">可审计<br><span style="font-weight:400;text-transform:none;letter-spacing:0">15%</span></th>
+          <th style="text-align:center">体验<br><span style="font-weight:400;text-transform:none;letter-spacing:0">10%</span></th>
+          <th style="text-align:right">总分</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<section id="table">
+  <div class="sec-head"><h2>完整对比表</h2><span class="tag gray">点表头排序 · 上方筛选</span></div>
+  <div class="chips" id="filters"></div>
+  <div class="table-wrap">
+    <table class="grid" id="main-table">
+      <thead>
+        <tr>
+          <th data-sort="id">项</th>
+          <th data-sort="axis">轴</th>
+          <th data-sort="status">状态</th>
+          <th data-sort="evidence">证据</th>
+          <th data-sort="days" style="text-align:right">工期</th>
+          <th data-sort="score" style="text-align:right">收益分</th>
+          <th data-sort="roi" style="text-align:right">ROI</th>
+          <th data-sort="deps">依赖</th>
+          <th>一句话</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<section id="notes">
+  <div class="sec-head"><h2>重点项解读</h2><span class="tag gray">为什么这样排</span></div>
+  <p class="sec-note">解读卡上的分数按「均衡」预设标注；切换预设只改变排序与总分，不改变下面这些结论的理由。</p>
+  <div class="cards">
+    <div class="card">
+      <h3>L1 循环失控防护 <span class="tag teal">84 分 · 1.25d</span></h3>
+      <p class="one">唯一直接改变模型行为、同时压掉无效 token 的一项，也是 P0 里最贵的一项。</p>
+      <ul>
+        <li><strong>收益：</strong>把 3 步死循环和 30 步正常工作分开；结果参与键，避免误伤轮询（C4 净增益）。</li>
+        <li><strong>成本：</strong>新增 fold 骨架与四类计数器，收尾步要改 <span class="mono">runner/llm.ts</span>，不是只改常量。</li>
+        <li><strong>风险：</strong>默认开的前提是"轮询不误伤"同 PR；否则必须默认关。</li>
+      </ul>
+      <div class="foot"><span>轴：step 边界</span><span>证据：本轮实测</span></div>
+    </div>
+
+    <div class="card">
+      <h3>L30 + L17 cache 轴 <span class="tag teal">64 / 56 分 · 1.25d</span></h3>
+      <p class="one">最便宜的确定性：一条字节恒等测试就能判定 C22 成立与否。</p>
+      <ul>
+        <li><strong>收益：</strong>MCP 重连/升级不再打掉整个前缀；L17 把"前缀字节一致"变成可测断言。</li>
+        <li><strong>成本：</strong>一个递归排序纯函数 + 一个哈希断言，不需要 provider。</li>
+        <li><strong>依赖：</strong>L17 是 L4、L25、L34 的共同守门人；L30 不成立则整条 cache 轴收缩。</li>
+      </ul>
+      <div class="foot"><span>轴：prompt cache</span><span>证据：本轮实测</span></div>
+    </div>
+
+    <div class="card">
+      <h3>L2 Plan shell 守卫 <span class="tag teal">56 分 · 0.75d</span></h3>
+      <p class="one">当前真实存在的破坏性执行洞：plan agent 没有 deny <span class="mono">shell</span>。</p>
+      <ul>
+        <li><strong>收益：</strong>把 <span class="mono">rm -rf</span>、<span class="mono">git reset --hard</span>、包管理安装挡在 plan 外。</li>
+        <li><strong>成本：</strong>纯判定函数 + 一个 <span class="mono">execute.before</span> 钩子，复用现有 <span class="mono">ShellParse.scanPortable</span>。</li>
+        <li><strong>边界：</strong>不可判定即拒绝；不引入 basename 白名单之类的安全假设。</li>
+      </ul>
+      <div class="foot"><span>轴：权限</span><span>证据：本轮实测</span></div>
+    </div>
+
+    <div class="card">
+      <h3>L32 指令预算 <span class="tag blue">62 分 · 1.5d</span></h3>
+      <p class="one">最大的长期 token 杠杆，但依赖 L29 的二分纯函数，且必须让裁剪可见。</p>
+      <ul>
+        <li><strong>收益：</strong>AGENTS.md 与技能清单不再无限进 prompt；全局/项目分开核算。</li>
+        <li><strong>成本：</strong>模型在 <span class="mono">select</span> 阶段拿不到窗口，百分比预算要先解析模型。</li>
+        <li><strong>风险：</strong>冲突"可见但不自动择一"可能引发产品反馈；裁剪标记必须模型可见。</li>
+      </ul>
+      <div class="foot"><span>轴：上下文注入</span><span>证据：本轮实测</span></div>
+    </div>
+
+    <div class="card">
+      <h3>L31 审批回执 <span class="tag purple">48 分 · 2.5d</span></h3>
+      <p class="one">把"升级优先于任何 allow"从声明变成可审计，但短期 ROI 最低。</p>
+      <ul>
+        <li><strong>收益：</strong>四分归主 + blocked ≠ failed ≠ not-run；唯一性优势第一次可被检查。</li>
+        <li><strong>成本：</strong>投影表 + 迁移 + 纯函数 builder + TUI surface；Posture 要协议加 <span class="mono">source</span>。</li>
+        <li><strong>边界：</strong>回执是本地记录，不是安全认证；缺数据记 <span class="mono">not_recorded</span>。</li>
+      </ul>
+      <div class="foot"><span>轴：权限</span><span>证据：本轮实测</span></div>
+    </div>
+
+    <div class="card">
+      <h3>L25 cache 保活 <span class="tag amber">38 分 · 1.5d</span></h3>
+      <p class="one">收益未测。这不是失败，是尚未付测付费；没有可比数据不许开默认。</p>
+      <ul>
+        <li><strong>假设：</strong>审批等待、读 diff、长 shell 期间前缀被闲置，TTL 过期后下一请求全价重推。</li>
+        <li><strong>成本：</strong>空闲边界计时 + 非流式 ping + 用量新 source；不能起 daemon 线程。</li>
+        <li><strong>先决：</strong>L30 → L17；用 <span class="mono">session-efficiency.ts</span> 拆出真实间隙成本。</li>
+      </ul>
+      <div class="foot"><span>轴：prompt cache</span><span>证据：待验证</span></div>
+    </div>
+
+    <div class="card">
+      <h3>L26a formatter 失败可见 <span class="tag teal">47 分 · 0.5d</span></h3>
+      <p class="one">已核实的静默数据丢失：格式失败被日志吞掉，模型只看到原文。</p>
+      <ul>
+        <li><strong>收益：</strong>把"写入成功但未格式化"变成模型下一轮的输入，而不是不存在的日志。</li>
+        <li><strong>成本：</strong>改 <span class="mono">Formatter.file</span> 返回结构 + 三个调用点各加一行提示。</li>
+        <li><strong>边界：</strong>完整的"编辑后验证回喂"仍等共识，不在本轮。</li>
+      </ul>
+      <div class="foot"><span>轴：工具反馈</span><span>证据：本轮实测</span></div>
+    </div>
+
+    <div class="card">
+      <h3>L5 TUI 四小件 <span class="tag gray">26 分 · 0.25d 剩余</span></h3>
+      <p class="one">剪贴板与终端标题已存在；palette 探测也已存在。只剩 stdio 捕获待验证。</p>
+      <ul>
+        <li><strong>收益：</strong>低；主要价值是去掉清单里的伪工作项。</li>
+        <li><strong>成本：</strong>先跑一次 <span class="mono">dev:live</span> 验证 server 日志是否污染 stdout。</li>
+        <li><strong>结论：</strong>验证不需要就撤项，不保留"已写完但没用"的代码。</li>
+      </ul>
+      <div class="foot"><span>轴：TUI</span><span>证据：本轮实测</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="caveats">
+  <div class="sec-head"><h2>口径与限制</h2></div>
+  <div class="panel pad">
+    <ul style="margin:0;padding-left:18px;color:var(--muted);font-size:13px">
+      <li><strong style="color:var(--ink)">收益分不是实测。</strong>它是 1–5 分的工程判断；唯一的实测数据是工期估算与证据等级。</li>
+      <li><strong style="color:var(--ink)">L25 的收益栏是假设。</strong>它必须先用 <span class="mono">script/session-efficiency.ts</span> 测出"间隙导致 TTL 过期"的成本占比，才允许谈默认值。</li>
+      <li><strong style="color:var(--ink)">L26b 未立项。</strong>共识题（验证属于循环还是模型）没有结论前不写码；L26a 是无论如何都该修的那一小半。</li>
+      <li><strong style="color:var(--ink)">工期是工程日，不含 review 往返与返工。</strong>按摘要与方案里的保守估算；架构不确定性已单列在"风险"。</li>
+      <li><strong style="color:var(--ink)">依赖会改变实际顺序。</strong>L32 等 L29，L25 等 L30/L17，L31 与 L37 同批；ROI 排序不等于开工顺序。</li>
+      <li><strong style="color:var(--ink)">所有结论对应基线 <span class="mono">81738639df</span>。</strong>代码若已变化，先重跑方案附录 C 的复核命令。</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  基于 <span class="mono">P0-可执行技术方案.md</span> 与 <span class="mono">P0-功能点摘要.md</span> · 2026-11-01 · 单文件、无外部依赖，可直接打印或归档。
+</footer>
+
+</div>
+
+<script>
+const PRESETS = {
+  "均衡": { rel: 0.30, cost: 0.25, sec: 0.20, audit: 0.15, ux: 0.10 },
+  "速度优先 · 花钱无所谓": { rel: 0.40, cost: 0.35, sec: 0.05, audit: 0.05, ux: 0.15 },
+  "安全可控": { rel: 0.25, cost: 0.10, sec: 0.45, audit: 0.15, ux: 0.05 },
+  "审计交付": { rel: 0.20, cost: 0.10, sec: 0.20, audit: 0.40, ux: 0.10 }
+};
+const PRESET_NOTE = {
+  "均衡": "默认视角：可靠性与成本各占一半权重，安全与审计保留下限。",
+  "速度优先 · 花钱无所谓": "目标＝工具执行快、完成效率高，钱不计。<strong>L25 的成本反对意见消失</strong>（它本来就是为省时间而存在，只剩技术前提：ping 必须命中同一 promptCacheKey）；L1/L14/L13 因“省掉无效步”上升；L31、L27、L16 掉到后面。<strong>L2 建议无视目标保留</strong>：它不占运行时开销，且是唯一真实的破坏性执行洞。",
+  "安全可控": "目标＝不出事故。L2、L16、L31 上升；纯性能项退居其次。",
+  "审计交付": "目标＝能向别人交代“谁批准的、改了什么”。L31、L27 上升，回执与配置一致性成为主线。"
+};
+let WEIGHTS = PRESETS["速度优先 · 花钱无所谓"];
+let PRESET = "速度优先 · 花钱无所谓";
+
+// scores: 1–5 engineering judgement; days: estimated person-days from the plan.
+const DATA = [
+  { id: "L30", name: "MCP schema 字节确定化", axis: "缓存", status: "先做", evidence: "本轮实测", days: 0.5,  scores: { rel: 5, cost: 5, sec: 1, audit: 1, ux: 1 }, deps: "无", what: "递归排序 schema 键与 required，消除重连后的前缀抖动" },
+  { id: "L17", name: "prompt cache 确定性纪律", axis: "缓存", status: "先做", evidence: "本轮实测", days: 0.75, scores: { rel: 4, cost: 4, sec: 1, audit: 2, ux: 1 }, deps: "L30", what: "把“同一 turn 前缀字节一致”变成可测断言" },
+  { id: "L14", name: "空响应重试", axis: "循环", status: "先做", evidence: "本轮实测", days: 0.5,  scores: { rel: 4, cost: 2, sec: 1, audit: 1, ux: 3 }, deps: "无", what: "真空响应重试 3 次；工具成功后的短回复不误判" },
+  { id: "L13", name: "幻觉工具名自愈", axis: "循环", status: "先做", evidence: "本轮实测", days: 0.5,  scores: { rel: 4, cost: 3, sec: 1, audit: 1, ux: 3 }, deps: "无", what: "名字折回 advertise 集，未知工具附可用清单" },
+  { id: "L3",  name: "拒绝反馈措辞", axis: "权限", status: "先做", evidence: "本轮实测", days: 0.75, scores: { rel: 3, cost: 2, sec: 2, audit: 2, ux: 4 }, deps: "与 L1 协调", what: "用户决定与规则拒绝两套 token，四个出口一起改" },
+  { id: "L1",  name: "循环失控防护", axis: "循环", status: "先做", evidence: "本轮实测", days: 1.25, scores: { rel: 5, cost: 5, sec: 3, audit: 3, ux: 4 }, deps: "L3", what: "四类计数器共用 durable fold；结果参与键；收尾不是 error" },
+  { id: "L32", name: "指令 / 技能预算", axis: "上下文", status: "规划", evidence: "本轮实测", days: 1.5,  scores: { rel: 3, cost: 5, sec: 1, audit: 3, ux: 3 }, deps: "L29 纯函数", what: "全局/项目分开核算；裁剪可见；技能冲突全部列出" },
+  { id: "L31", name: "审批落盘 + 回执", axis: "权限", status: "战略", evidence: "本轮实测", days: 2.5,  scores: { rel: 1, cost: 1, sec: 4, audit: 5, ux: 3 }, deps: "L37 同批", what: "四分归主 + blocked ≠ failed ≠ not-run；本地记录非认证" },
+  { id: "L2",  name: "Plan shell 硬后盾", axis: "权限", status: "先做", evidence: "本轮实测", days: 0.75, scores: { rel: 3, cost: 1, sec: 5, audit: 3, ux: 2 }, deps: "无", what: "plan agent 下不可判定的 shell 一律拒绝" },
+  { id: "L16", name: "MCP 子进程卫生", axis: "进程", status: "规划", evidence: "本轮实测", days: 1.0,  scores: { rel: 2, cost: 1, sec: 4, audit: 2, ux: 1 }, deps: "与 L15 同 PR", what: "env denylist + OSV 只拦 MAL-*，fail-open" },
+  { id: "L15", name: "Windows Job Object", axis: "进程", status: "规划", evidence: "本轮实测", days: 1.0,  scores: { rel: 4, cost: 2, sec: 3, audit: 1, ux: 1 }, deps: "与 L16 同 PR", what: "kill-on-close 替代 taskkill /T 的孙进程盲区" },
+  { id: "L27", name: "配置 codegen 接线", axis: "配置", status: "规划", evidence: "本轮实测", days: 1.0,  scores: { rel: 2, cost: 2, sec: 1, audit: 4, ux: 4 }, deps: "可组 L33", labelSide: -1, what: "check:generated 进 lint；config 页从 schema 渲染" },
+  { id: "L4",  name: "模型→工具路由", axis: "配置", status: "规划", evidence: "本轮实测", days: 1.0,  scores: { rel: 2, cost: 4, sec: 2, audit: 1, ux: 3 }, deps: "L17", labelSide: -1, what: "按 provider/model glob 过滤工具集，同 turn 前缀稳定" },
+  { id: "L5",  name: "TUI 四小件", axis: "TUI", status: "已存在", evidence: "本轮实测", days: 0.5,  scores: { rel: 1, cost: 1, sec: 1, audit: 1, ux: 4 }, deps: "无", what: "5c/5d 已存在；只剩 5b stdio 捕获待验证" },
+  { id: "L25", name: "cache 保活 ping", axis: "缓存", status: "先量", evidence: "待验证", days: 1.5,  scores: { rel: 1, cost: 4, sec: 1, audit: 2, ux: 1 }, deps: "L30 → L17", what: "空闲边界非流式 ping；收益未测，默认关" },
+  { id: "L26a", name: "formatter 失败可见", axis: "验证", status: "先做", evidence: "本轮实测", days: 0.5,  scores: { rel: 3, cost: 2, sec: 1, audit: 3, ux: 3 }, deps: "无", what: "格式化失败写进工具结果，不再静默吞掉" },
+  { id: "L26b", name: "编辑后验证回喂", axis: "验证", status: "条件", evidence: "待验证", days: 1.0,  scores: { rel: 3, cost: 2, sec: 1, audit: 1, ux: 4 }, deps: "共识题", what: "验证属于循环还是模型；未定不写码" }
+];
+
+const STATUS_COLOR = {
+  "先做": "var(--teal)",
+  "规划": "var(--blue)",
+  "战略": "var(--purple)",
+  "先量": "var(--amber)",
+  "条件": "var(--gray)",
+  "已存在": "var(--line-strong)"
+};
+const STATUS_TAG = { "先做": "teal", "规划": "blue", "战略": "purple", "先量": "amber", "条件": "gray", "已存在": "gray" };
+
+function recompute() {
+  for (const d of DATA) {
+    d.score = Math.round(20 * (d.scores.rel * WEIGHTS.rel + d.scores.cost * WEIGHTS.cost + d.scores.sec * WEIGHTS.sec + d.scores.audit * WEIGHTS.audit + d.scores.ux * WEIGHTS.ux));
+    d.roi = d.score / d.days;
+  }
+}
+
+const byId = (a, b) => a.id.localeCompare(b.id, "en", { numeric: true });
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
+const fmt = (n) => (Math.round(n * 10) / 10).toString();
+const fmtDays = (n) => (Math.round(n * 100) / 100).toString();
+
+/* ---------- scatter ---------- */
+function renderScatter() {
+  const svg = document.getElementById("scatter");
+  svg.innerHTML = "";
+  const W = 980, H = 500, m = { l: 64, r: 26, t: 26, b: 58 };
+  const x0 = 0, x1 = 2.7, Y_BOT = 20, Y_MID = 60, Y_TOP = 100;
+  const px = (v) => m.l + ((v - x0) / (x1 - x0)) * (W - m.l - m.r);
+  const py = (v) => H - m.b - ((v - Y_BOT) / (Y_TOP - Y_BOT)) * (H - m.t - m.b);
+  const ns = "http://www.w3.org/2000/svg";
+  const el = (tag, attrs, text) => {
+    const n = document.createElementNS(ns, tag);
+    for (const [k, v] of Object.entries(attrs || {})) n.setAttribute(k, v);
+    if (text !== undefined) n.textContent = text;
+    svg.appendChild(n);
+    return n;
+  };
+
+  // quadrant bands
+  el("rect", { x: px(0), y: py(Y_TOP), width: px(1) - px(0), height: py(Y_MID) - py(Y_TOP), fill: "var(--teal)", "fill-opacity": 0.07 });
+  el("rect", { x: px(1), y: py(Y_TOP), width: px(2.7) - px(1), height: py(Y_MID) - py(Y_TOP), fill: "var(--blue)", "fill-opacity": 0.05 });
+  el("rect", { x: px(0), y: py(Y_MID), width: px(1) - px(0), height: py(Y_BOT) - py(Y_MID), fill: "var(--gray)", "fill-opacity": 0.05 });
+  el("rect", { x: px(1), y: py(Y_MID), width: px(2.7) - px(1), height: py(Y_BOT) - py(Y_MID), fill: "var(--amber)", "fill-opacity": 0.05 });
+
+  for (let v = x0; v <= x1 + 0.001; v += 0.5) {
+    el("line", { x1: px(v), x2: px(v), y1: py(Y_TOP), y2: py(Y_BOT), stroke: "var(--line)", "stroke-width": 1 });
+    el("text", { x: px(v), y: H - m.b + 22, "text-anchor": "middle", "font-size": 11, fill: "var(--faint)" }, (v === 0 ? "0" : fmt(v)) + " 天");
+  }
+  for (let v = Y_BOT; v <= Y_TOP; v += 20) {
+    el("line", { x1: px(0), x2: px(2.7), y1: py(v), y2: py(v), stroke: v === Y_MID ? "var(--line-strong)" : "var(--line)", "stroke-dasharray": v === Y_MID ? "4 4" : "none", "stroke-width": 1 });
+    el("text", { x: px(0) - 10, y: py(v) + 4, "text-anchor": "end", "font-size": 11, fill: "var(--faint)" }, String(v));
+  }
+  el("text", { x: px(0.5), y: py(Y_TOP) + 2, "text-anchor": "middle", "font-size": 11, fill: "var(--teal)", "font-weight": 700 }, "低投入 · 高收益");
+  el("text", { x: px(1.85), y: py(Y_TOP) + 2, "text-anchor": "middle", "font-size": 11, fill: "var(--blue)", "font-weight": 700 }, "高投入 · 高收益");
+  el("text", { x: px(0.5), y: py(Y_BOT) - 8, "text-anchor": "middle", "font-size": 11, fill: "var(--faint)", "font-weight": 700 }, "低投入 · 低收益");
+  el("text", { x: px(1.85), y: py(Y_BOT) - 8, "text-anchor": "middle", "font-size": 11, fill: "var(--amber)", "font-weight": 700 }, "高投入 · 待验证 / 后置");
+  el("text", { x: W - m.r, y: H - 10, "text-anchor": "end", "font-size": 11, fill: "var(--faint)" }, "← 工期（人日）");
+  el("text", { x: px(0) - 48, y: m.t + 2, "font-size": 11, fill: "var(--faint)" }, "收益分 ↑");
+
+  // deterministic jitter for overlapping points
+  const seen = new Map();
+  for (const d of DATA) {
+    const base = d.days + "|" + d.score;
+    const n = seen.get(base) || 0;
+    seen.set(base, n + 1);
+    d._jx = n * 0.055 * (n % 2 ? -1 : 1);
+  }
+
+  const ordered = [...DATA].sort((a, b) => b.score - a.score);
+  for (const d of ordered) {
+    const cx = px(d.days + (d._jx || 0));
+    const cy = py(d.score);
+    const color = STATUS_COLOR[d.status];
+    const g = el("g", {});
+    const t = el("title", {}, `${d.id} ${d.name}｜${d.score} 分｜${fmtDays(d.days)} 人日｜ROI ${fmt(d.roi)}｜${d.evidence}`);
+    g.appendChild(t);
+    if (d.status === "先量" || d.status === "条件") {
+      el("circle", { cx, cy, r: 8, fill: "var(--panel)", stroke: color, "stroke-width": 2, "stroke-dasharray": "3 2" });
+    } else {
+      el("circle", { cx, cy, r: 7, fill: color, "fill-opacity": d.status === "已存在" ? .35 : .9 });
+    }
+    const side = d.labelSide ?? (d._jx && d._jx < 0 ? -1 : 1);
+    el("text", { x: cx + side * 11, y: cy + 4, "text-anchor": side < 0 ? "end" : "start", "font-size": 11, "font-weight": 700, fill: "var(--ink)" }, d.id);
+  }
+
+  const legend = document.getElementById("scatter-legend");
+  legend.innerHTML = "";
+  for (const [label, color] of Object.entries(STATUS_COLOR)) {
+    if (label === "已存在") continue;
+    const s = document.createElement("span");
+    s.innerHTML = `<span class="dot" style="background:${color}"></span>${label}`;
+    legend.appendChild(s);
+  }
+  const s = document.createElement("span");
+  s.innerHTML = `<span class="dot" style="background:var(--panel);border:2px dashed var(--amber)"></span>虚线 = 待验证 / 条件项`;
+  legend.appendChild(s);
+}
+
+/* ---------- rank bars ---------- */
+function renderRank() {
+  const box = document.getElementById("rank-bars");
+  box.innerHTML = "";
+  const sorted = [...DATA].sort((a, b) => b.roi - a.roi);
+  const max = Math.max(...sorted.map((d) => d.roi));
+  for (const d of sorted) {
+    const row = document.createElement("div");
+    row.className = "bar-row";
+    row.innerHTML = `
+      <div class="bar-id">${esc(d.id)}</div>
+      <div class="track" title="${esc(d.name)}"><div class="fill" style="width:${(d.roi / max) * 100}%;background:${STATUS_COLOR[d.status]}"></div></div>
+      <div class="bar-meta">${d.score} 分 · ${fmtDays(d.days)}d · ROI ${fmt(d.roi)}</div>`;
+    box.appendChild(row);
+  }
+}
+
+/* ---------- heat map ---------- */
+function renderHeat() {
+  const tbody = document.querySelector("#heat-table tbody");
+  tbody.innerHTML = "";
+  const cols = [["rel"], ["cost"], ["sec"], ["audit"], ["ux"]];
+  const sorted = [...DATA].sort((a, b) => b.score - a.score);
+  for (const d of sorted) {
+    const tr = document.createElement("tr");
+    const cells = cols.map(([key]) => `<td class="cell h${d.scores[key]}">${d.scores[key]}</td>`).join("");
+    tr.innerHTML = `<td><strong>${esc(d.id)}</strong></td><td class="what">${esc(d.what)}</td>${cells}<td class="num" style="text-align:right"><strong>${d.score}</strong></td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+/* ---------- main table ---------- */
+let activeAxis = "全部";
+let sortKey = "score";
+let sortDir = -1;
+
+function drawTable() {
+  const tbody = document.querySelector("#main-table tbody");
+  const rows = DATA.filter((d) => activeAxis === "全部" || d.axis === activeAxis);
+  rows.sort((a, b) => {
+    const av = a[sortKey], bv = b[sortKey];
+    if (typeof av === "string") return av.localeCompare(bv, "en", { numeric: true }) * sortDir;
+    return (av - bv) * sortDir;
+  });
+  tbody.innerHTML = rows.map((d) => `
+    <tr>
+      <td><strong>${esc(d.id)}</strong><br><span style="color:var(--faint);font-size:12px">${esc(d.name)}</span></td>
+      <td>${esc(d.axis)}</td>
+      <td><span class="tag ${STATUS_TAG[d.status]}">${esc(d.status)}</span></td>
+      <td><span class="tag ${d.evidence === "本轮实测" ? "teal" : d.evidence === "待验证" ? "amber" : "blue"}">${esc(d.evidence)}</span></td>
+      <td class="num" style="text-align:right">${fmtDays(d.days)}</td>
+      <td class="num" style="text-align:right"><strong>${d.score}</strong></td>
+      <td class="num" style="text-align:right">${fmt(d.roi)}</td>
+      <td style="color:var(--muted)">${esc(d.deps)}</td>
+      <td class="what">${esc(d.what)}</td>
+    </tr>`).join("");
+}
+
+function buildFilters() {
+  const chips = document.getElementById("filters");
+  chips.innerHTML = "";
+  for (const axis of ["全部", ...Array.from(new Set(DATA.map((d) => d.axis)))]) {
+    const b = document.createElement("button");
+    b.className = "chip";
+    b.textContent = axis;
+    b.setAttribute("aria-pressed", axis === activeAxis ? "true" : "false");
+    b.addEventListener("click", () => {
+      activeAxis = axis;
+      for (const c of chips.children) c.setAttribute("aria-pressed", c.textContent === axis ? "true" : "false");
+      drawTable();
+    });
+    chips.appendChild(b);
+  }
+}
+
+document.querySelectorAll("#main-table thead th[data-sort]").forEach((th) => {
+  th.addEventListener("click", () => {
+    const key = th.dataset.sort;
+    if (sortKey === key) sortDir *= -1;
+    else { sortKey = key; sortDir = key === "id" || key === "axis" || key === "status" || key === "evidence" || key === "deps" ? 1 : -1; }
+    drawTable();
+  });
+});
+
+/* ---------- presets ---------- */
+function renderAll() {
+  recompute();
+  renderScatter();
+  renderRank();
+  renderHeat();
+  drawTable();
+  const w = WEIGHTS;
+  document.getElementById("weight-line").textContent =
+    `当前预设：${PRESET} · 可靠性 ${(w.rel * 100).toFixed(0)}% / 时间 ${(w.cost * 100).toFixed(0)}% / 安全 ${(w.sec * 100).toFixed(0)}% / 审计 ${(w.audit * 100).toFixed(0)}% / 体验 ${(w.ux * 100).toFixed(0)}%`;
+  document.getElementById("preset-note").innerHTML = PRESET_NOTE[PRESET];
+  const top = [...DATA].sort((a, b) => b.roi - a.roi).slice(0, 5).map((d) => d.id).join(" → ");
+  document.getElementById("preset-top").textContent = `按 ROI 前五：${top}`;
+}
+
+function buildPresets() {
+  const box = document.getElementById("presets");
+  box.innerHTML = "";
+  for (const name of Object.keys(PRESETS)) {
+    const b = document.createElement("button");
+    b.className = "chip";
+    b.textContent = name;
+    b.setAttribute("aria-pressed", name === PRESET ? "true" : "false");
+    b.addEventListener("click", () => {
+      PRESET = name;
+      WEIGHTS = PRESETS[name];
+      for (const c of box.children) c.setAttribute("aria-pressed", c.textContent === name ? "true" : "false");
+      renderAll();
+    });
+    box.appendChild(b);
+  }
+}
+
+buildFilters();
+buildPresets();
+renderAll();
+</script>
+</body>
+</html>

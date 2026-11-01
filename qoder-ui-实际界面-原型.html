@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Qoder CN 实际界面还原原型</title>
+<style>body{margin:0;background:#17181a;padding:24px 16px}main{max-width:1400px;margin:0 auto}</style>
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+</head>
+<body>
+<main>
+<div id="qoder-mock2" data-qtheme="light">
+  <style>
+    #qoder-mock2 { --q-radius: 10px; font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; font-size: 13px; line-height: 1.6; color: var(--q-text); }
+    #qoder-mock2 * { box-sizing: border-box; margin: 0; padding: 0; }
+    #qoder-mock2 button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+    #qoder-mock2 svg { width: 15px; height: 15px; flex: none; }
+
+    /* 暖白亮色(默认,取自实际截图) */
+    #qoder-mock2[data-qtheme="light"] {
+      --q-bg: #f7f6f1; --q-side: #f0efe8; --q-card: #ffffff; --q-card2: #f4f3ec;
+      --q-border: #e5e3d8; --q-text: #292824; --q-mut: #8f8d82; --q-mut2: #6f6d63;
+      --q-acc: #4d9868; --q-acc-soft: #e3eee2; --q-sel: #e6ebdf;
+      --q-err: #c2543f; --q-blue: #3f7fc4; --q-blue-soft: #e8f0fa;
+      --q-code: #f1f0e8; --q-hm0: #ebe9de; --q-hm1: #d9e8d2; --q-hm2: #b6d8b2; --q-hm3: #8cc08e; --q-hm4: #5da06b;
+      --q-shadow: 0 18px 50px rgba(60, 56, 44, 0.18), 0 2px 8px rgba(60, 56, 44, 0.08);
+    }
+    #qoder-mock2[data-qtheme="dark"] {
+      --q-bg: #1d1e1b; --q-side: #232420; --q-card: #2a2b27; --q-card2: #30322c;
+      --q-border: #3a3c35; --q-text: #e8eae4; --q-mut: #999f92; --q-mut2: #b6bbae;
+      --q-acc: #8ee5a1; --q-acc-soft: #2c352c; --q-sel: #2e382e;
+      --q-err: #e08a77; --q-blue: #7fb3e8; --q-blue-soft: #26313d;
+      --q-code: #262823; --q-hm0: #2c2e28; --q-hm1: #31402f; --q-hm2: #3d5a3e; --q-hm3: #4f7d51; --q-hm4: #8ee5a1;
+      --q-shadow: 0 18px 50px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.35);
+    }
+    #qoder-mock2[data-qtheme="light-parchment"] {
+      --q-bg: #f8f3ea; --q-side: #f1ebdd; --q-card: #fffdf8; --q-card2: #f3ecdc;
+      --q-border: #e2d8c2; --q-text: #2b2418; --q-mut: #8f8672; --q-mut2: #736a55;
+      --q-acc: #b85c3c; --q-acc-soft: #f3e2d6; --q-sel: #efe4d2;
+      --q-err: #b85c3c; --q-blue: #3f7fc4; --q-blue-soft: #eaf0f8;
+      --q-code: #f2ebdb; --q-hm0: #ece3cd; --q-hm1: #e0d2ae; --q-hm2: #d4b98a; --q-hm3: #c99a67; --q-hm4: #c96442;
+      --q-shadow: 0 18px 50px rgba(80, 66, 44, 0.2), 0 2px 8px rgba(80, 66, 44, 0.1);
+    }
+    #qoder-mock2[data-qtheme="forest-light"] {
+      --q-bg: #f4f8f4; --q-side: #ebf1e9; --q-card: #ffffff; --q-card2: #eaf2ea;
+      --q-border: #d8e2d6; --q-text: #1d2b20; --q-mut: #6e8073; --q-mut2: #52644f;
+      --q-acc: #316e50; --q-acc-soft: #ddecdf; --q-sel: #dfe9dc;
+      --q-err: #b8503c; --q-blue: #3f7fc4; --q-blue-soft: #e8f0fa;
+      --q-code: #edf3ec; --q-hm0: #e3ebdf; --q-hm1: #cfe4cc; --q-hm2: #aed4ab; --q-hm3: #83bb85; --q-hm4: #316e50;
+      --q-shadow: 0 18px 50px rgba(30, 50, 36, 0.16), 0 2px 8px rgba(30, 50, 36, 0.08);
+    }
+
+    #qoder-mock2 .qwin {
+      position: relative; height: 744px; display: flex; flex-direction: column; overflow: hidden;
+      background: var(--q-bg); border: 1px solid var(--q-border);
+      border-radius: var(--q-radius); box-shadow: var(--q-shadow);
+    }
+    /* 原生菜单栏 + 导航 */
+    #qoder-mock2 .q-tb { flex: none; height: 38px; display: flex; align-items: center; gap: 4px; padding: 0 10px; border-bottom: 1px solid var(--q-border); color: var(--q-text); }
+    #qoder-mock2 .q-tb-ic { width: 28px; height: 26px; border-radius: 6px; display: grid; place-items: center; color: var(--q-mut2); }
+    #qoder-mock2 .q-tb-ic:hover { background: var(--q-card2); }
+    #qoder-mock2 .q-menu { padding: 4px 9px; border-radius: 6px; font-size: 12.5px; color: var(--q-text); }
+    #qoder-mock2 .q-menu:hover { background: var(--q-card2); }
+    #qoder-mock2 .q-winctl { margin-left: auto; display: flex; align-items: center; }
+    #qoder-mock2 .q-winctl button { width: 40px; height: 30px; display: grid; place-items: center; color: var(--q-mut2); border-radius: 6px; }
+    #qoder-mock2 .q-winctl button:hover { background: var(--q-card2); }
+    #qoder-mock2 .q-winctl button.q-close:hover { background: #d64667; color: #fff; }
+
+    #qoder-mock2 .q-cols { flex: 1; min-height: 0; display: flex; }
+
+    /* 左侧栏 */
+    #qoder-mock2 .q-side { flex: none; width: 252px; background: var(--q-side); border-right: 1px solid var(--q-border); display: flex; flex-direction: column; padding: 10px 10px 8px; }
+    #qoder-mock2 .q-mode-row { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+    #qoder-mock2 .q-mode { display: inline-flex; align-items: center; gap: 7px; background: var(--q-card); border: 1px solid var(--q-border); border-radius: 9px; padding: 5px 12px 5px 9px; font-weight: 500; font-size: 12.5px; }
+    #qoder-mock2 .q-mode-ic { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; color: var(--q-mut2); border: 1px solid transparent; }
+    #qoder-mock2 .q-mode-ic:hover { background: var(--q-card); border-color: var(--q-border); }
+    #qoder-mock2 .q-nav { display: flex; align-items: center; gap: 10px; padding: 4.5px 8px; border-radius: 8px; color: var(--q-text); width: 100%; text-align: left; }
+    #qoder-mock2 .q-nav:hover { background: var(--q-card2); }
+    #qoder-mock2 .q-nav svg { color: var(--q-mut2); }
+    #qoder-mock2 .q-proj { margin-top: 9px; }
+    #qoder-mock2 .q-proj-h { display: flex; align-items: center; gap: 7px; padding: 2px 8px; font-size: 12.5px; color: var(--q-text); }
+    #qoder-mock2 .q-proj-h svg { width: 14px; height: 14px; color: var(--q-mut); }
+    #qoder-mock2 .q-titem { position: relative; display: block; width: 100%; text-align: left; padding: 4px 8px 4px 26px; border-radius: 8px; font-size: 12.5px; color: var(--q-mut2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #qoder-mock2 .q-titem:hover { background: var(--q-card2); }
+    #qoder-mock2 .q-titem.on { background: var(--q-sel); color: var(--q-text); font-weight: 500; }
+    #qoder-mock2 .q-titem.dim { opacity: 0.45; }
+    #qoder-mock2 .q-warn { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); color: var(--q-err); }
+    #qoder-mock2 .q-side-gap { flex: 1; min-height: 8px; }
+    #qoder-mock2 .q-side-foot { border-top: 1px solid var(--q-border); margin-top: 6px; padding-top: 7px; }
+    #qoder-mock2 .q-foot-row { display: flex; align-items: center; gap: 8px; padding: 2px 4px; }
+    #qoder-mock2 .q-foot-ava { width: 24px; height: 24px; border-radius: 50%; background: var(--q-err); color: #fff; display: grid; place-items: center; font-size: 11px; }
+    #qoder-mock2 .q-foot-name { font-weight: 500; font-size: 12.5px; }
+    #qoder-mock2 .q-foot-ics { margin-left: auto; display: flex; align-items: center; gap: 2px; color: var(--q-mut2); }
+    #qoder-mock2 .q-foot-ics button { width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; position: relative; }
+    #qoder-mock2 .q-foot-ics button:hover { background: var(--q-card2); }
+    #qoder-mock2 .q-dl { width: 15px; height: 15px; border-radius: 50%; background: var(--q-blue); color: #fff; font-size: 9px; display: grid; place-items: center; position: absolute; right: -2px; top: -2px; }
+    #qoder-mock2 .q-side svg { width: 16px; height: 16px; }
+
+    /* 内容列 */
+    #qoder-mock2 .q-cont { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    #qoder-mock2 .q-chead { flex: none; height: 46px; display: flex; align-items: center; gap: 8px; padding: 0 16px; }
+    #qoder-mock2 .q-chead-t { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+    #qoder-mock2 .q-chead-t svg { color: var(--q-mut); }
+    #qoder-mock2 .q-chead .q-ic { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; color: var(--q-mut2); }
+    #qoder-mock2 .q-chead .q-ic:hover { background: var(--q-card2); }
+    #qoder-mock2 .q-tools { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+    #qoder-mock2 .q-foldchip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--q-border); background: var(--q-card); border-radius: 9px; padding: 5px 8px 5px 10px; color: var(--q-text); }
+    #qoder-mock2 .q-foldchip svg { color: var(--q-mut2); width: 14px; height: 14px; }
+
+    #qoder-mock2 .q-work { flex: 1; min-height: 0; display: flex; }
+    #qoder-mock2 .q-stream { flex: 1; min-width: 0; overflow: hidden; padding: 4px 26px 8px 16px; mask-image: linear-gradient(to bottom, #000 88%, transparent); }
+    #qoder-mock2 .q-stream p { margin: 0 0 12px; font-size: 13.5px; }
+    #qoder-mock2 .q-stream h3 { font-size: 15px; font-weight: 600; margin: 18px 0 10px; }
+    #qoder-mock2 .q-ol { margin: 0 0 12px; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; font-size: 13.5px; }
+    #qoder-mock2 .q-inline { font-family: Consolas, monospace; font-size: 11.5px; background: var(--q-code); border: 1px solid var(--q-border); border-radius: 5px; padding: 1px 5px; }
+    #qoder-mock2 .q-codecard { background: var(--q-code); border: 1px solid var(--q-border); border-radius: 12px; margin: 4px 0 12px; overflow: hidden; }
+    #qoder-mock2 .q-codehead { display: flex; align-items: center; gap: 8px; padding: 8px 12px; font-size: 12.5px; color: var(--q-mut2); border-bottom: 1px solid var(--q-border); }
+    #qoder-mock2 .q-codehead .q-ic { width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; }
+    #qoder-mock2 .q-codehead .q-ic:hover { background: var(--q-card2); }
+    #qoder-mock2 .q-codebody { padding: 10px 14px; font-family: Consolas, monospace; font-size: 12.5px; }
+    #qoder-mock2 .q-chip-help { display: inline-block; background: var(--q-card2); border-radius: 7px; padding: 2px 10px; font-size: 12px; color: var(--q-mut2); margin-top: 2px; }
+    #qoder-mock2 .q-ai-tag { text-align: right; color: var(--q-mut); font-size: 11px; margin: 10px 0 4px; }
+    #qoder-mock2 .q-fb { display: flex; align-items: center; gap: 2px; color: var(--q-mut2); }
+    #qoder-mock2 .q-fb button { width: 27px; height: 27px; border-radius: 7px; display: grid; place-items: center; }
+    #qoder-mock2 .q-fb button:hover { background: var(--q-card2); }
+    #qoder-mock2 .q-fb svg { width: 14px; height: 14px; }
+
+    /* 右栏:上下文 / 技能与 MCP / 产出 / 来源 */
+    #qoder-mock2 .q-right { flex: none; width: 296px; border-left: 1px solid var(--q-border); padding: 6px 14px 8px 4px; overflow: hidden; display: flex; flex-direction: column; gap: 10px; mask-image: linear-gradient(to bottom, #000 90%, transparent); }
+    #qoder-mock2 .q-ctx { background: var(--q-card); border: 1px solid var(--q-border); border-radius: 14px; padding: 12px 13px; }
+    #qoder-mock2 .q-ctx-h { display: flex; align-items: center; gap: 9px; margin-bottom: 8px; }
+    #qoder-mock2 .q-ctx-ava { width: 34px; height: 34px; border-radius: 10px; background: var(--q-acc-soft); color: var(--q-acc); display: grid; place-items: center; }
+    #qoder-mock2 .q-ctx-time { font-size: 11px; color: var(--q-mut); }
+    #qoder-mock2 .q-ctx-tx { font-size: 12px; color: var(--q-mut2); line-height: 1.65; }
+    #qoder-mock2 .q-rsec { display: flex; align-items: center; gap: 8px; font-weight: 500; padding: 2px 2px 0; }
+    #qoder-mock2 .q-rbadge { margin-left: auto; background: var(--q-blue-soft); color: var(--q-blue); border-radius: 999px; padding: 1px 9px; font-size: 10.5px; font-weight: 400; }
+    #qoder-mock2 .q-radd { margin-left: auto; color: var(--q-mut2); width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; }
+    #qoder-mock2 .q-rrow { display: flex; align-items: center; gap: 9px; padding: 4px 6px; border-radius: 8px; font-size: 12.5px; color: var(--q-text); }
+    #qoder-mock2 .q-rrow:hover { background: var(--q-card2); }
+    #qoder-mock2 .q-rrow .q-sq { width: 24px; height: 24px; border-radius: 7px; border: 1px solid var(--q-border); background: var(--q-card); display: grid; place-items: center; color: var(--q-mut2); }
+    #qoder-mock2 .q-rrow .q-sq svg { width: 13px; height: 13px; }
+    #qoder-mock2 .q-rrow svg { color: var(--q-mut2); }
+
+    /* 欢迎页 */
+    #qoder-mock2 .q-wel { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; padding: 10px 24px 0; }
+    #qoder-mock2 .q-mobile { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--q-border); background: var(--q-card); border-radius: 999px; padding: 5px 14px; font-size: 12px; color: var(--q-text); margin: 4px 0 8px; }
+    #qoder-mock2 .q-stamp { width: 118px; height: 82px; border-radius: 4px; background: var(--q-card); border: 1px solid var(--q-border); box-shadow: 0 3px 10px rgba(60,56,44,0.12); display: grid; place-items: center; position: relative; transform: rotate(-2deg); margin-bottom: 14px; }
+    #qoder-mock2 .q-stamp::before { content: ""; position: absolute; inset: 5px; border: 1px dashed var(--q-border); border-radius: 2px; }
+    #qoder-mock2 .q-stamp svg { width: 34px; height: 34px; color: var(--q-mut); }
+    #qoder-mock2 .q-stamp-no { position: absolute; top: 9px; right: 12px; font-family: Consolas, monospace; font-size: 10px; color: var(--q-mut); }
+    #qoder-mock2 .q-h1 { font-size: 26px; font-weight: 600; letter-spacing: 0.01em; }
+    #qoder-mock2 .q-sub { margin: 6px 0 18px; font-size: 14px; color: var(--q-mut2); }
+    #qoder-mock2 .q-sub b { color: var(--q-text); font-weight: 500; border-bottom: 1px dashed var(--q-mut); display: inline-flex; align-items: center; gap: 3px; }
+    #qoder-mock2 .q-stat { width: min(660px, 92%); background: var(--q-card); border: 1px solid var(--q-border); border-radius: 16px; padding: 13px 16px 12px; }
+    #qoder-mock2 .q-stat-tabs { display: flex; gap: 4px; margin-bottom: 11px; }
+    #qoder-mock2 .q-stattab { padding: 4px 12px; border-radius: 8px; font-size: 12.5px; color: var(--q-mut2); }
+    #qoder-mock2 .q-stattab[aria-pressed="true"] { background: var(--q-card2); color: var(--q-text); font-weight: 500; }
+    #qoder-mock2 .q-hm-labels { display: flex; justify-content: space-between; padding: 0 2px 5px; font-size: 10px; color: var(--q-mut); }
+    #qoder-mock2 .q-hm { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 10px); gap: 3px; }
+    #qoder-mock2 .q-hm i { width: 10px; height: 10px; border-radius: 2.5px; background: var(--q-hm0); }
+    #qoder-mock2 .q-hm i.l1 { background: var(--q-hm1); } #qoder-mock2 .q-hm i.l2 { background: var(--q-hm2); }
+    #qoder-mock2 .q-hm i.l3 { background: var(--q-hm3); } #qoder-mock2 .q-hm i.l4 { background: var(--q-hm4); }
+
+    /* 输入区 */
+    #qoder-mock2 .q-comp { flex: none; margin: 8px 16px 10px; background: var(--q-card); border: 1px solid var(--q-border); border-radius: 16px; padding: 13px 14px 10px; box-shadow: 0 4px 16px rgba(60,56,44,0.07); }
+    #qoder-mock2 .q-comp-in { width: 100%; border: none; background: none; outline: none; resize: none; font: inherit; color: var(--q-text); height: 24px; }
+    #qoder-mock2 .q-comp-in::placeholder { color: var(--q-mut); }
+    #qoder-mock2 .q-comp-row { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
+    #qoder-mock2 .q-cic { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; color: var(--q-mut2); }
+    #qoder-mock2 .q-cic:hover { background: var(--q-card2); }
+    #qoder-mock2 .q-perm { display: inline-flex; align-items: center; gap: 5px; color: var(--q-err); font-size: 12.5px; padding: 4px 8px; border-radius: 8px; }
+    #qoder-mock2 .q-perm:hover { background: var(--q-card2); }
+    #qoder-mock2 .q-perm svg { width: 13px; height: 13px; }
+    #qoder-mock2 .q-model { display: inline-flex; align-items: center; gap: 6px; color: var(--q-text); font-size: 12.5px; padding: 4px 8px; border-radius: 8px; margin-left: auto; }
+    #qoder-mock2 .q-model:hover { background: var(--q-card2); }
+    #qoder-mock2 .q-model .q-fish { color: var(--q-blue); }
+    #qoder-mock2 .q-send { width: 32px; height: 32px; border-radius: 50%; background: var(--q-acc); color: #fff; display: grid; place-items: center; }
+    #qoder-mock2[data-qtheme="dark"] .q-send { color: #14201a; }
+
+    /* 状态栏 */
+    #qoder-mock2 .q-status { flex: none; height: 32px; border-top: 1px solid var(--q-border); display: flex; align-items: center; gap: 16px; padding: 0 56px 0 16px; font-size: 12px; color: var(--q-mut2); }
+    #qoder-mock2 .q-status .q-si { display: flex; align-items: center; gap: 6px; }
+    #qoder-mock2 .q-status .q-si svg { width: 13px; height: 13px; }
+    #qoder-mock2 .q-prog { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+    #qoder-mock2 .q-prog i { width: 5px; height: 9px; border-radius: 1.5px; background: var(--q-border); }
+    #qoder-mock2 .q-prog i.on { background: var(--q-mut2); }
+    #qoder-mock2 .q-help { position: absolute; right: 12px; bottom: 6px; width: 32px; height: 32px; border-radius: 50%; background: var(--q-text); color: var(--q-bg); display: grid; place-items: center; box-shadow: 0 6px 16px rgba(0,0,0,0.25); z-index: 6; }
+    #qoder-mock2 .q-sec-t { position: relative; }
+
+    @media (max-width: 1080px) { #qoder-mock2 .q-right { display: none; } }
+    @media (max-width: 880px) { #qoder-mock2 .q-side { width: 210px; } }
+    @media (prefers-reduced-motion: reduce) { #qoder-mock2 * { animation: none !important; } }
+  </style>
+
+  <div class="viz-carousel" aria-label="Qoder CN 实际界面还原" data-previous-label="上一个" data-next-label="下一个">
+    <section data-variant="任务对话" aria-label="任务对话页面">
+      <div class="qwin q-sec-t">
+        <div class="q-tb">
+          <button class="q-tb-ic" type="button" aria-label="切换侧栏"><i data-lucide="panel-left" aria-hidden="true"></i></button>
+          <button class="q-tb-ic" type="button" aria-label="后退"><i data-lucide="arrow-left" aria-hidden="true"></i></button>
+          <button class="q-tb-ic" type="button" aria-label="前进"><i data-lucide="arrow-right" aria-hidden="true"></i></button>
+          <button class="q-menu" type="button">文件</button>
+          <button class="q-menu" type="button">编辑</button>
+          <button class="q-menu" type="button">视图</button>
+          <button class="q-menu" type="button">帮助</button>
+          <div class="q-winctl">
+            <button type="button" aria-label="最小化"><i data-lucide="minus" aria-hidden="true"></i></button>
+            <button type="button" aria-label="最大化"><i data-lucide="square" aria-hidden="true"></i></button>
+            <button type="button" class="q-close" aria-label="关闭"><i data-lucide="x" aria-hidden="true"></i></button>
+          </div>
+        </div>
+        <div class="q-cols">
+          <aside class="q-side">
+            <div class="q-mode-row">
+              <span class="q-mode"><i data-lucide="code" aria-hidden="true"></i>编程</span>
+              <button class="q-mode-ic" type="button" aria-label="群聊模式"><i data-lucide="sparkles" aria-hidden="true"></i></button>
+            </div>
+            <button class="q-nav" type="button"><i data-lucide="square-pen" aria-hidden="true"></i>新的任务</button>
+            <button class="q-nav" type="button"><i data-lucide="search" aria-hidden="true"></i>搜索</button>
+            <div class="q-proj">
+              <div class="q-proj-h"><i data-lucide="folder" aria-hidden="true"></i>proxydeck-self</div>
+              <button class="q-titem" type="button">修复 qoder 国际登录报错</button>
+              <button class="q-titem" type="button">修复代理并增加登录方式</button>
+              <button class="q-titem" type="button">修复国际版账号登录</button>
+            </div>
+            <div class="q-proj">
+              <div class="q-proj-h"><i data-lucide="folder" aria-hidden="true"></i>ControlCenter</div>
+              <button class="q-titem" type="button">档位区别说明</button>
+              <button class="q-titem" type="button">提交并推送<span class="q-warn"><i data-lucide="circle-alert" aria-hidden="true"></i></span></button>
+              <button class="q-titem" type="button">审查当前项目</button>
+            </div>
+            <div class="q-proj">
+              <div class="q-proj-h"><i data-lucide="folder" aria-hidden="true"></i>deepseek-test</div>
+              <button class="q-titem on" type="button">安装WSL</button>
+              <button class="q-titem" type="button">排查SQL重复数据</button>
+              <button class="q-titem" type="button">写一个在方想服务器上排查…</button>
+              <button class="q-titem" type="button">nvr是什么</button>
+              <button class="q-titem dim" type="button">Go悬浮窗开发</button>
+            </div>
+            <div class="q-side-gap"></div>
+            <button class="q-nav" type="button"><i data-lucide="globe" aria-hidden="true"></i>站点</button>
+            <button class="q-nav" type="button"><i data-lucide="clock" aria-hidden="true"></i>自动化</button>
+            <button class="q-nav" type="button"><i data-lucide="puzzle" aria-hidden="true"></i>扩展</button>
+            <button class="q-nav" type="button"><i data-lucide="ellipsis" aria-hidden="true"></i>更多</button>
+            <div class="q-side-foot">
+              <div class="q-foot-row">
+                <span class="q-foot-ava" aria-hidden="true">散</span>
+                <span class="q-foot-name">故山疑梦</span>
+                <span class="q-foot-ics">
+                  <button type="button" aria-label="下载更新(0.5.1 已就绪)"><i data-lucide="arrow-down-to-line" aria-hidden="true"></i><span class="q-dl" aria-hidden="true">↓</span></button>
+                  <button type="button" aria-label="历史"><i data-lucide="history" aria-hidden="true"></i></button>
+                  <button type="button" aria-label="设置"><i data-lucide="settings" aria-hidden="true"></i></button>
+                </span>
+              </div>
+            </div>
+          </aside>
+          <div class="q-cont">
+            <div class="q-chead">
+              <span class="q-chead-t"><i data-lucide="folder" aria-hidden="true"></i>安装WSL</span>
+              <button class="q-ic" type="button" aria-label="更多操作"><i data-lucide="ellipsis" aria-hidden="true"></i></button>
+              <div class="q-tools">
+                <button class="q-foldchip" type="button"><i data-lucide="folder-open" aria-hidden="true"></i><i data-lucide="chevron-down" aria-hidden="true"></i></button>
+                <button class="q-ic" type="button" aria-label="快速操作"><i data-lucide="zap" aria-hidden="true"></i></button>
+                <button class="q-ic" type="button" aria-label="任务清单"><i data-lucide="list-checks" aria-hidden="true"></i></button>
+                <button class="q-ic" type="button" aria-label="布局"><i data-lucide="panel-right" aria-hidden="true"></i></button>
+                <button class="q-ic" type="button" aria-label="布局"><i data-lucide="columns-2" aria-hidden="true"></i></button>
+              </div>
+            </div>
+            <div class="q-work">
+              <div class="q-stream" role="figure" aria-label="任务对话内容">
+                <p><b>为什么卡片仍显示"缺少 nvidia runtime"</b>:ADM 进程 00:29:22 启动,Docker Desktop 是 00:40:41 才好的,当时 WSL 尚未安装,<span class="q-inline">docker info</span> 拿不到 Runtimes,就落进 ADM 里"缺少 nvidia runtime"这个兜底分支;结论缓存在进程内。且该进程的 PATH 是 00:29 的快照,不含 <span class="q-inline">...\DockerDesktop\resources\bin</span>。</p>
+                <h3>你需要做的操作</h3>
+                <div class="q-ol">
+                  <span>1. <b>完全退出 ADM</b>(托盘图标 → 退出),再重新打开 —— 让新进程继承当前 PATH 并重新检测。</span>
+                  <span>2. 回到 Qwen-Image-2.1 卡片,点「下载」或「启动」。镜像已在本地,下载会秒过;ADM 会自行起容器并把 8188 映射到 127.0.0.1:64646。</span>
+                  <span>3. 启动后可用这条命令确认:</span>
+                </div>
+                <div class="q-codecard">
+                  <div class="q-codehead"><i data-lucide="file-text" aria-hidden="true"></i>code.txt<span style="margin-left:auto;display:flex;gap:2px"><button class="q-ic" type="button" aria-label="复制" style="width:24px;height:24px"><i data-lucide="copy" aria-hidden="true"></i></button><button class="q-ic" type="button" aria-label="下载" style="width:24px;height:24px"><i data-lucide="arrow-down-to-line" aria-hidden="true"></i></button></span></div>
+                  <div class="q-codebody">curl -s -o NUL -w "%{http_code}\n" http://127.0.0.1:64646/</div>
+                </div>
+                <p>预期输出 <span class="q-inline">200</span>(首次启动 ComfyUI 约 45–90 秒)。</p>
+                <p>本次未装/改任何驱动、没动 Docker Desktop 设置、也没删你的镜像、容器和工作目录文件。如果有帮助,直接重启 ADM,说一声即可。 <span class="q-chip-help">有帮助</span></p>
+                <div class="q-ai-tag">由 AI 生成</div>
+                <div class="q-fb">
+                  <button type="button" aria-label="复制"><i data-lucide="copy" aria-hidden="true"></i></button>
+                  <button type="button" aria-label="赞"><i data-lucide="thumbs-up" aria-hidden="true"></i></button>
+                  <button type="button" aria-label="踩"><i data-lucide="thumbs-down" aria-hidden="true"></i></button>
+                  <button type="button" aria-label="分享"><i data-lucide="share" aria-hidden="true"></i></button>
+                  <button type="button" aria-label="定位原文"><i data-lucide="bookmark" aria-hidden="true"></i></button>
+                  <button type="button" aria-label="更多"><i data-lucide="ellipsis" aria-hidden="true"></i></button>
+                </div>
+              </div>
+              <aside class="q-right" aria-label="上下文与技能">
+                <div class="q-ctx">
+                  <div class="q-ctx-h">
+                    <span class="q-ctx-ava"><i data-lucide="sprout" aria-hidden="true"></i></span>
+                    <span class="q-ctx-time">更新于 01:44</span>
+                  </div>
+                  <div class="q-ctx-tx">四项条件全部实测通过:镜像拉取完成,容器内 nvidia-smi 认出 RTX 5070 Ti(驱动 572.90,CUDA 12.8),ComfyUI 在 8188 起监并返回 200,临时容器已删、端口无残留。结论是环境没缺陷,ADM 显示的"不可用"只是旧检测结果,接下来回到 admAgent 检测页,看怎么让它重测。</div>
+                </div>
+                <div class="q-rsec">技能与 MCP<span class="q-rbadge">5条建议</span></div>
+                <div class="q-rrow"><span class="q-sq"><i data-lucide="wrench" aria-hidden="true"></i></span>wsl-docker-gpu-windows</div>
+                <div class="q-rrow"><span class="q-sq"><i data-lucide="wrench" aria-hidden="true"></i></span>windows-native-output-capture</div>
+                <div class="q-rrow"><span class="q-sq"><i data-lucide="wrench" aria-hidden="true"></i></span>gui-health-check-forensics</div>
+                <div class="q-rrow"><span class="q-sq"><i data-lucide="wrench" aria-hidden="true"></i></span>windows-wsl-docker-setup</div>
+                <div class="q-rrow"><span class="q-sq"><i data-lucide="wrench" aria-hidden="true"></i></span>github-release-asset-download</div>
+                <div class="q-rsec">产出</div>
+                <div class="q-rrow"><i data-lucide="file-text" aria-hidden="true"></i>wsl_install_log.txt</div>
+                <div class="q-rrow"><i data-lucide="file-text" aria-hidden="true"></i>wsl_appx_log.txt</div>
+                <div class="q-rsec">来源<button class="q-radd" type="button" aria-label="添加来源"><i data-lucide="plus" aria-hidden="true"></i></button></div>
+                <div class="q-rrow"><i data-lucide="image" aria-hidden="true"></i>image.png</div>
+              </aside>
+            </div>
+            <div class="q-comp">
+              <input class="q-comp-in" type="text" placeholder="长按鼠标语音输入文字" aria-label="任务输入" />
+              <div class="q-comp-row">
+                <button class="q-cic" type="button" aria-label="添加"><i data-lucide="plus" aria-hidden="true"></i></button>
+                <button class="q-cic" type="button" aria-label="附件"><i data-lucide="paperclip" aria-hidden="true"></i></button>
+                <button class="q-perm" type="button"><i data-lucide="triangle-alert" aria-hidden="true"></i>完全访问<i data-lucide="chevron-down" aria-hidden="true"></i></button>
+                <button class="q-model" type="button"><i data-lucide="fish" class="q-fish" aria-hidden="true"></i>DeepSeek-Flash 最大<i data-lucide="chevron-down" aria-hidden="true"></i></button>
+                <button class="q-cic" type="button" aria-label="语音输入"><i data-lucide="mic" aria-hidden="true"></i></button>
+                <button class="q-send" type="button" aria-label="发送"><i data-lucide="arrow-up" aria-hidden="true"></i></button>
+              </div>
+            </div>
+            <div class="q-status">
+              <span class="q-si"><i data-lucide="folder" aria-hidden="true"></i>deepseek-test</span>
+              <span class="q-si"><i data-lucide="monitor" aria-hidden="true"></i>本地</span>
+              <span class="q-prog" aria-label="进度 9%"><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>9%</span>
+            </div>
+          </div>
+        </div>
+        <button class="q-help" type="button" aria-label="帮助"><i data-lucide="circle-help" aria-hidden="true"></i></button>
+      </div>
+    </section>
+
+    <section data-variant="欢迎页" aria-label="欢迎页面" hidden>
+      <div class="qwin">
+        <div class="q-tb">
+          <button class="q-tb-ic" type="button" aria-label="切换侧栏"><i data-lucide="panel-left" aria-hidden="true"></i></button>
+          <button class="q-tb-ic" type="button" aria-label="后退"><i data-lucide="arrow-left" aria-hidden="true"></i></button>
+          <button class="q-tb-ic" type="button" aria-label="前进"><i data-lucide="arrow-right" aria-hidden="true"></i></button>
+          <button class="q-menu" type="button">文件</button>
+          <button class="q-menu" type="button">编辑</button>
+          <button class="q-menu" type="button">视图</button>
+          <button class="q-menu" type="button">帮助</button>
+          <div class="q-winctl">
+            <button type="button" aria-label="最小化"><i data-lucide="minus" aria-hidden="true"></i></button>
+            <button type="button" aria-label="最大化"><i data-lucide="square" aria-hidden="true"></i></button>
+            <button type="button" class="q-close" aria-label="关闭"><i data-lucide="x" aria-hidden="true"></i></button>
+          </div>
+        </div>
+        <div class="q-cols">
+          <aside class="q-side">
+            <div class="q-mode-row">
+              <span class="q-mode"><i data-lucide="code" aria-hidden="true"></i>编程</span>
+              <button class="q-mode-ic" type="button" aria-label="群聊模式"><i data-lucide="sparkles" aria-hidden="true"></i></button>
+            </div>
+            <button class="q-nav" type="button"><i data-lucide="square-pen" aria-hidden="true"></i>新的任务</button>
+            <button class="q-nav" type="button"><i data-lucide="search" aria-hidden="true"></i>搜索</button>
+            <div class="q-proj">
+              <div class="q-proj-h"><i data-lucide="folder" aria-hidden="true"></i>proxydeck-self</div>
+              <button class="q-titem" type="button">修复 qoder 国际登录报错</button>
+              <button class="q-titem" type="button">修复代理并增加登录方式</button>
+              <button class="q-titem" type="button">修复国际版账号登录</button>
+            </div>
+            <div class="q-proj">
+              <div class="q-proj-h"><i data-lucide="folder" aria-hidden="true"></i>ControlCenter</div>
+              <button class="q-titem" type="button">档位区别说明</button>
+              <button class="q-titem" type="button">提交并推送<span class="q-warn"><i data-lucide="circle-alert" aria-hidden="true"></i></span></button>
+              <button class="q-titem" type="button">审查当前项目</button>
+            </div>
+            <div class="q-proj">
+              <div class="q-proj-h"><i data-lucide="folder" aria-hidden="true"></i>deepseek-test</div>
+              <button class="q-titem" type="button">安装WSL</button>
+              <button class="q-titem" type="button">排查SQL重复数据</button>
+              <button class="q-titem" type="button">写一个在方想服务器上排查…</button>
+              <button class="q-titem" type="button">nvr是什么</button>
+              <button class="q-titem dim" type="button">Go悬浮窗开发</button>
+            </div>
+            <div class="q-side-gap"></div>
+            <button class="q-nav" type="button"><i data-lucide="globe" aria-hidden="true"></i>站点</button>
+            <button class="q-nav" type="button"><i data-lucide="clock" aria-hidden="true"></i>自动化</button>
+            <button class="q-nav" type="button"><i data-lucide="puzzle" aria-hidden="true"></i>扩展</button>
+            <button class="q-nav" type="button"><i data-lucide="ellipsis" aria-hidden="true"></i>更多</button>
+            <div class="q-side-foot">
+              <div class="q-foot-row">
+                <span class="q-foot-ava" aria-hidden="true">散</span>
+                <span class="q-foot-name">故山疑梦</span>
+                <span class="q-foot-ics">
+                  <button type="button" aria-label="下载更新(0.5.1 已就绪)"><i data-lucide="arrow-down-to-line" aria-hidden="true"></i><span class="q-dl" aria-hidden="true">↓</span></button>
+                  <button type="button" aria-label="历史"><i data-lucide="history" aria-hidden="true"></i></button>
+                  <button type="button" aria-label="设置"><i data-lucide="settings" aria-hidden="true"></i></button>
+                </span>
+              </div>
+            </div>
+          </aside>
+          <div class="q-cont">
+            <div class="q-chead">
+              <div class="q-tools" style="margin-left:auto">
+                <button class="q-ic" type="button" aria-label="布局"><i data-lucide="panel-right" aria-hidden="true"></i></button>
+                <button class="q-ic" type="button" aria-label="布局"><i data-lucide="columns-2" aria-hidden="true"></i></button>
+              </div>
+            </div>
+            <div class="q-wel">
+              <span class="q-mobile"><i data-lucide="smartphone" aria-hidden="true"></i>手机遥控电脑</span>
+              <div class="q-stamp" aria-hidden="true"><i data-lucide="trees" aria-hidden="true"></i><span class="q-stamp-no">1666</span></div>
+              <div class="q-h1">不止于编程</div>
+              <div class="q-sub">在 <b>deepseek-test<i data-lucide="chevron-down" aria-hidden="true" style="width:12px;height:12px"></i></b>&nbsp; 用 <b>Qoder<i data-lucide="chevron-down" aria-hidden="true" style="width:12px;height:12px"></i></b>&nbsp; 创造了不起的事物</div>
+              <div class="q-stat">
+                <div class="q-stat-tabs">
+                  <button class="q-stattab" type="button" aria-pressed="true">会话</button>
+                  <button class="q-stattab" type="button" aria-pressed="false">Credits</button>
+                </div>
+                <div class="q-hm-labels"><span>11月</span><span>12月</span><span>1月</span><span>2月</span><span>3月</span><span>4月</span><span>5月</span><span>6月</span><span>7月</span><span>8月</span><span>9月</span><span>10月</span></div>
+                <div class="q-hm" id="q-hm" role="img" aria-label="最近一年的会话活跃热力图"></div>
+              </div>
+            </div>
+            <div class="q-comp">
+              <input class="q-comp-in" type="text" placeholder="长按鼠标语音输入文字" aria-label="任务输入" />
+              <div class="q-comp-row">
+                <button class="q-cic" type="button" aria-label="添加"><i data-lucide="plus" aria-hidden="true"></i></button>
+                <button class="q-cic" type="button" aria-label="附件"><i data-lucide="paperclip" aria-hidden="true"></i></button>
+                <button class="q-perm" type="button"><i data-lucide="triangle-alert" aria-hidden="true"></i>完全访问<i data-lucide="chevron-down" aria-hidden="true"></i></button>
+                <button class="q-model" type="button"><i data-lucide="fish" class="q-fish" aria-hidden="true"></i>DeepSeek-Flash 最大<i data-lucide="chevron-down" aria-hidden="true"></i></button>
+                <button class="q-send" type="button" aria-label="语音输入"><i data-lucide="audio-lines" aria-hidden="true"></i></button>
+              </div>
+            </div>
+            <div class="q-status">
+              <span class="q-si"><i data-lucide="folder" aria-hidden="true"></i>deepseek-test</span>
+              <span class="q-si"><i data-lucide="monitor" aria-hidden="true"></i>本地模式</span>
+              <span class="q-si"><i data-lucide="git-branch" aria-hidden="true"></i>没有可用的本地分支</span>
+            </div>
+          </div>
+        </div>
+        <button class="q-help" type="button" aria-label="帮助"><i data-lucide="circle-help" aria-hidden="true"></i></button>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    (function () {
+      var root = document.getElementById("qoder-mock2");
+      var state = { theme: "light" };
+      function render() { root.dataset.qtheme = state.theme; }
+      render();
+
+      // 欢迎页热力图:44 周,最近两个月逐渐活跃(确定性伪随机)
+      function mulberry32(a) {
+        return function () {
+          a |= 0; a = (a + 0x6d2b79f5) | 0;
+          var t = Math.imul(a ^ (a >>> 15), 1 | a);
+          t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+      var hm = document.getElementById("q-hm");
+      if (hm && !hm.childNodes.length) {
+        var rnd = mulberry32(20261031);
+        var frag = document.createDocumentFragment();
+        for (var w = 0; w < 44; w++) {
+          for (var d = 0; d < 7; d++) {
+            var cell = document.createElement("i");
+            var r = rnd();
+            var lvl = 0;
+            if (w >= 36) lvl = r < 0.42 ? 3 : r < 0.72 ? 4 : r < 0.86 ? 2 : 1;
+            else if (w >= 30) lvl = r < 0.1 ? 2 : r < 0.22 ? 1 : 0;
+            else lvl = r < 0.05 ? 1 : 0;
+            if (lvl) cell.className = "l" + lvl;
+            frag.appendChild(cell);
+          }
+        }
+        hm.appendChild(frag);
+      }
+
+      // 本地交互:统计 tab、任务选中
+      root.addEventListener("click", function (e) {
+        var tab = e.target.closest(".q-stattab");
+        if (tab) {
+          tab.parentElement.querySelectorAll(".q-stattab").forEach(function (t) {
+            t.setAttribute("aria-pressed", t === tab ? "true" : "false");
+          });
+          return;
+        }
+        var item = e.target.closest(".q-titem");
+        if (item) {
+          root.querySelectorAll(".q-titem").forEach(function (t) {
+            t.classList.toggle("on", t === item);
+          });
+        }
+      });
+
+      if (globalThis.Tweak) {
+        var tweak = new Tweak({ container: root, onChange: render });
+        tweak.addSelect(state, "theme", {
+          label: "主题",
+          reference: "mock2.theme",
+          options: [
+            { label: "暖白(实际默认)", value: "light" },
+            { label: "深色", value: "dark" },
+            { label: "羊皮纸 light-parchment", value: "light-parchment" },
+            { label: "森林 forest-light", value: "forest-light" }
+          ]
+        });
+      }
+    })();
+  </script>
+</div>
+
+</main>
+<script>lucide.createIcons({attrs:{width:15,height:15}});</script>
+<script>
+(function () {
+  var root = document.querySelector(".viz-carousel");
+  if (!root) return;
+  var secs = Array.prototype.slice.call(root.children);
+  var i = 0;
+  var bar = document.createElement("div");
+  bar.style.cssText = "display:flex;align-items:center;justify-content:center;gap:14px;padding:14px 0 4px;font:13px/1.4 'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;";
+  var prev = document.createElement("button"); prev.textContent = "‹ 上一个";
+  var label = document.createElement("span");
+  var next = document.createElement("button"); next.textContent = "下一个 ›";
+  [prev, next].forEach(function (b) {
+    b.style.cssText = "border:1px solid #4a4a44;background:#26262a;color:#e8e8e2;border-radius:999px;padding:6px 16px;cursor:pointer;font-size:12.5px;";
+  });
+  label.style.cssText = "color:#bdbdb6;min-width:120px;text-align:center;";
+  bar.appendChild(prev); bar.appendChild(label); bar.appendChild(next);
+  root.after(bar);
+  function show(n) {
+    i = (n + secs.length) % secs.length;
+    secs.forEach(function (s, k) { s.hidden = k !== i; });
+    label.textContent = (i + 1) + " / " + secs.length + " · " + (secs[i].dataset.variant || "");
+  }
+  prev.addEventListener("click", function () { show(i - 1); });
+  next.addEventListener("click", function () { show(i + 1); });
+  show(0);
+})();
+</script>
+</body>
+</html>

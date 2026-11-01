@@ -1,0 +1,709 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenHands 对照 P0 清单 · 12 项的收益、成本与先后</title>
+<style>
+  :root {
+    --bg: #f6f6f3;
+    --panel: #ffffff;
+    --ink: #1b1f23;
+    --muted: #5f676e;
+    --faint: #8a9298;
+    --line: #e3e3dd;
+    --line-strong: #cfd0c9;
+    --teal: #0f766e;
+    --teal-soft: #d9eeea;
+    --blue: #1d4ed8;
+    --blue-soft: #dde5fb;
+    --purple: #6d28d9;
+    --purple-soft: #e9e0fb;
+    --amber: #b45309;
+    --amber-soft: #f8e8d4;
+    --gray: #6b7280;
+    --gray-soft: #ececea;
+    --radius: 14px;
+    --shadow: 0 1px 2px rgba(20, 24, 28, .05), 0 10px 30px rgba(20, 24, 28, .05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111417;
+      --panel: #191d21;
+      --ink: #e8e6e1;
+      --muted: #a4abb1;
+      --faint: #7c848b;
+      --line: #2a2f34;
+      --line-strong: #3a4046;
+      --teal: #2dd4bf;
+      --teal-soft: #10322e;
+      --blue: #93b4ff;
+      --blue-soft: #17233f;
+      --purple: #c4b5fd;
+      --purple-soft: #241a3d;
+      --amber: #fbbf24;
+      --amber-soft: #35270f;
+      --gray: #9ca3af;
+      --gray-soft: #24282c;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .4);
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Segoe UI", system-ui, -apple-system, "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 28px; }
+  header.hero { padding: 64px 0 30px; border-bottom: 1px solid var(--line); }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--teal); font-weight: 700; }
+  h1 { font-size: clamp(30px, 4.4vw, 50px); line-height: 1.12; margin: 12px 0 14px; letter-spacing: -.02em; }
+  .lede { max-width: 820px; color: var(--muted); font-size: 16px; margin: 0; }
+  .lede strong { color: var(--ink); font-weight: 650; }
+  .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 30px 0 4px; }
+  .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); }
+  .kpi .v { font-size: 27px; font-weight: 720; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .kpi .k { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  section { padding: 46px 0 8px; }
+  .sec-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 8px; }
+  h2 { font-size: 24px; letter-spacing: -.01em; margin: 0; }
+  .sec-note { color: var(--muted); font-size: 13px; margin: 0 0 20px; max-width: 860px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+  .pad { padding: 20px 22px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 12px; color: var(--muted); margin-top: 12px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: 1px; }
+  .two-col { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(300px, .65fr); gap: 18px; align-items: start; }
+  @media (max-width: 940px) { .two-col { grid-template-columns: 1fr; } .kpis { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+  .weights { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .weights th, .weights td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--line); }
+  .weights th { color: var(--muted); font-weight: 600; }
+  .weights td:last-child, .weights th:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+  .bar-list { display: flex; flex-direction: column; gap: 9px; }
+  .bar-row { display: grid; grid-template-columns: 62px 1fr 168px; gap: 12px; align-items: center; }
+  .bar-id { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .track { position: relative; height: 20px; background: var(--gray-soft); border-radius: 6px; overflow: hidden; }
+  .fill { height: 100%; border-radius: 6px; background: var(--teal); opacity: .82; }
+  .bar-meta { font-size: 12px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tag { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line-strong); color: var(--muted); white-space: nowrap; }
+  .tag.teal { color: var(--teal); border-color: color-mix(in srgb, var(--teal) 45%, transparent); background: var(--teal-soft); }
+  .tag.blue { color: var(--blue); border-color: color-mix(in srgb, var(--blue) 45%, transparent); background: var(--blue-soft); }
+  .tag.purple { color: var(--purple); border-color: color-mix(in srgb, var(--purple) 45%, transparent); background: var(--purple-soft); }
+  .tag.amber { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 45%, transparent); background: var(--amber-soft); }
+  .tag.gray { color: var(--gray); background: var(--gray-soft); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+  .chip { border: 1px solid var(--line-strong); background: transparent; color: var(--muted); border-radius: 999px; padding: 5px 12px; font-size: 12px; cursor: pointer; font-family: inherit; }
+  .chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .chip:hover { border-color: var(--ink); }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); box-shadow: var(--shadow); }
+  table.grid { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 900px; }
+  table.grid th, table.grid td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  table.grid thead th { position: sticky; top: 0; background: var(--panel); z-index: 1; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); cursor: pointer; user-select: none; white-space: nowrap; }
+  table.grid thead th:hover { color: var(--ink); }
+  table.grid tbody tr:hover { background: color-mix(in srgb, var(--teal) 5%, transparent); }
+  table.grid td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  table.grid td.what { color: var(--muted); min-width: 280px; }
+  .heat td.cell { text-align: center; font-weight: 650; font-variant-numeric: tabular-nums; border-radius: 5px; }
+  .heat td.h1 { background: color-mix(in srgb, var(--teal) 8%, transparent); }
+  .heat td.h2 { background: color-mix(in srgb, var(--teal) 20%, transparent); }
+  .heat td.h3 { background: color-mix(in srgb, var(--teal) 38%, transparent); }
+  .heat td.h4 { background: color-mix(in srgb, var(--teal) 58%, transparent); color: var(--panel); }
+  .heat td.h5 { background: color-mix(in srgb, var(--teal) 76%, transparent); color: var(--panel); }
+  @media (max-width: 720px) {
+    #heat-table { min-width: 0 !important; }
+    #heat-table th:nth-child(2), #heat-table td:nth-child(2) { display: none; }
+    #heat-table th, #heat-table td { padding: 8px 6px; }
+  }
+  .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  @media (max-width: 860px) { .cards { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow); }
+  .card h3 { margin: 0 0 4px; font-size: 17px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .card .one { color: var(--muted); font-size: 14px; margin: 0 0 12px; }
+  .card ul { margin: 0; padding-left: 18px; font-size: 13px; color: var(--muted); }
+  .card li { margin: 4px 0; }
+  .card li strong { color: var(--ink); font-weight: 620; }
+  .card .foot { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); font-size: 12px; color: var(--faint); display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .callout { border-left: 3px solid var(--amber); background: var(--amber-soft); padding: 14px 16px; border-radius: 0 10px 10px 0; font-size: 13px; color: var(--ink); margin: 16px 0; }
+  .callout strong { color: var(--amber); }
+  .callout.teal { border-left-color: var(--teal); background: var(--teal-soft); }
+  .callout.teal strong { color: var(--teal); }
+  .mono { font-family: ui-monospace, SFMono-Regular, "Cascadia Code", Consolas, monospace; font-size: 12px; }
+  footer { margin-top: 48px; padding: 26px 0 50px; border-top: 1px solid var(--line); color: var(--faint); font-size: 12px; }
+  svg text { font-family: inherit; }
+  .chart-scroll { overflow-x: auto; overflow-y: hidden; }
+  .chart-scroll svg { min-width: 860px; }
+  .hint { font-size: 12px; color: var(--faint); margin: 10px 0 0; }
+  @media print {
+    body { background: #fff; }
+    .chip, .chips { display: none; }
+    section { break-inside: avoid; }
+    .panel, .card, .table-wrap { box-shadow: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <div class="eyebrow">OpenHands 对照 · 基线 2.2.0-fork.10 @ 81738639df · 2026-11-01</div>
+  <h1>OpenHands 对照 12 项：收益、成本与先后</h1>
+  <p class="lede">
+    把 <strong>OpenHands-借鉴清单</strong> 的 11 个借鉴项，加上对照时照出来的 <strong>1 个本仓实测缺陷</strong>，放到与
+    <strong>P0-收益对比分析</strong> 同一张账上：五个维度打分口径、四套目标预设、工程日估算全部沿用，因此两页可以直接比较。
+    本页要回答的还是那三件事 —— <strong>先做哪些、哪些必须做但不便宜、哪些要先量再决定</strong>。
+    默认按 <strong>速度优先 · 花钱无所谓</strong> 打开；但本页有两个结论<strong>不受预设影响</strong>：OH-1 与 OH-0（见预设说明）。
+  </p>
+  <div class="kpis">
+    <div class="kpi"><div class="v">12</div><div class="k">条目（11 借鉴项 + 1 本仓缺陷）</div></div>
+    <div class="kpi"><div class="v">6</div><div class="k">先做集合（含 2 个前置实测）</div></div>
+    <div class="kpi"><div class="v">3.75<span style="font-size:14px;font-weight:600"> 人日</span></div><div class="k">先做集合</div></div>
+    <div class="kpi"><div class="v">11.25<span style="font-size:14px;font-weight:600"> 人日</span></div><div class="k">全部（含战略与待复现）</div></div>
+  </div>
+</header>
+
+<main>
+
+<section id="scope">
+  <div class="sec-head"><h2>账的范围</h2><span class="tag gray">与 16 项 L 账不重复</span></div>
+  <p class="sec-note">
+    被对照的对象是 <span class="mono">@openhands/agent-canvas</span> v1.34.0（前端产品 + 编排脚本 + Electron 壳）。它的 agent 循环、压缩算法、
+    成本计算、模型目录都在 Python 兄弟仓里，本地不可见，<strong>所以本页没有任何"它的 loop 比我们好/差"的判断</strong>。
+    能对照的只有两层：客户端产品形态、交付与工程纪律。
+  </p>
+  <div class="two-col">
+    <div class="panel pad">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:10px">本轮看到、但已归属既有轮次的东西（不在本页计分）</div>
+      <table class="weights">
+        <thead><tr><th>项</th><th>归属</th><th>为什么不在本页</th></tr></thead>
+        <tbody>
+          <tr><td>依赖发布冷却 / 供应链闸门</td><td>codex M2</td><td>他轮已立项；本页只取"纪律双写进 AGENTS.md 与 CI"的措辞</td></tr>
+          <tr><td>自更新（它只给命令，不自动更新）</td><td>L39</td><td>L39 方案更强；本页只提供"版本永不等于上游"这一决策点参照</td></tr>
+          <tr><td>审批规则 / per-tool allow / always-allow</td><td>M1、M3、L19、L21、L31</td><td>对方更弱（只有整次动作 accept/reject），列为反面证据</td></tr>
+          <tr><td>流式增量按帧合并</td><td>codex M7-4</td><td>已判"评估而非照搬"，本轮不改判</td></tr>
+          <tr><td>断线重连 seq 空洞栅栏</td><td>codex §4 / M7-P3</td><td>我们走 <span class="mono">server.connected</span> 强制 resync，语义更保守</td></tr>
+          <tr><td>压缩算法、condenser 阈值</td><td>对方后端仓</td><td>本地不可见，不评价</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="panel pad">
+      <div class="callout teal" style="margin-top:0">
+        <strong>两个不受预设影响的结论。</strong>
+        <strong>OH-1</strong>（桌面后端版本纪律）不占任何运行时开销，且它修的是"当前在跑的到底是哪个后端"这个未知数 ——
+        这是本仓已付过学费的坑。
+        <strong>OH-0</strong>（<span class="mono">source: "title"</span> 的辅助调用成本不进任何报表）是账目正确性，
+        与快慢、与安全目标都无关。无论切到哪套预设，这两项都该先做。
+      </div>
+      <p class="hint">
+        OH-2 与 OH-10 记为「先做（含前置实测）」和「先量」：它们的<strong>问题在本仓已实测存在</strong>，
+        但<strong>危害大小还没测</strong>，不许直接开工。
+      </p>
+    </div>
+  </div>
+</section>
+
+<section id="model">
+  <div class="sec-head"><h2>评分模型</h2><span class="tag gray">工程判断，不是实测</span></div>
+  <p class="sec-note">
+    与 16 项那页同口径：单个维度 1–5 分，加权后 ×20 映射到 100 分；唯一的实测数据是工期估算与证据等级。
+    这样做的理由是这批收益大多不是"功能有没有"，而是"装错版本时少背多少锅、失败时用户能不能自救"。
+    <strong>切换预设，象限、ROI、热力表总分、对比表全部重算。</strong>
+  </p>
+  <div class="chips" id="presets" style="margin:0 0 10px"></div>
+  <p class="hint" id="weight-line" style="margin:0 0 8px"></p>
+  <div class="callout" id="preset-note" style="margin-top:0"></div>
+  <p class="hint" id="preset-top" style="margin:8px 0 18px"></p>
+  <div class="two-col">
+    <div class="panel pad">
+      <p class="hint" style="margin:0 0 10px">下表是「均衡」预设的权重定义；切换预设后，生效权重显示在页面顶部。</p>
+      <table class="weights">
+        <thead><tr><th>维度</th><th>看什么</th><th>权重</th></tr></thead>
+        <tbody>
+          <tr><td>运行可靠性</td><td>装错后端版本、MCP 起不来、缺键静默回退、发布脚本静默改错</td><td>30%</td></tr>
+          <tr><td>成本 / 延迟</td><td>账单是否完整、无效往返、CI 与返工时间</td><td>25%</td></tr>
+          <tr><td>安全 / 权限</td><td>反向工具的新权限面、密钥是否进历史、失败分类是否可信</td><td>20%</td></tr>
+          <tr><td>可审计性</td><td>版本一致性、账目去向、架构约束、工具链自证</td><td>15%</td></tr>
+          <tr><td>用户可见体验</td><td>首屏警告、进度摘要、主题正确继承、可操作错误文案</td><td>10%</td></tr>
+        </tbody>
+      </table>
+      <div class="callout" style="margin-bottom:0">
+        <strong>读法：</strong>分数高不等于先做。<strong>OH-1</strong> 是唯一又高又不算便宜的；<strong>OH-0 / OH-5 / OH-11</strong> 是"半天换确定收益"；
+        <strong>OH-3</strong> 战略价值最高、短期 ROI 最低；<strong>OH-2 / OH-10</strong> 的收益栏在实测前只能算假设。
+      </div>
+    </div>
+    <div class="panel pad">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:10px">状态分组</div>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--teal)"></span>先做（含前置实测）</span>
+        <span><span class="dot" style="background:var(--blue)"></span>规划（随后）</span>
+        <span><span class="dot" style="background:var(--purple)"></span>战略（新能力面）</span>
+        <span><span class="dot" style="background:var(--amber)"></span>先量（不测不开）</span>
+        <span><span class="dot" style="background:var(--gray)"></span>条件立项</span>
+      </div>
+      <div style="font-size:13px;color:var(--muted);margin:18px 0 8px">证据分级</div>
+      <table class="weights">
+        <tbody>
+          <tr><td><span class="tag teal">本轮实测</span></td><td>本次直接打开文件核对（含对方仓）</td></tr>
+          <tr><td><span class="tag blue">摘要实测</span></td><td>子代理报告，动手前必须复核</td></tr>
+          <tr><td><span class="tag amber">待验证</span></td><td>事实存在、危害未测，先定生死</td></tr>
+        </tbody>
+      </table>
+      <p class="hint">分级与「复核命令」见 <span class="mono">OpenHands-借鉴清单.md</span> 第六、八节。</p>
+    </div>
+  </div>
+</section>
+
+<section id="quadrant">
+  <div class="sec-head"><h2>投入产出象限</h2><span class="tag gray">横轴 = 人日 · 纵轴 = 收益分</span></div>
+  <p class="sec-note">
+    左上"低投入 · 高收益"是先做集合；<strong>OH-3 落在右下不是坏位置</strong>——它是本轮唯一的新能力面，
+    只是必须先做权限档位设计。OH-0 贴左边界（0.25 人日）。<strong>OH-2 与 OH-10 用虚线圈</strong>：收益是假设。同坐标的点做了微小水平偏移以便区分。
+  </p>
+  <div class="panel pad">
+    <div class="chart-scroll">
+      <svg id="scatter" viewBox="0 0 980 500" role="img" aria-label="OpenHands 对照 12 项的工期与收益分散点图" style="width:100%;height:auto;display:block"></svg>
+    </div>
+    <div class="legend" id="scatter-legend"></div>
+    <p class="hint">窄窗口下图表可横向滚动；桌面宽度一次显示全部。</p>
+  </div>
+</section>
+
+<section id="rank">
+  <div class="sec-head"><h2>按投入产出比排序</h2><span class="tag gray">收益分 ÷ 人日</span></div>
+  <p class="sec-note">
+    ROI 只回答"同样的时间先花在哪"。三处会误导：<strong>OH-0</strong> 的 ROI 在四套预设下都是第一，因为它是 0.25 人日的补洞，不代表它比 OH-1 重要；
+    <strong>OH-10</strong> 常年进前五，纯粹因为 0.25 人日 + 还没实测 —— 它是这批里最便宜的假设，不是最划算的活；
+    <strong>OH-3</strong> 的 ROI 低，但它是本轮唯一让产品能力面变宽的一项，ROI 排序不该决定它的生死。
+  </p>
+  <div class="panel pad">
+    <div class="bar-list" id="rank-bars"></div>
+  </div>
+</section>
+
+<section id="matrix">
+  <div class="sec-head"><h2>收益结构热力表</h2><span class="tag gray">1–5 分 · 颜色越深收益越大</span></div>
+  <p class="sec-note">同一总分可能来自完全不同的结构：OH-1 靠可靠性与审计，OH-3 靠体验与权限面，OH-7 靠可靠性与审计，OH-4 只有体验。决定"先做什么"要看结构，不只看总分。</p>
+  <div class="table-wrap">
+    <table class="grid heat" id="heat-table" style="min-width:760px">
+      <thead>
+        <tr>
+          <th>项</th><th>一句话</th>
+          <th style="text-align:center">可靠性<br><span style="font-weight:400;text-transform:none;letter-spacing:0">30%</span></th>
+          <th style="text-align:center">成本/延迟<br><span style="font-weight:400;text-transform:none;letter-spacing:0">25%</span></th>
+          <th style="text-align:center">安全<br><span style="font-weight:400;text-transform:none;letter-spacing:0">20%</span></th>
+          <th style="text-align:center">可审计<br><span style="font-weight:400;text-transform:none;letter-spacing:0">15%</span></th>
+          <th style="text-align:center">体验<br><span style="font-weight:400;text-transform:none;letter-spacing:0">10%</span></th>
+          <th style="text-align:right">总分</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<section id="table">
+  <div class="sec-head"><h2>完整对比表</h2><span class="tag gray">点表头排序 · 上方筛选</span></div>
+  <div class="chips" id="filters"></div>
+  <div class="table-wrap">
+    <table class="grid" id="main-table">
+      <thead>
+        <tr>
+          <th data-sort="id">项</th>
+          <th data-sort="axis">轴</th>
+          <th data-sort="status">状态</th>
+          <th data-sort="evidence">证据</th>
+          <th data-sort="days" style="text-align:right">工期</th>
+          <th data-sort="score" style="text-align:right">收益分</th>
+          <th data-sort="roi" style="text-align:right">ROI</th>
+          <th data-sort="deps">依赖 / 前置</th>
+          <th>一句话</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<section id="notes">
+  <div class="sec-head"><h2>重点项解读</h2><span class="tag gray">为什么这样排</span></div>
+  <p class="sec-note">解读卡上标的是<strong>状态与工期</strong>，不标分数（分数随预设变，见上方四套实算排序）。对方机制一律标注来源文件，本方现状一律标注符号名并注明是否复核。</p>
+  <div class="cards">
+    <div class="card">
+      <h3>OH-1 桌面版本纪律 <span class="tag teal">先做 · 1.0d</span></h3>
+      <p class="one">本轮唯一的 P0：重连场景直接采纳任意在跑的后台版本，而且没有文档。</p>
+      <ul>
+        <li><strong>对方机制：</strong><span class="mono">config/defaults.json</span> 单一真源 + <span class="mono">check-sdk-version-sync.mjs</span> 拒绝任何版本 range + 启动期 <span class="mono">assertAgentServerVersionIsSupported</span> 三种稳定错误码；版本解析失败当失败，不当通过。</li>
+        <li><strong>我方实测：</strong><span class="mono">cli-version.ts</span> 的 <span class="mono">serviceVersion</span> 在 <span class="mono">mode === "reconnect"</span> 时 <span class="mono">return undefined</span>；版本不符替换只有 <span class="mono">logInfo</span>；<span class="mono">doc/</span> 无桌面版本这一节。</li>
+        <li><strong>成本：</strong>构建期守卫近免费（<span class="mono">opencode-cli.version</span> 已在 <span class="mono">extraResources</span> filter 里）。</li>
+        <li><strong>边界：</strong>fork 版本永远不等于上游，校验必须是<strong>下限/区间</strong>，不许照抄对方"pin == 下限"的耦合。</li>
+      </ul>
+      <div class="foot"><span>轴：交付</span><span>证据：本轮实测（双方）</span></div>
+    </div>
+
+    <div class="card">
+      <h3>OH-0 title 成本不落账 <span class="tag teal">先做 · 0.25d</span></h3>
+      <p class="one">不是借鉴项，是对照时照出来的本仓缺陷：钱被记成 durable 事件，然后哪张报表都不去读。</p>
+      <ul>
+        <li><strong>实测：</strong><span class="mono">UsageRecorded.source</span> 是 <span class="mono">["title","compaction"]</span>；<span class="mono">title.ts</span> 确实按 <span class="mono">"title"</span> 发布；但 <span class="mono">stats.ts</span> 里唯一读 <span class="mono">UsageRecorded</span> 的查询带着 <span class="mono">$.source = 'compaction'</span> 过滤。</li>
+        <li><strong>文档：</strong><span class="mono">doc/usage-stats.md</span> 只写了 compaction 会折进 <span class="mono">tokens</span>，没有任何一句说明 title 被排除。</li>
+        <li><strong>对方对照：</strong>它按 <span class="mono">usage_to_metrics</span> 的<strong>任意 key</strong> 聚合，<span class="mono">condenser</span> 与 <span class="mono">profile:&lt;name&gt;:&lt;uuid&gt;</span> 分账一律并入总账。</li>
+        <li><strong>验收：</strong><span class="mono">session-stats.test.ts</span> 已经发布了一条 0.5 USD 的 title 事件，断言里加它的去向即可。</li>
+      </ul>
+      <div class="foot"><span>轴：账目</span><span>证据：本轮实测（本仓）</span></div>
+    </div>
+
+    <div class="card">
+      <h3>OH-2 stdio MCP 运行时诊断 <span class="tag amber">先做（前置实测）· 0.75d</span></h3>
+      <p class="one">事实实测存在，危害未测。不许按这张卡直接开工——先在本机跑一次桌面 + <span class="mono">npx</span> MCP。</p>
+      <ul>
+        <li><strong>对方做法：</strong><span class="mono">electron/main.mjs</span> 显式把打包的 uv 与 Node 注入 PATH，注释写明"打包后系统 PATH 极小，<span class="mono">command: "npx"</span> 会 ENOENT"；dev 模式故意 no-op，找不到时大声 warn 且不动 PATH。</li>
+        <li><strong>我方实测：</strong><span class="mono">extraResources</span> 只带 CLI；<span class="mono">preferApplicationEnvironment</span> 在 <span class="mono">win32</span> 把 shell 置 <span class="mono">null</span>，不探登录环境。</li>
+        <li><strong>不抄的半截：</strong>打包 Node（体积 + 与 Bun 单文件 CLI 职责重叠）。抄诊断：把"命令找不到"变成有名字的 <span class="mono">runtime-missing</span> 分类 + 可操作文案。</li>
+        <li><strong>未确认：</strong>Windows 由 Explorer 合并 <span class="mono">HKCU\Environment</span>，所以"npx 一定找不到"不成立；真正丢的是 shell profile 追加的条目。</li>
+      </ul>
+      <div class="foot"><span>轴：交付</span><span>证据：待验证</span></div>
+    </div>
+
+    <div class="card">
+      <h3>OH-3 反向工具（UI 交给模型） <span class="tag purple">战略 · 3.0d</span></h3>
+      <p class="one">本轮唯一让能力面变宽的一项，也是唯一需要先动协议与权限档位的一项。</p>
+      <ul>
+        <li><strong>对方机制：</strong><span class="mono">ClientToolSpec</span> 带 <span class="mono">readOnly/destructive/idempotent/openWorld</span> annotations 随启动载荷下发；<span class="mono">claim-client-tool-call.ts</span> 用 localStorage 记账挡住重放重复执行，账本损坏时<strong>不阻塞调用</strong>；<span class="mono">secret-request.ts</span> 回传只有 <span class="mono">{status,name,guidance}</span>，永不含值。</li>
+        <li><strong>我方半条腿：</strong>TUI 已有 client-hosted MCP（<span class="mono">ClientMcp</span>）；GUI 插件契约 <span class="mono">Browser.open</span>、<span class="mono">Command/Panel/Slot</span> 存在但没有桥成模型可见工具；<span class="mono">notifications/coordinator.ts</span> 的 <span class="mono">claim</span> 已是比对方更强的幂等基线。</li>
+        <li><strong>必须一次带三件：</strong>annotations（决定权限档）、幂等 claim、结果回灌走<strong>合成 inbox 控制项</strong>。</li>
+        <li><strong>反面：</strong>它没有结果通道，只能把结果当 user 消息回灌、再靠文本前缀从聊天里隐藏（注释自承 brittle by design）。我们的幂等 ID 规则从结构上消掉了这个妥协。</li>
+      </ul>
+      <div class="foot"><span>轴：能力面</span><span>证据：摘要实测（现状半边未复核）</span></div>
+    </div>
+
+    <div class="card">
+      <h3>OH-6 + OH-7 交付纪律 <span class="tag teal">0.75d / 2.0d</span></h3>
+      <p class="one">两条都是"让约束可以被机器检查"，共同点是先复用本仓已有形态，不新造框架。</p>
+      <ul>
+        <li><strong>OH-6 机制：</strong>对方用守卫测试（递归遍历 <span class="mono">src</span>、相对路径 allowlist 而非散落的 disable、显式处理 Windows 路径分隔符）<strong>并</strong>自写 AST 规则展开 <span class="mono">TemplateLiteral</span> 求静态 URL，补上正则抓不到的绕过。</li>
+        <li><strong>OH-6 落点：</strong>本仓 <span class="mono">agents.md</span> 写了 Schema → Core/Protocol → Server 的分层方向，但无机械强制（ZCode 轮已自我更正过一次）；形态照 <span class="mono">script/doc-refs.ts</span> 套。</li>
+        <li><strong>OH-7 机制：</strong>对方 <span class="mono">test-mapping.json</span> 做 源码 glob → e2e 子目录；约 43 个"工具链自身"测试，含 Dockerfile 漏 COPY 即失败；CI 脚本本身也跑测试。</li>
+        <li><strong>OH-7 落点：</strong>我们只有包粒度 <span class="mono">turbo --affected</span>。优先给 <span class="mono">script/pack.ts</span> 与 <span class="mono">tag-release.sh</span> 加自测——它们重写全 workspace 版本号，出错静默。</li>
+      </ul>
+      <div class="foot"><span>轴：架构 / 测试</span><span>证据：本轮实测（对方）+ 摘要实测（我方）</span></div>
+    </div>
+
+    <div class="card">
+      <h3>OH-5 + OH-11 穷举守卫 <span class="tag teal">0.5d + 0.5d</span></h3>
+      <p class="one">同一件事的两个面：新主题/新键不能"静默继承"或"静默缺译"。都刚好处在合适的时间窗。</p>
+      <ul>
+        <li><strong>对方机制：</strong><span class="mono">src/themes/README.md</span> 声明三套渲染系统（CSS/HeroUI、Prism+Monaco、xterm）必须同时被覆盖，映射表写成<strong>穷举 Record</strong>，理由写得很直白："新主题不能悄悄继承深色"。</li>
+        <li><strong>OH-5 时机：</strong>Indigo 主题与 rail 主题切换刚落地（<span class="mono">3558c4c</span> / <span class="mono">82efecf</span>），是加守卫成本最低的时候。</li>
+        <li><strong>OH-11 实测：</strong>本仓 <span class="mono">packages/ui/src/i18n</span> 约 60 个语种文件，但 <span class="mono">no.ts</span> 用穷举 <span class="mono">Record&lt;Keys,string&gt;</span>，<span class="mono">bs.ts</span>/<span class="mono">de.ts</span> 用 <span class="mono">satisfies Partial&lt;...&gt;</span> —— 后者缺键静默回退。</li>
+        <li><strong>只借机制不借规模：</strong>它 2207 键 × 16 语种的全量翻译不是我们要的东西；我们要的是"生成键枚举 + 拒绝把英文原样复制进各语种"。</li>
+      </ul>
+      <div class="foot"><span>轴：主题 / i18n</span><span>证据：本轮实测（对方 README + 我方 i18n）</span></div>
+    </div>
+
+    <div class="card">
+      <h3>OH-4 事件组进度摘要 <span class="tag blue">规划 · 0.75d</span></h3>
+      <p class="one">纯体验项，成本低，但要先复核我方现状（子代理报告，不可直接采信）。</p>
+      <ul>
+        <li><strong>对方机制：</strong><span class="mono">event-group.tsx</span> 把同一个组当"活尾"时主位显示当前动作、副位显示 <span class="mono">"k/n actions completed"</span>；一旦被后面的条目超过，计数升为主位并带成功勾。带推理的事件会先冲刷当前组、单列成一项，保证推理不被折进折叠组里消失。</li>
+        <li><strong>另一件好事：</strong><span class="mono">deriveLiveActivity(events)</span> 是纯函数，反向遍历解出唯一未回答的动作，<span class="mono">role="status"</span> 渲染，<strong>不需要后端支持</strong>。</li>
+        <li><strong>我方现状（待复核）：</strong>TUI 已有分组与 <span class="mono">"3 commands, 1 edit, 2 reads"</span> 分类计数，但没有 k/n；GUI 只有 <span class="mono">todo-pill</span> 有 N/M。</li>
+        <li><strong>硬约束：</strong>只动组内摘要行，状态行的 tok/s、缓存命中、上下文百分比必须原样保留。</li>
+      </ul>
+      <div class="foot"><span>轴：体验</span><span>证据：摘要实测</span></div>
+    </div>
+
+    <div class="card">
+      <h3>OH-8 mutation 的入门姿势 <span class="tag gray">条件 · 0.5d</span></h3>
+      <p class="one">这条的真正价值是<strong>更正一条既有撤下理由</strong>，不是马上开工。</p>
+      <ul>
+        <li><strong>对账更正：</strong>既有轮次以"覆盖率、mutation、SBOM、PR-size 门<strong>三家都没有</strong>"撤下 mutation。本轮事实推翻该理由：OpenHands 有，而且是无阈值的低成本形态。结论可以保留，<strong>理由必须改写</strong>。</li>
+        <li><strong>它的姿势：</strong><span class="mono">stryker.config.mjs</span> 只 <span class="mono">mutate: src/**</span>、开 <span class="mono">vitest.related</span>、<strong>完全不设阈值</strong>，文档明说"report-only，先建立基线"；diff 模式用 <span class="mono">--incremental --force --mutate &lt;files&gt;</span>；进程边界用 <span class="mono">// Stryker disable all</span>。</li>
+        <li><strong>若做：</strong>只跑 <span class="mono">session/stats.ts</span> 这类纯折叠代码，不接 CI。我们已有 <span class="mono">fast-check</span> 属性测试与语料防自欺守卫，mutation 的边际收益取决于前两者抓不到的那类变异。</li>
+      </ul>
+      <div class="foot"><span>轴：测试</span><span>证据：本轮实测（对方配置）</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="caveats">
+  <div class="sec-head"><h2>口径与限制</h2></div>
+  <div class="panel pad">
+    <ul style="margin:0;padding-left:18px;color:var(--muted);font-size:13px">
+      <li><strong style="color:var(--ink)">收益分不是实测。</strong>它是 1–5 分的工程判断；本页唯一的实测数据是工期估算与证据等级。</li>
+      <li><strong style="color:var(--ink)">OH-2 与 OH-10 的收益栏是假设。</strong>事实存在（我方实测），危害未测：前者要先跑一次桌面 + <span class="mono">npx</span> MCP，后者要先在真实窗口复现拖拽是否被吃掉。</li>
+      <li><strong style="color:var(--ink)">三处现状结论仍挂在子代理级别。</strong>OH-3 的 <span class="mono">ClientMcp</span> 只暴露两个工具、OH-4 的 <span class="mono">activity-summary</span> 是否有 k/n、OH-9 的 MCP 状态机分类 —— 动手前必须逐行复核，清单第六节已列出。</li>
+      <li><strong style="color:var(--ink)">对方的后端层不在本页范围内。</strong>agent 循环、压缩算法、成本计算、模型目录都在 Python 仓，本仓不可见；任何"它的 loop 更好/更差"的说法都没有依据，本页不提供。</li>
+      <li><strong style="color:var(--ink)">工期是工程日，不含 review 往返与返工。</strong>OH-3 的 3 天不含权限档位的共识讨论；OH-7 的 2 天不含映射表的长期维护。</li>
+      <li><strong style="color:var(--ink)">依赖会改变实际顺序。</strong>OH-2 与 OH-9 同批；OH-3 等 M1/M3 的档位结论，且其提示词注入部分撞 L17/L34 的字节稳定纪律；OH-6 复用 <span class="mono">script/doc-refs.ts</span> 的形态。ROI 排序不等于开工顺序。</li>
+      <li><strong style="color:var(--ink)">所有结论对应基线 <span class="mono">81738639df</span> 与 <span class="mono">80ddd49ef</span>。</strong>任一侧代码变化后，先重跑 <span class="mono">OpenHands-借鉴清单.md</span> 第八节的复核命令。</li>
+      <li><strong style="color:var(--ink)">本页与 16 项那页共用同一评分模型与预设权重</strong>，所以两页的分数可以横比；但本页项目多为交付与工程纪律，在"速度优先"预设下天然吃亏，这正是把 OH-1/OH-0 标为不受预设影响的原因。</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  基于 <span class="mono">OpenHands-借鉴清单.md</span> · 对象 <span class="mono">D:\code\github\OpenHands</span> v1.34.0 @ <span class="mono">80ddd49ef</span> · 对照 <span class="mono">loop-reliability-docs</span> @ <span class="mono">81738639df</span> · 2026-11-01 · 单文件、无外部依赖，可直接打印或归档。
+</footer>
+
+</div>
+
+<script>
+const PRESETS = {
+  "均衡": { rel: 0.30, cost: 0.25, sec: 0.20, audit: 0.15, ux: 0.10 },
+  "速度优先 · 花钱无所谓": { rel: 0.40, cost: 0.35, sec: 0.05, audit: 0.05, ux: 0.15 },
+  "安全可控": { rel: 0.25, cost: 0.10, sec: 0.45, audit: 0.15, ux: 0.05 },
+  "审计交付": { rel: 0.20, cost: 0.10, sec: 0.20, audit: 0.40, ux: 0.10 }
+};
+const PRESET_NOTE = {
+  "均衡": "默认视角：可靠性与成本各占一半权重，安全与审计保留下限。实算排序 OH-1 71 › OH-7 56 › OH-3 53 › OH-2 51 › OH-0 50 = OH-9 50 › OH-6 45 › …› OH-4 26 › OH-10 24。OH-1 与第二名差了 15 分，这一页没有「争议第一名」。",
+  "速度优先 · 花钱无所谓": "目标＝工具执行快、完成效率高，钱不计。<strong>OH-1 与 OH-0 建议无视目标保留</strong>：前者不占运行时开销，修的却是\"跑的是哪个后端\"这个未知数；后者是账目正确性，与快慢无关。实算下 OH-1 反而涨到 73（它本质是可靠性项）；与均衡相比真正<strong>上升</strong>的是 <strong>OH-2 51→55</strong>（失败时用户能自救＝省一次往返）与 <strong>OH-4 26→29</strong>（进度可见）；<strong>下降</strong>的是 OH-6 45→40 与 OH-0 50→49 —— 它们省的是返工时间和账目，不是运行时时间。OH-3 53→51 基本不动：它涨不了，因为它的收益不在速度上。",
+  "安全可控": "目标＝不出事故。实算下<strong>变化最大的是 OH-9：并列第 5 → 第 2（50→56）</strong>——\"连不上\"和\"没权限\"必须可区分，在这个视角里是硬需求；OH-3 稳居第 3（53→55，与 OH-7 并列），能力面与风险面同时被计分；OH-1 仍在最前（66）。退居其次的是 OH-0 50→42、OH-5 38→34、OH-4 26→23。注意 OH-3 同时也是本页<strong>风险面最大</strong>的一项：它把\"模型能改界面\"变成新攻击面，这一预设既抬它也要求它先补档位。",
+  "审计交付": "目标＝能向别人交代\"跑的是哪个版本、钱花在哪、约束有没有被绕过\"。OH-1 涨到 80（本页最高分），OH-0 与 OH-7 并列第 2（62），OH-6 从 45 升到 56、OH-3 53→58。这一预设下首尾分差 56 分，是四套预设里最大的——因为本页 12 项里本来就有一半是审计与交付项。"
+};
+let WEIGHTS = PRESETS["速度优先 · 花钱无所谓"];
+let PRESET = "速度优先 · 花钱无所谓";
+
+// scores: 1–5 engineering judgement; days: estimated person-days (不含返工).
+const DATA = [
+  { id: "OH-1",  name: "桌面版本单一真源 + 下限断言", axis: "交付", status: "先做", evidence: "本轮实测", days: 1.0,  scores: { rel: 5, cost: 2, sec: 2, audit: 5, ux: 4 }, deps: "无（守卫测试可先行）", what: "reconnect 也校验版本；版本不符从 logInfo 变成可见警告；补 doc 一节" },
+  { id: "OH-0",  name: "title 辅助调用成本落账（本仓缺陷）", axis: "账目", status: "先做", evidence: "本轮实测", days: 0.25, scores: { rel: 2, cost: 3, sec: 1, audit: 5, ux: 2 }, deps: "与 doc/usage-stats.md 同批", what: "source=\"title\" 的 durable 用量行现在哪张报表都不读" },
+  { id: "OH-2",  name: "stdio MCP 运行时诊断", axis: "交付", status: "先做", evidence: "待验证", days: 0.75, scores: { rel: 4, cost: 1, sec: 2, audit: 2, ux: 4 }, deps: "前置＝本机实测；与 OH-9 同批", what: "把\"PATH 里没有 npx\"从含糊的 ConnectError 变成有名字的 runtime-missing" },
+  { id: "OH-6",  name: "分层方向机械强制", axis: "架构", status: "先做", evidence: "本轮实测", days: 0.75, scores: { rel: 3, cost: 1, sec: 2, audit: 4, ux: 1 }, deps: "复用 script/doc-refs.ts 形态", what: "守卫测试 + 自写 AST 规则双保险，禁 client 直连 core、禁裸 HTTP" },
+  { id: "OH-5",  name: "主题跨渲染器穷举守卫", axis: "主题", status: "先做", evidence: "摘要实测", days: 0.5,  scores: { rel: 2, cost: 1, sec: 1, audit: 3, ux: 4 }, deps: "挂 L35 对比度执法", what: "新主题漏配任一渲染器时编译/测试即失败，不再静默继承深色" },
+  { id: "OH-11", name: "i18n 键约束统一", axis: "i18n", status: "先做", evidence: "本轮实测", days: 0.5,  scores: { rel: 2, cost: 1, sec: 1, audit: 3, ux: 3 }, deps: "无", what: "Partial 那批语种改成穷举 Record；缺译与\"照抄英文\"要能查出来" },
+  { id: "OH-3",  name: "反向工具（UI 交给模型）", axis: "能力面", status: "战略", evidence: "摘要实测", days: 3.0,  scores: { rel: 2, cost: 2, sec: 3, audit: 3, ux: 5 }, deps: "等 M1/M3 档位；提示注入撞 L17/L34", what: "annotations + 幂等 claim + 合成 inbox 回灌，三件一次带齐" },
+  { id: "OH-7",  name: "受影响测试映射 + 工具链自测", axis: "测试", status: "规划", evidence: "摘要实测", days: 2.0,  scores: { rel: 4, cost: 2, sec: 2, audit: 4, ux: 1 }, deps: "无；优先 pack.ts 与 tag-release.sh", what: "只改 tui 不启动 e2e；重写全 workspace 版本号的脚本要有测试" },
+  { id: "OH-9",  name: "MCP 探测结果诚实分类", axis: "MCP", status: "规划", evidence: "摘要实测", days: 1.0,  scores: { rel: 3, cost: 1, sec: 3, audit: 3, ux: 3 }, deps: "与 OH-2 同批", what: "过期探测结果不能覆盖新结果；\"连上了但一个工具都没暴露\"要如实标注" },
+  { id: "OH-4",  name: "事件组 k/n 进度摘要", axis: "体验", status: "规划", evidence: "摘要实测", days: 0.75, scores: { rel: 1, cost: 1, sec: 1, audit: 1, ux: 4 }, deps: "复核 activity-summary 现状", what: "活尾显示当前动作 + k/n，被超过后降为\"n 步\"；推理不得折进折叠组" },
+  { id: "OH-8",  name: "mutation 以 report-only 起步", axis: "测试", status: "条件", evidence: "本轮实测", days: 0.5,  scores: { rel: 3, cost: 1, sec: 1, audit: 3, ux: 1 }, deps: "先改撤下理由再决定", what: "不设阈值、不接 CI、只跑纯折叠代码；价值在于更正一条台账" },
+  { id: "OH-10", name: "面板拖拽 shield", axis: "体验", status: "先量", evidence: "待验证", days: 0.25, scores: { rel: 1, cost: 1, sec: 1, audit: 1, ux: 3 }, deps: "前置＝真实窗口复现", what: "拖拽期注入全屏层，避免被下层控件吃掉 mousemove；本方无此层" }
+];
+
+const STATUS_COLOR = {
+  "先做": "var(--teal)",
+  "规划": "var(--blue)",
+  "战略": "var(--purple)",
+  "先量": "var(--amber)",
+  "条件": "var(--gray)"
+};
+const STATUS_TAG = { "先做": "teal", "规划": "blue", "战略": "purple", "先量": "amber", "条件": "gray" };
+
+function recompute() {
+  for (const d of DATA) {
+    d.score = Math.round(20 * (d.scores.rel * WEIGHTS.rel + d.scores.cost * WEIGHTS.cost + d.scores.sec * WEIGHTS.sec + d.scores.audit * WEIGHTS.audit + d.scores.ux * WEIGHTS.ux));
+    d.roi = d.score / d.days;
+  }
+}
+
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
+const fmt = (n) => (Math.round(n * 10) / 10).toString();
+const fmtDays = (n) => (Math.round(n * 100) / 100).toString();
+
+/* ---------- scatter ---------- */
+function renderScatter() {
+  const svg = document.getElementById("scatter");
+  svg.innerHTML = "";
+  const W = 980, H = 500, m = { l: 64, r: 26, t: 26, b: 58 };
+  const x0 = 0, x1 = 3.3, X_SPLIT = 1.0;
+  const Y_BOT = 20, Y_MID = 60, Y_TOP = 90;
+  const px = (v) => m.l + ((v - x0) / (x1 - x0)) * (W - m.l - m.r);
+  const py = (v) => H - m.b - ((v - Y_BOT) / (Y_TOP - Y_BOT)) * (H - m.t - m.b);
+  const ns = "http://www.w3.org/2000/svg";
+  const el = (tag, attrs, text) => {
+    const n = document.createElementNS(ns, tag);
+    for (const [k, v] of Object.entries(attrs || {})) n.setAttribute(k, v);
+    if (text !== undefined) n.textContent = text;
+    svg.appendChild(n);
+    return n;
+  };
+
+  // quadrant bands
+  el("rect", { x: px(x0), y: py(Y_TOP), width: px(X_SPLIT) - px(x0), height: py(Y_MID) - py(Y_TOP), fill: "var(--teal)", "fill-opacity": 0.07 });
+  el("rect", { x: px(X_SPLIT), y: py(Y_TOP), width: px(x1) - px(X_SPLIT), height: py(Y_MID) - py(Y_TOP), fill: "var(--blue)", "fill-opacity": 0.05 });
+  el("rect", { x: px(x0), y: py(Y_MID), width: px(X_SPLIT) - px(x0), height: py(Y_BOT) - py(Y_MID), fill: "var(--gray)", "fill-opacity": 0.05 });
+  el("rect", { x: px(X_SPLIT), y: py(Y_MID), width: px(x1) - px(X_SPLIT), height: py(Y_BOT) - py(Y_MID), fill: "var(--amber)", "fill-opacity": 0.05 });
+
+  for (let v = x0; v <= x1 + 0.001; v += 0.5) {
+    el("line", { x1: px(v), x2: px(v), y1: py(Y_TOP), y2: py(Y_BOT), stroke: "var(--line)", "stroke-width": 1 });
+    el("text", { x: px(v), y: H - m.b + 22, "text-anchor": "middle", "font-size": 11, fill: "var(--faint)" }, (v === 0 ? "0" : fmt(v)) + " 天");
+  }
+  for (let v = Y_BOT; v <= Y_TOP; v += 20) {
+    el("line", { x1: px(x0), x2: px(x1), y1: py(v), y2: py(v), stroke: v === Y_MID ? "var(--line-strong)" : "var(--line)", "stroke-dasharray": v === Y_MID ? "4 4" : "none", "stroke-width": 1 });
+    el("text", { x: px(x0) - 10, y: py(v) + 4, "text-anchor": "end", "font-size": 11, fill: "var(--faint)" }, String(v));
+  }
+  el("text", { x: px(0.5), y: py(Y_TOP) + 2, "text-anchor": "middle", "font-size": 11, fill: "var(--teal)", "font-weight": 700 }, "低投入 · 高收益");
+  el("text", { x: px(2.15), y: py(Y_TOP) + 2, "text-anchor": "middle", "font-size": 11, fill: "var(--blue)", "font-weight": 700 }, "高投入 · 高收益");
+  el("text", { x: px(0.5), y: py(Y_BOT) - 8, "text-anchor": "middle", "font-size": 11, fill: "var(--faint)", "font-weight": 700 }, "低投入 · 低收益");
+  el("text", { x: px(2.15), y: py(Y_BOT) - 8, "text-anchor": "middle", "font-size": 11, fill: "var(--amber)", "font-weight": 700 }, "高投入 · 战略 / 待验证");
+  el("text", { x: W - m.r, y: H - 10, "text-anchor": "end", "font-size": 11, fill: "var(--faint)" }, "← 工期（人日）");
+  el("text", { x: px(x0) - 48, y: m.t + 2, "font-size": 11, fill: "var(--faint)" }, "收益分 ↑");
+
+  // deterministic jitter for overlapping points
+  const seen = new Map();
+  for (const d of DATA) {
+    const base = d.days + "|" + d.score;
+    const n = seen.get(base) || 0;
+    seen.set(base, n + 1);
+    d._jx = n * 0.07 * (n % 2 ? -1 : 1);
+  }
+
+  const ordered = [...DATA].sort((a, b) => b.score - a.score);
+  for (const d of ordered) {
+    const cx = px(Math.min(d.days + (d._jx || 0), x1 - 0.02));
+    const cy = py(Math.max(Math.min(d.score, Y_TOP), Y_BOT));
+    const color = STATUS_COLOR[d.status];
+    const g = el("g", {});
+    const t = el("title", {}, `${d.id} ${d.name}｜${d.score} 分｜${fmtDays(d.days)} 人日｜ROI ${fmt(d.roi)}｜${d.evidence}`);
+    g.appendChild(t);
+    if (d.status === "先量" || d.status === "条件") {
+      el("circle", { cx, cy, r: 8, fill: "var(--panel)", stroke: color, "stroke-width": 2, "stroke-dasharray": "3 2" });
+    } else {
+      el("circle", { cx, cy, r: 7, fill: color, "fill-opacity": .9 });
+    }
+    const side = d.labelSide ?? (d._jx && d._jx < 0 ? -1 : 1);
+    el("text", { x: cx + side * 11, y: cy + 4, "text-anchor": side < 0 ? "end" : "start", "font-size": 11, "font-weight": 700, fill: "var(--ink)" }, d.id);
+  }
+
+  const legend = document.getElementById("scatter-legend");
+  legend.innerHTML = "";
+  for (const [label, color] of Object.entries(STATUS_COLOR)) {
+    const s = document.createElement("span");
+    s.innerHTML = `<span class="dot" style="background:${color}"></span>${label}`;
+    legend.appendChild(s);
+  }
+  const s = document.createElement("span");
+  s.innerHTML = `<span class="dot" style="background:var(--panel);border:2px dashed var(--amber)"></span>虚线 = 先量 / 条件（收益为假设）`;
+  legend.appendChild(s);
+}
+
+/* ---------- rank bars ---------- */
+function renderRank() {
+  const box = document.getElementById("rank-bars");
+  box.innerHTML = "";
+  const sorted = [...DATA].sort((a, b) => b.roi - a.roi);
+  const max = Math.max(...sorted.map((d) => d.roi));
+  for (const d of sorted) {
+    const row = document.createElement("div");
+    row.className = "bar-row";
+    row.innerHTML = `
+      <div class="bar-id">${esc(d.id)}</div>
+      <div class="track" title="${esc(d.name)}"><div class="fill" style="width:${(d.roi / max) * 100}%;background:${STATUS_COLOR[d.status]}"></div></div>
+      <div class="bar-meta">${d.score} 分 · ${fmtDays(d.days)}d · ROI ${fmt(d.roi)}</div>`;
+    box.appendChild(row);
+  }
+}
+
+/* ---------- heat map ---------- */
+function renderHeat() {
+  const tbody = document.querySelector("#heat-table tbody");
+  tbody.innerHTML = "";
+  const cols = ["rel", "cost", "sec", "audit", "ux"];
+  const sorted = [...DATA].sort((a, b) => b.score - a.score);
+  for (const d of sorted) {
+    const tr = document.createElement("tr");
+    const cells = cols.map((key) => `<td class="cell h${d.scores[key]}">${d.scores[key]}</td>`).join("");
+    tr.innerHTML = `<td><strong>${esc(d.id)}</strong></td><td class="what">${esc(d.what)}</td>${cells}<td class="num" style="text-align:right"><strong>${d.score}</strong></td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+/* ---------- main table ---------- */
+let activeAxis = "全部";
+let sortKey = "score";
+let sortDir = -1;
+
+function drawTable() {
+  const tbody = document.querySelector("#main-table tbody");
+  const rows = DATA.filter((d) => activeAxis === "全部" || d.axis === activeAxis);
+  rows.sort((a, b) => {
+    const av = a[sortKey], bv = b[sortKey];
+    if (typeof av === "string") return av.localeCompare(bv, "zh-Hans-CN", { numeric: true }) * sortDir;
+    return (av - bv) * sortDir;
+  });
+  tbody.innerHTML = rows.map((d) => `
+    <tr>
+      <td><strong>${esc(d.id)}</strong><br><span style="color:var(--faint);font-size:12px">${esc(d.name)}</span></td>
+      <td>${esc(d.axis)}</td>
+      <td><span class="tag ${STATUS_TAG[d.status]}">${esc(d.status)}</span></td>
+      <td><span class="tag ${d.evidence === "本轮实测" ? "teal" : d.evidence === "待验证" ? "amber" : "blue"}">${esc(d.evidence)}</span></td>
+      <td class="num" style="text-align:right">${fmtDays(d.days)}</td>
+      <td class="num" style="text-align:right"><strong>${d.score}</strong></td>
+      <td class="num" style="text-align:right">${fmt(d.roi)}</td>
+      <td style="color:var(--muted)">${esc(d.deps)}</td>
+      <td class="what">${esc(d.what)}</td>
+    </tr>`).join("");
+}
+
+function buildFilters() {
+  const chips = document.getElementById("filters");
+  chips.innerHTML = "";
+  for (const axis of ["全部", ...Array.from(new Set(DATA.map((d) => d.axis)))]) {
+    const b = document.createElement("button");
+    b.className = "chip";
+    b.textContent = axis;
+    b.setAttribute("aria-pressed", axis === activeAxis ? "true" : "false");
+    b.addEventListener("click", () => {
+      activeAxis = axis;
+      for (const c of chips.children) c.setAttribute("aria-pressed", c.textContent === axis ? "true" : "false");
+      drawTable();
+    });
+    chips.appendChild(b);
+  }
+}
+
+document.querySelectorAll("#main-table thead th[data-sort]").forEach((th) => {
+  th.addEventListener("click", () => {
+    const key = th.dataset.sort;
+    if (sortKey === key) sortDir *= -1;
+    else { sortKey = key; sortDir = key === "id" || key === "axis" || key === "status" || key === "evidence" || key === "deps" ? 1 : -1; }
+    drawTable();
+  });
+});
+
+/* ---------- presets ---------- */
+function renderAll() {
+  recompute();
+  renderScatter();
+  renderRank();
+  renderHeat();
+  drawTable();
+  const w = WEIGHTS;
+  document.getElementById("weight-line").textContent =
+    `当前预设：${PRESET} · 可靠性 ${(w.rel * 100).toFixed(0)}% / 成本·时间 ${(w.cost * 100).toFixed(0)}% / 安全 ${(w.sec * 100).toFixed(0)}% / 审计 ${(w.audit * 100).toFixed(0)}% / 体验 ${(w.ux * 100).toFixed(0)}%`;
+  document.getElementById("preset-note").innerHTML = PRESET_NOTE[PRESET];
+  const top = [...DATA].sort((a, b) => b.roi - a.roi).slice(0, 5).map((d) => d.id).join(" → ");
+  document.getElementById("preset-top").textContent = `按 ROI 前五：${top}`;
+}
+
+function buildPresets() {
+  const box = document.getElementById("presets");
+  box.innerHTML = "";
+  for (const name of Object.keys(PRESETS)) {
+    const b = document.createElement("button");
+    b.className = "chip";
+    b.textContent = name;
+    b.setAttribute("aria-pressed", name === PRESET ? "true" : "false");
+    b.addEventListener("click", () => {
+      PRESET = name;
+      WEIGHTS = PRESETS[name];
+      for (const c of box.children) c.setAttribute("aria-pressed", c.textContent === name ? "true" : "false");
+      renderAll();
+    });
+    box.appendChild(b);
+  }
+}
+
+buildFilters();
+buildPresets();
+renderAll();
+</script>
+</body>
+</html>
