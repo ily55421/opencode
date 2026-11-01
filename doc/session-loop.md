@@ -57,14 +57,32 @@ Several mechanisms end or extend a loop without user input:
 | Repeated identical call | The same (tool, arguments, result) made five times in a row, or a block of up to five calls repeating five times | `core/src/session/runner/loop.ts`, refused in `SessionStep.attempt`'s `executeTool` |
 | Repeated refusal | One exact call denied by the permission rules eight times in a row | `core/src/session/runner/loop.ts` |
 | Unformattable calls | Three tool calls in one turn that never parsed, when the step did not end at the output limit | `core/src/session/runner/loop.ts` |
+| Cross-parameter failures | One tool failing six times in a turn across *different* arguments, counted per (tool, error category) and per (tool, normalized path) | `core/src/session/runner/loop.ts` |
+| Failure-streak advisory | The same streak reaching five failures publishes one model-facing advisory instead of blocking | `core/src/session/runner/loop.ts`, published by `runStep` as a `failure-streak-advisory` synthetic |
 
-All three loop counters fold from the durable message history the same way `SessionRunnerUnfinished.decide`
-does, and all three close the turn the same way the step budget does: `runStep` appends the guard's notice as
+All four loop counters fold from the durable message history the same way `SessionRunnerUnfinished.decide`
+does, and all four close the turn the same way the step budget does: `runStep` appends the guard's notice as
 an assistant message and sends the final request with `toolChoice: "none"`. None of them is a session error —
 an error reads as a broken session when the truth is that the model is going in circles. A refusal is
 recorded as a failed tool call whose message starts with the token below, and the fold **excludes** its own
 refusals when it looks for a repeating block; leaving them in would break the pattern after one refusal and
 the guard would release itself.
+
+The cross-parameter counters exist because the exact-call repetition search above is blind to a model that
+varies its arguments: `read(a)`, `read(b)` and `read(c)` all failing share no call key, yet nothing about
+the situation is moving. Each failure feeds two counters — one per `(tool, error category)` (a small
+message-based bucket: `not-found`, `timeout`, `invalid`, `error`) and one per `(tool, normalized path)` for
+calls whose input carries a path-like argument. A success of the tool clears its category counters, and a
+success on a path clears that path's counter, so a retry that starts producing is never read as spinning.
+Failures that arrived in one parallel batch count once per key — the model has not yet seen the results it
+is adjusting against — and the next batch still accumulates. Timeouts count on purpose; permission refusals
+stay owned by the repeated-refusal counter, unformattable calls by the format counter, and aborted or
+result-missing settlements are machinery, not the model, and feed nothing.
+
+One failure before the limit, the guard speaks instead of blocking: `runStep` publishes a
+`SessionEvent.Synthetic` whose `metadata.notice` is `failure-streak-advisory`. The published synthetic is
+itself the dedup counter — it folds from history like every other counter, so a restart cannot hand the
+model a second advisory, and the next step either heeds it or closes at the limit.
 
 The refusal and closing texts are model-visible contract tokens, kept verbatim:
 
@@ -77,6 +95,18 @@ different approach, or ask the user.
 ```
 Loop guard: automatic continuation stopped because the same tool calls kept
 repeating. Tools are disabled for this closing step. Say what is stuck and ask the user how to proceed.
+```
+
+```
+Failure guard: <tool> has failed <N> times in this turn, each with different arguments. Repeating
+it with new parameters is not making progress. Change the approach, inspect the underlying problem, or ask
+the user.
+```
+
+```
+Failure guard: automatic continuation stopped because <tool> kept failing across different arguments
+(<N> failures in this turn). Tools are disabled for this closing step. Report what is failing and
+ask the user how to proceed.
 ```
 
 `experimental.loop_guard` turns the whole guard off; with it off the fold returns no decision and the loop
@@ -216,14 +246,28 @@ turns over to `Completed`. A refusal is the guard speaking, not the model moving
 the calls with refusals removed — keeping them in makes the pattern fail on the next step and the guard releases
 itself after one refusal.
 
+**Cross-parameter streaks are counted per tool and category, and a success clears them.** Rejected: counting every
+failure of a tool regardless of kind — a tool that returns "not found" five times and "invalid input" twice is
+exploring, not spinning, and merging the buckets would close it at six mixed failures. Rejected: counting only
+*consecutive* failures — the borrowed design measured that shape, but a parallel batch of five failures is one
+decision the model has not yet seen the results of, so a batch counts once per key and the next batch accumulates.
+Rejected: letting permission refusals feed the streak — the decline counter already owns refusals with its own limit
+and wording, and double-counting them would close a same-call refusal streak at six instead of its contract's eight.
+A success clears the counters because a tool that just worked was not spinning; without the clear, one environmental
+outage followed by legitimate retries would still compound toward the limit. The advisory at limit−1 is the one
+place a counter speaks before it closes — a model varying arguments looks productive to every other signal in this
+loop, so the cheapest possible intervention (one synthetic message) comes a step before the expensive one.
+
 ## Tests
 
 `packages/core/test/session-runner.test.ts` drives full drain loops against a `TestLLM` and asserts on `DrainResult`
 and the event sequence; `session-step.test.ts` covers one step, `session-runner-tool-events.test.ts` covers tool
 settlement, `session-execution.test.ts` covers the coordinator, and `session-runner-unfinished.test.ts` covers the
 nudge decision on projected history directly. `session-runner-loop.test.ts` covers the loop guard as a pure fold —
-repetition, alternating pairs, polls that must not trip it, refusal streaks, malformed counts, and the turn boundary —
-while `session-runner.test.ts` keeps two end-to-end cases for the refusal and the closing step. The empty response has
+repetition, alternating pairs, polls that must not trip it, refusal streaks, malformed counts, the turn boundary, and
+the cross-parameter streaks (advisory at limit−1, close at the limit, clear-on-success, parallel batches, the
+excluded kinds) — while `session-runner.test.ts` keeps three end-to-end cases: the refusal, the closing step, and
+the cross-parameter advisory-then-close. The empty response has
 the same two layers: `session-runner-empty.test.ts` folds constructed history, and three drain scenarios there cover
 the nudge, the three-strikes stop, and the blank-after-tool pass. Scenarios that mean "the turn ends" push a response
 with visible text (`closing()`), because a bare settled stop *is* an empty response and the recovery answers it. Note

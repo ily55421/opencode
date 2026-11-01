@@ -10,7 +10,6 @@ import {
   LLMEvent,
   type LLMRequest,
   Message,
-  type ToolEntry,
   UnknownProviderError,
   type Usage,
 } from "@opencode/ai/effect"
@@ -39,6 +38,7 @@ import { SessionRunnerModel } from "./runner/model.js"
 import { SessionRunnerRetry } from "./runner/retry.js"
 import { toLLMMessages } from "./runner/to-llm-message.js"
 import { SessionRecentText } from "./recent-text.js"
+import { SessionToolSurface } from "./tool-surface.js"
 import { contentFilterError, toSessionError } from "./to-session-error.js"
 import { SessionUsage } from "./usage.js"
 
@@ -1277,17 +1277,8 @@ const fitOutput = (request: LLMRequest, limit: SessionContext.Loaded["model"]["l
 
 const estimateRequest = (request: Pick<LLMRequest, "system" | "tools" | "messages">) =>
   request.system.reduce((sum, part) => sum + Token.estimateWide(part.text), 0) +
-  request.tools.reduce((sum, tool) => sum + estimateTool(tool), 0) +
+  request.tools.reduce((sum, tool) => sum + SessionToolSurface.estimateTool(tool), 0) +
   request.messages.reduce((sum, message) => sum + estimateMessage(message), 0)
-
-/** Only what providers receive; `metadata` and `native` stay local. */
-const estimateTool = (tool: ToolEntry): number => {
-  if (tool.type === "tool") return Token.estimateWide(tool.name + tool.description + JSON.stringify(tool.inputSchema))
-  return (
-    Token.estimateWide(tool.name + (tool.description ?? "")) +
-    tool.tools.reduce((sum, entry) => sum + estimateTool(entry), 0)
-  )
-}
 
 const estimateMessage = (message: Message) => message.content.reduce((sum, part) => sum + estimatePart(part), 0)
 

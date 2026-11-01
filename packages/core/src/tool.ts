@@ -84,6 +84,8 @@ export interface Snapshot {
     readonly progress?: (update: Tool.Metadata) => Effect.Effect<void>
     /** Surviving request definitions, keyed by the names advertised after session context hooks. */
     readonly definitions?: ReadonlyMap<string, ToolDefinition>
+    /** Appended to the unavailable-tool errors; the on-demand surface uses it to point at discovery. */
+    readonly unavailableHint?: string
   }) => Effect.Effect<NormalizedResult, Tool.Error>
 }
 
@@ -322,10 +324,14 @@ const layer = Layer.effect(
                 : (recoverToolName(input.call.name, advertised) ?? input.call.name)
               const event = yield* beforeExecute(called, input.call.input, context)
               const requested = input.definitions?.get(event.tool)
+              const unavailable = (message: string) =>
+                input.unavailableHint === undefined ? message : `${message} ${input.unavailableHint}`
               // Preserve session context removal and alias resolution, now after the repair hook.
               if (!requested && input.definitions && (direct.has(event.tool) || codeModeTool?.name === event.tool))
                 return yield* new Tool.Error({
-                  message: `Tool is not available for this request: ${event.tool}.${availableTools(advertised)}`,
+                  message: unavailable(
+                    `Tool is not available for this request: ${event.tool}.${availableTools(advertised)}`,
+                  ),
                 })
               const name = requested?.name ?? event.tool
               if (name === "execute" && codeModeTool)
@@ -333,7 +339,7 @@ const layer = Layer.effect(
               const tool = direct.get(name)
               if (tool) return yield* executeTool(tool, name, event.input, context)
               return yield* new Tool.Error({
-                message: `No tool named "${name}" is currently available.${availableTools(advertised)}`,
+                message: unavailable(`No tool named "${name}" is currently available.${availableTools(advertised)}`),
               })
             }),
           }

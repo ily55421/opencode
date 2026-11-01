@@ -44,6 +44,10 @@ export class Info extends Schema.Class<Info>("ConfigExperimental.Info")({
     description:
       "Stop a turn that keeps making the same tool calls with the same arguments and the same results, and count the calls the model cannot format. The counters fold the durable history, so a restart does not reset them. Defaults to true.",
   }),
+  defer_tool_schemas: Schema.Boolean.pipe(optional).annotate({
+    description:
+      "Advertise on demand: when the tool schemas of one request would cost more than 10% of the model's context window, send only the tools the session has already used plus a tool_search discovery tool, and refuse calls to tools that are not loaded yet with a hint to search first. The discovered set folds the durable history, so a restart does not un-advertise a tool. Defaults to false.",
+  }),
   location_idle_timeout: Schema.Union([Schema.DurationFromString, Schema.Literal(false)])
     .pipe(optional)
     .annotate({

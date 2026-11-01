@@ -43,6 +43,7 @@ import { SessionModelTransport } from "./model-transport.js"
 import { SessionRunnerModel } from "./runner/model.js"
 import { SessionSchema } from "./schema.js"
 import { SessionSystemPrompt } from "./system-prompt.js"
+import { SessionToolSurface } from "./tool-surface.js"
 import { toLLMMessages } from "./runner/to-llm-message.js"
 import type { SessionMessage } from "./message.js"
 
@@ -87,6 +88,11 @@ export interface Input {
   readonly toolChoice?: LLM.LLMRequestInput["toolChoice"]
   /** Only the durable runner may use a stateful WebSocket. */
   readonly webSocket?: "session"
+  /**
+   * The on-demand tool schema surface, decided by the caller from durable history: when enabled and
+   * the surface measures over its threshold, only discovered tools stay advertised.
+   */
+  readonly deferredTools?: { readonly enabled: boolean; readonly discoveredNames: ReadonlyArray<string> }
   /** Prompt size, measured by the provider or estimated. The default output limit leaves room for it. */
   readonly inputTokens?: { readonly measured: number; readonly estimated: number }
 }
@@ -310,6 +316,18 @@ export const layer = Layer.effect(
       const generation = Object.fromEntries(entries.filter(([k]) => GENERATION_KEYS.has(k))) as GenerationOptionsFields
       const providerOptions = Object.fromEntries(entries.filter(([k]) => !GENERATION_KEYS.has(k)))
       const affinity = SessionAffinity.get(session)
+      // The advertised surface is decided after the hooks: a hook sees the full tool set, and
+      // deferral applies to whatever the request would finally carry. `requested` is that final set.
+      const requested = Array.from(hooked, ([name, t]) => ({ ...t, name }))
+      const surface = SessionToolSurface.plan({
+        definitions: requested,
+        discoveredNames: input.deferredTools?.discoveredNames ?? [],
+        contextWindow: model.limit.context,
+        enabled: input.deferredTools?.enabled ?? false,
+      })
+      const advertisedNames = new Set(
+        surface === undefined ? [] : surface.advertised.flatMap((entry) => (entry.type === "tool" ? [entry.name] : [])),
+      )
       const base = ai.request({
         model: model.model,
         headers: {
@@ -328,7 +346,7 @@ export const layer = Layer.effect(
         cache: model.cache?.ttl === undefined ? undefined : { ttl: model.cache.ttl },
         system: shaped.system,
         messages: boundImages(unsupportedParts(shaped.messages, model.capabilities, model.model.provider)),
-        tools: Array.from(hooked, ([name, t]) => ({ ...t, name })),
+        tools: surface === undefined ? requested : surface.advertised,
         toolChoice: input.toolChoice,
         ...generation,
         providerOptions: Object.keys(providerOptions).length === 0 ? undefined : providerOptions,
@@ -419,21 +437,50 @@ export const layer = Layer.effect(
         // catch them and turn a "no" into model-visible output. Recover them here as failures,
         // including declines a tool rethrew and its wrapper attached to a Tool.Error, as Promise
         // plugin tools do.
-        executeTool: (call: Parameters<Prepared["executeTool"]>[0]) =>
-          tools.execute({ ...call, definitions: hooked }).pipe(
-            Effect.catchCauseFilter(
-              (cause) => {
-                const decline = cause.reasons
-                  .map((r) => (Cause.isDieReason(r) ? r.defect : Cause.isFailReason(r) ? r.error.error : undefined))
-                  .find(
-                    (value): value is Permission.DeclinedError | QuestionTool.CancelledError =>
-                      value instanceof Permission.DeclinedError || value instanceof QuestionTool.CancelledError,
-                  )
-                return decline ? Result.succeed(decline) : Result.fail(cause)
-              },
-              (decline) => Effect.fail(decline),
-            ),
-          ),
+        executeTool: (execute: Parameters<Prepared["executeTool"]>[0]) => {
+          const call = execute.call
+          if (surface !== undefined) {
+            // The discovery tool is not registered; the request itself answers the query, and the
+            // result metadata is what the next history fold reads as the newly discovered set.
+            if (call.name === SessionToolSurface.TOOL_SEARCH_NAME) {
+              const args = typeof call.input === "object" && call.input !== null ? (call.input as Record<string, unknown>) : {}
+              const result = SessionToolSurface.search(
+                surface.deferred,
+                typeof args.query === "string" ? args.query : undefined,
+                typeof args.limit === "number" ? args.limit : undefined,
+              )
+              return Effect.succeed({
+                content: [{ type: "text" as const, text: result.text }],
+                metadata: { loaded: result.loaded },
+              })
+            }
+            if (!advertisedNames.has(call.name) && surface.deferred.some((entry) => entry.name === call.name))
+              return Effect.fail(new Tool.Error({ message: SessionToolSurface.NOT_LOADED(call.name) }))
+          }
+          return tools
+            .execute({
+              ...execute,
+              // A mangled name may only repair onto a tool this step advertised, so the map the
+              // executor sees is the advertised one, never the full post-hook set.
+              definitions:
+                surface === undefined ? hooked : new Map(Array.from(hooked).filter(([name]) => advertisedNames.has(name))),
+              unavailableHint: surface === undefined ? undefined : SessionToolSurface.UNAVAILABLE_HINT,
+            })
+            .pipe(
+              Effect.catchCauseFilter(
+                (cause) => {
+                  const decline = cause.reasons
+                    .map((r) => (Cause.isDieReason(r) ? r.defect : Cause.isFailReason(r) ? r.error.error : undefined))
+                    .find(
+                      (value): value is Permission.DeclinedError | QuestionTool.CancelledError =>
+                        value instanceof Permission.DeclinedError || value instanceof QuestionTool.CancelledError,
+                    )
+                  return decline ? Result.succeed(decline) : Result.fail(cause)
+                },
+                (decline) => Effect.fail(decline),
+              ),
+            )
+        },
       }
     })
 

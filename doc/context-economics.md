@@ -2,7 +2,8 @@
 
 How the size of a prompt is estimated, what budgets that estimate is used to enforce, and where a change to either can
 burn money or hit a provider rejection. Read this before touching `packages/core/src/session/compaction.ts`,
-`packages/core/src/tool-output.ts`, `packages/core/src/session/model-request.ts`, or `packages/util/src/token.ts`.
+`packages/core/src/tool-output.ts`, `packages/core/src/session/model-request.ts`,
+`packages/core/src/session/tool-surface.ts`, or `packages/util/src/token.ts`.
 
 ## Two estimators, one rule in core
 
@@ -105,6 +106,37 @@ Each ID below is defined in more than one location. The first path is the one in
 - id "review": /repo/.opencode/skills/review/SKILL.md shadows /home/u/.config/opencode/skills/review/SKILL.md
 ```
 
+## The tool schema surface
+
+Every tool definition rides in every request by default. `core/src/session/tool-surface.ts` measures that surface with
+the same rule the compaction estimator applies to an assembled request — `Token.estimateWide` over name, description
+and the serialized `inputSchema` (`estimateTool`, shared with `compaction.ts`) — and, only when
+`experimental.defer_tool_schemas` is on, defers most of it once the measure exceeds the larger of `SURFACE_MIN_TOKENS`
+(2 000) and 10% of the model's window. A deferred request advertises three things: the tools that can never defer
+(namespace entries and Code Mode's `execute` tool, whose whole flow hangs off that one definition), the tools the
+session has already used, and one `tool_search` discovery tool whose results carry full definitions.
+
+The already-used set is **rebuilt from the durable history at every step** — every settled tool call's name, plus the
+names a `tool_search` result recorded under its own result `metadata.loaded`. Nothing else stores it. The refusal to
+run an un-loaded tool (`Load guard: …`) is the mechanism speaking, not a use, so the fold skips it — the same
+exclusion that keeps the loop guard's own refusals out of its pattern — which is why the model cannot load a tool by
+calling it blind.
+
+The advertised list is **append-only within a turn**: the fixed part (exempt tools, then `tool_search`) comes first
+and each discovery appends after it. History only appends within a turn, so the previous step's `tools` array stays a
+byte-prefix of the next one and the "Step-to-step bytes" rule below holds at the wire; what the deferral changes is
+that the cached-prefix test in `session-runner.test.ts` asserts full equality only for sessions that never defer.
+
+Two degradations are accepted. A mid-turn compaction can drop the history a discovery was folded from, so a
+previously advertised tool can disappear until one more `tool_search` call re-loads it. And a `session.context` hook
+sees the full tool set but its addition defers like everything else, because the surface is decided after the hook;
+the system prompt is likewise assembled from the pre-deferral snapshot names, so its conditional guidance may name a
+deferred tool, and the discovery tool's description carries the on-demand contract.
+
+Budget ownership sits here. The instruction pools above cap injected blocks and never touch tool schemas; model→tool
+routing is a plan (`P0-可执行技术方案.md` §3.12), not code, and would compose upstream of this threshold when it
+lands — one owner per axis, so two budgets cannot silently contradict each other.
+
 ## Prefix bytes
 
 Two rules keep the provider's cached prefix alive, and both are checked without a provider:
@@ -117,7 +149,9 @@ Two rules keep the provider's cached prefix alive, and both are checked without 
 - **Step-to-step bytes.** The cached-prefix cases in `packages/core/test/session-runner.test.ts` assert that the second
   request of a turn replays the first request's `{system, tools, messages}` byte for byte, at the wire level through
   `compileRequest`. Anything that varies the assembled request between steps — a per-request timestamp, a map iteration
-  order, a tool list that changes mid-turn — fails that test rather than costing money nobody attributes.
+  order, a tool list that changes mid-turn — fails that test rather than costing money nobody attributes. The one
+  sanctioned change is the on-demand surface's append-only growth ("The tool schema surface" above), which keeps the
+  previous step's tools a prefix of the next.
 
 ## When compaction runs
 
@@ -255,6 +289,33 @@ in production calls. The wire bytes are already reachable from a test through `c
 seam than hashing the assembled `LLMRequest` — it compares what the provider actually reads. If a cache keepalive
 lands later, it will need the same comparison before it sends, and that is when the helper earns a production home.
 
+**The discovered tool set is rebuilt from history, never held in memory.** Rejected: a per-session `Set<string>`
+next to the runner. Failure mode: a restart would un-advertise tools the session already built work around — the
+model's next call to one of them would be refused mid-task, and the refusal would read as a bug rather than a
+mechanism. The same reasoning as the loop counters in `doc/session-loop.md`, one layer up; the cost paid is the
+compaction degradation above.
+
+**A refusal does not discover the tool it refused.** Rejected: folding every tool part's name, refusals included.
+Failure mode: calling a deferred tool blind would be enough to advertise it on the next step, so the `Load guard:`
+hint would teach the model that the way to load a tool is to call it and eat the error.
+
+**Tools grow append-only within a turn.** Rejected: re-sorting the advertised list per request, the way
+`Tool.snapshot` sorts the registry's own definitions. Failure mode: a discovery that sorted before an existing entry
+would move it, and every step after a discovery would re-push the prefix at full price — the exact cost the deferral
+exists to avoid. Discoveries therefore append after the fixed part, in first-use order, which the history fold
+reproduces for free.
+
+**Deferral is opt-in and threshold-gated.** Rejected: on by default. Failure mode: small sessions pay discovery
+latency and an extra tool definition on every request for nothing. Rejected: deferring always once enabled. Failure
+mode: a session with three MCP tools would search for tools it could have been handed outright. The threshold
+follows the borrowed design's own measurement — defer when the surface costs more than a tenth of the window, with a
+floor so a tiny window cannot defer a tiny surface.
+
+**The Code Mode `execute` tool never defers.** It is the only advertised tool its flow hangs off, and deferring it
+would turn every Code Mode session into a search for a tool whose catalog was already paid for. The exemption is by
+name because name is the only signal a `ToolDefinition` carries; a user tool named `execute` staying advertised is
+harmless.
+
 ## Tests
 
 `packages/core/test/session-compaction.test.ts` drives the real `SessionCompaction.node` against SQLite and a mock
@@ -271,5 +332,8 @@ freshness) and the `core/skill-conflicts` source's initial, changed, and removed
 `config/skill.test.ts` asserts the disclosure end to end against two directories defining one ID;
 `mcp-schema-canonical.test.ts` proves two key-orderings of one schema serialize to the same tool definition and that
 the un-canonicalized bytes differ, which is the gap; the cached-prefix cases in `session-runner.test.ts` compare the
-wire bytes of consecutive steps through `compileRequest`, including a deliberately timestamped negative. Run from
-`packages/core` with `bun run test`.
+wire bytes of consecutive steps through `compileRequest`, including a deliberately timestamped negative.
+`session-tool-surface.test.ts` covers the surface measurement, the discovered fold (including the refusal exclusion
+and the `tool_search` result metadata), the threshold decision, the append-only ordering, and the search; the
+deferral flow end to end — blind refusal, search, append-only tools between steps — runs in `session-runner.test.ts`.
+Run from `packages/core` with `bun run test`.

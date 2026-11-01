@@ -36,6 +36,7 @@ import { PluginHooks } from "../../plugin/hooks.js"
 import { MAX_STEPS_PROMPT } from "./max-steps.js"
 import { SessionRunnerEmpty } from "./empty.js"
 import { SessionRunnerLoop } from "./loop.js"
+import { SessionToolSurface } from "../tool-surface.js"
 
 const CONTINUE_AFTER_INCOMPLETE_STREAM =
   "The previous response was interrupted. Continue from where you left off without repeating completed content."
@@ -293,6 +294,15 @@ const layer = Layer.effect(
         // The guard is folded from durable history at every Step boundary, so a rejection the model
         // has already eaten keeps counting after a restart.
         const guard = SessionRunnerLoop.decide(loaded.messages, yield* SessionRunnerLoop.enabled)
+        // One failure before the failure-streak limit the guard speaks instead of blocking. The
+        // synthetic is the dedup counter: the next fold sees it and does not repeat the advisory.
+        if (guard.advisory)
+          yield* bus.publish(SessionEvent.Synthetic, {
+            sessionID,
+            text: guard.advisory.text,
+            description: "Advising the model one failure before a failure-streak stop",
+            metadata: { notice: guard.advisory.notice },
+          })
         const closing = guard.stop ?? (stepLimitReached ? MAX_STEPS_PROMPT : undefined)
         const transcript = SessionModelRequest.baseTranscript({
           agent: loaded.agent.info,
@@ -314,6 +324,10 @@ const layer = Layer.effect(
             toolChoice: closing === undefined ? undefined : "none",
             webSocket: "session",
             inputTokens: estimate,
+            deferredTools: {
+              enabled: yield* SessionToolSurface.enabled,
+              discoveredNames: SessionToolSurface.discovered(loaded.messages),
+            },
           })
           .pipe(
             // The hook event holds every message from before images are bounded, screenshots included, and is a separate

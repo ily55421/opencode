@@ -63,6 +63,8 @@ import { Agent } from "@opencode/core/agent"
 import { Config } from "@opencode/core/config"
 import { Document, Info } from "@opencode/schema/config"
 import { ConfigCompaction } from "@opencode/schema/config/compaction"
+import { ConfigExperimental } from "@opencode/schema/config/experimental"
+import { TOOL_SEARCH_NAME } from "@opencode/core/session/tool-surface"
 import { Tool } from "@opencode/core/tool"
 import type { Info as ToolInfo } from "@opencode/schema/tool"
 import { InstructionStateTable, SessionInboxTable, SessionMessageTable, SessionTable } from "@opencode/core/session/sql"
@@ -78,7 +80,7 @@ import { SessionSystemPrompt } from "@opencode/core/session/system-prompt"
 import { ID, Model } from "@opencode/core/model"
 import { Location } from "@opencode/core/location"
 import { Provider } from "@opencode/core/provider"
-import { Cause, Context, DateTime, Deferred, Effect, Exit, Fiber, Layer, Queue, Schema, Scope, Stream } from "effect"
+import { Cause, Context, DateTime, Deferred, Effect, Exit, Fiber, Layer, Option, Queue, Schema, Scope, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { and, asc, desc, eq, sql } from "drizzle-orm"
 import { testEffect } from "./lib/effect"
@@ -236,6 +238,9 @@ const makeRunnerState = (compaction?: SessionRunnerModel.Resolved["compaction"])
     skillBaselines: new Map<Agent.ID, string>(),
     authorizations: new Array<Tool.Context>(),
     executions: new Array<string>(),
+    // When set, the echo tool fails with this message instead of running; the failure-streak
+    // scenarios use it to make every call fail while the model varies the arguments.
+    echoFailure: undefined as string | undefined,
     closedTransports: new Array<Session.ID>(),
     blockTools: (count = 1) =>
       Effect.acquireRelease(
@@ -313,6 +318,7 @@ const layer = Layer.unwrap(
                 Effect.gen(function* () {
                   state.authorizations.push(context)
                   state.executions.push(text)
+                  if (state.echoFailure !== undefined) return yield* new Tool.Error({ message: state.echoFailure })
                   yield* state.awaitToolBarrier
                   return { output: { text }, content: text }
                 }),
@@ -7559,5 +7565,95 @@ describe("SessionRunnerLLM", () => {
       content: [{ type: "text", text: expect.stringContaining("Loop guard: automatic continuation stopped") }],
     })
     expect((yield* s.messages).some((entry) => entry.type === "assistant" && entry.error !== undefined)).toBe(false)
+  })
+
+  scenario("advises on cross-parameter failures and closes the turn at the streak limit", function* (s) {
+    s.echoFailure = "Echo unavailable"
+    const varying = Array.from({ length: 6 }, (_, index) => TestLLM.tool(`call-fail-${index}`, "echo", { text: `v${index}` }))
+    yield* s.llm.push(...varying, TestLLM.text("Wrapped up", "failure-stop"))
+    yield* s.runPrompt("Echo something")
+
+    // Five varied failures publish the one advisory; the sixth closes the turn with the failure stop.
+    expect(s.requests).toHaveLength(7)
+    const notices = yield* Effect.map(s.context, (messages) =>
+      messages.flatMap((entry) =>
+        entry.type === "synthetic" && entry.metadata?.notice === "failure-streak-advisory" ? [entry.text] : [],
+      ),
+    )
+    expect(notices).toHaveLength(1)
+    expect(notices[0]).toContain("Failure guard: echo has failed 5 times")
+    expect(yield* loopGuardFailures(s)).toHaveLength(0)
+    expect(s.requests[6]?.toolChoice).toMatchObject({ type: "none" })
+    expect(s.requests[6]?.messages.at(-1)).toMatchObject({
+      role: "assistant",
+      content: [{ type: "text", text: expect.stringContaining("Failure guard: automatic continuation stopped") }],
+    })
+  })
+
+  scenario("defers tool schemas over the threshold and loads them on demand", function* (s) {
+    // The test layer carries `Config.Test`, but the scenario contract does not name it; read it
+    // optionally so the body keeps the layer's own R.
+    const config = Option.getOrUndefined(yield* Effect.serviceOption(Config.Test))
+    if (config === undefined) return yield* Effect.die(new Error("Config.Test is not in the scenario context"))
+    const current = yield* config.entries()
+    yield* config.setEntries([
+      ...current,
+      new Document({
+        type: "document",
+        info: new Info({ experimental: new ConfigExperimental.Info({ defer_tool_schemas: true }) }),
+      }),
+    ])
+    // A window whose 10% share matches the floor keeps the threshold at 2 000 tokens, which the
+    // shared fixture tools alone stay under and the fat scenario tools push past.
+    modelLimits.set("defer-model", { context: 20_000, output: 1_000 })
+    s.currentModel = LanguageModel.make({ id: "defer-model", provider: "fake", route: OpenAIChat.route })
+    const registry = yield* Tool.Service
+    yield* transformTools(
+      registry,
+      Object.fromEntries(
+        ["alpha", "beta", "gamma", "delta"].map((name) => [
+          name,
+          {
+            name,
+            description: `Tool ${name}. ${"x".repeat(2_000)}`,
+            input: Schema.Struct({ path: Schema.String }),
+            output: Schema.Struct({}),
+            execute: () => Effect.succeed({ output: {} }),
+          },
+        ]),
+      ),
+      { codemode: false },
+    )
+
+    yield* s.llm.push(
+      TestLLM.tool("call-blind", "beta", { path: "b" }),
+      TestLLM.tool("call-search", TOOL_SEARCH_NAME, { query: "alpha" }),
+      TestLLM.tool("call-alpha", "alpha", { path: "a" }),
+      TestLLM.text("Done", "defer-done"),
+    )
+    yield* s.runPrompt("Use alpha")
+
+    const names = (index: number) => s.requests[index]?.tools.map((tool) => tool.name) ?? []
+    // The first request advertises the discovery tool and nothing deferred; the blind call changes
+    // nothing; the search result appends alpha after the tools the previous step already had.
+    expect(names(0)).toContain(TOOL_SEARCH_NAME)
+    expect(names(0)).not.toContain("alpha")
+    expect(names(0)).not.toContain("beta")
+    expect(names(1)).toEqual(names(0))
+    expect(names(2)).toEqual([...names(0), "alpha"])
+    expect(names(3)).toEqual(names(2))
+
+    const toolParts = yield* Effect.map(s.context, (messages) =>
+      messages.flatMap((entry) =>
+        entry.type !== "assistant"
+          ? []
+          : entry.content.flatMap((part) => (part.type === "tool" ? [part] : [])),
+      ),
+    )
+    const blind = toolParts.find((part) => part.state.status === "error" && part.name === "beta")
+    expect(blind?.state.status === "error" && blind.state.error.message.startsWith("Load guard:")).toBe(true)
+    const loaded = toolParts.find((part) => part.name === TOOL_SEARCH_NAME && part.state.status === "completed")
+    expect(loaded?.state.status === "completed" && loaded.state.metadata).toMatchObject({ loaded: ["alpha"] })
+    expect(toolParts.some((part) => part.name === "alpha" && part.state.status === "completed")).toBe(true)
   })
 })
