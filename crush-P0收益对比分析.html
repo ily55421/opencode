@@ -1,0 +1,691 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>crush 对照 P0 清单 · 12 项的收益、成本与先后</title>
+<style>
+  :root {
+    --bg: #f6f6f3;
+    --panel: #ffffff;
+    --ink: #1b1f23;
+    --muted: #5f676e;
+    --faint: #8a9298;
+    --line: #e3e3dd;
+    --line-strong: #cfd0c9;
+    --teal: #0f766e;
+    --teal-soft: #d9eeea;
+    --blue: #1d4ed8;
+    --blue-soft: #dde5fb;
+    --purple: #6d28d9;
+    --purple-soft: #e9e0fb;
+    --amber: #b45309;
+    --amber-soft: #f8e8d4;
+    --gray: #6b7280;
+    --gray-soft: #ececea;
+    --radius: 14px;
+    --shadow: 0 1px 2px rgba(20, 24, 28, .05), 0 10px 30px rgba(20, 24, 28, .05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111417;
+      --panel: #191d21;
+      --ink: #e8e6e1;
+      --muted: #a4abb1;
+      --faint: #7c848b;
+      --line: #2a2f34;
+      --line-strong: #3a4046;
+      --teal: #2dd4bf;
+      --teal-soft: #10322e;
+      --blue: #93b4ff;
+      --blue-soft: #17233f;
+      --purple: #c4b5fd;
+      --purple-soft: #241a3d;
+      --amber: #fbbf24;
+      --amber-soft: #35270f;
+      --gray: #9ca3af;
+      --gray-soft: #24282c;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .4);
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Segoe UI", system-ui, -apple-system, "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 28px; }
+  header.hero { padding: 64px 0 30px; border-bottom: 1px solid var(--line); }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--teal); font-weight: 700; }
+  h1 { font-size: clamp(30px, 4.4vw, 50px); line-height: 1.12; margin: 12px 0 14px; letter-spacing: -.02em; }
+  .lede { max-width: 820px; color: var(--muted); font-size: 16px; margin: 0; }
+  .lede strong { color: var(--ink); font-weight: 650; }
+  .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 30px 0 4px; }
+  .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); }
+  .kpi .v { font-size: 27px; font-weight: 720; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .kpi .k { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  section { padding: 46px 0 8px; }
+  .sec-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 8px; }
+  h2 { font-size: 24px; letter-spacing: -.01em; margin: 0; }
+  .sec-note { color: var(--muted); font-size: 13px; margin: 0 0 20px; max-width: 860px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+  .pad { padding: 20px 22px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 12px; color: var(--muted); margin-top: 12px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: 1px; }
+  .two-col { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(300px, .65fr); gap: 18px; align-items: start; }
+  @media (max-width: 940px) { .two-col { grid-template-columns: 1fr; } .kpis { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+  .weights { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .weights th, .weights td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--line); }
+  .weights th { color: var(--muted); font-weight: 600; }
+  .weights td:last-child, .weights th:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+  .bar-list { display: flex; flex-direction: column; gap: 9px; }
+  .bar-row { display: grid; grid-template-columns: 62px 1fr 168px; gap: 12px; align-items: center; }
+  .bar-id { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .track { position: relative; height: 20px; background: var(--gray-soft); border-radius: 6px; overflow: hidden; }
+  .fill { height: 100%; border-radius: 6px; background: var(--teal); opacity: .82; }
+  .bar-meta { font-size: 12px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tag { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line-strong); color: var(--muted); white-space: nowrap; }
+  .tag.teal { color: var(--teal); border-color: color-mix(in srgb, var(--teal) 45%, transparent); background: var(--teal-soft); }
+  .tag.blue { color: var(--blue); border-color: color-mix(in srgb, var(--blue) 45%, transparent); background: var(--blue-soft); }
+  .tag.purple { color: var(--purple); border-color: color-mix(in srgb, var(--purple) 45%, transparent); background: var(--purple-soft); }
+  .tag.amber { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 45%, transparent); background: var(--amber-soft); }
+  .tag.gray { color: var(--gray); background: var(--gray-soft); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+  .chip { border: 1px solid var(--line-strong); background: transparent; color: var(--muted); border-radius: 999px; padding: 5px 12px; font-size: 12px; cursor: pointer; font-family: inherit; }
+  .chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .chip:hover { border-color: var(--ink); }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); box-shadow: var(--shadow); }
+  table.grid { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 900px; }
+  table.grid th, table.grid td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  table.grid thead th { position: sticky; top: 0; background: var(--panel); z-index: 1; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); cursor: pointer; user-select: none; white-space: nowrap; }
+  table.grid thead th:hover { color: var(--ink); }
+  table.grid tbody tr:hover { background: color-mix(in srgb, var(--teal) 5%, transparent); }
+  table.grid td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  table.grid td.what { color: var(--muted); min-width: 280px; }
+  .heat td.cell { text-align: center; font-weight: 650; font-variant-numeric: tabular-nums; border-radius: 5px; }
+  .heat td.h1 { background: color-mix(in srgb, var(--teal) 8%, transparent); }
+  .heat td.h2 { background: color-mix(in srgb, var(--teal) 20%, transparent); }
+  .heat td.h3 { background: color-mix(in srgb, var(--teal) 38%, transparent); }
+  .heat td.h4 { background: color-mix(in srgb, var(--teal) 58%, transparent); color: var(--panel); }
+  .heat td.h5 { background: color-mix(in srgb, var(--teal) 76%, transparent); color: var(--panel); }
+  @media (max-width: 720px) {
+    #heat-table { min-width: 0 !important; }
+    #heat-table th:nth-child(2), #heat-table td:nth-child(2) { display: none; }
+    #heat-table th, #heat-table td { padding: 8px 6px; }
+  }
+  .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  @media (max-width: 860px) { .cards { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow); }
+  .card h3 { margin: 0 0 4px; font-size: 17px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .card .one { color: var(--muted); font-size: 14px; margin: 0 0 12px; }
+  .card ul { margin: 0; padding-left: 18px; font-size: 13px; color: var(--muted); }
+  .card li { margin: 4px 0; }
+  .card li strong { color: var(--ink); font-weight: 620; }
+  .card .foot { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); font-size: 12px; color: var(--faint); display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .callout { border-left: 3px solid var(--amber); background: var(--amber-soft); padding: 14px 16px; border-radius: 0 10px 10px 0; font-size: 13px; color: var(--ink); margin: 16px 0; }
+  .callout strong { color: var(--amber); }
+  .callout.teal { border-left-color: var(--teal); background: var(--teal-soft); }
+  .callout.teal strong { color: var(--teal); }
+  .mono { font-family: ui-monospace, SFMono-Regular, "Cascadia Code", Consolas, monospace; font-size: 12px; }
+  footer { margin-top: 48px; padding: 26px 0 50px; border-top: 1px solid var(--line); color: var(--faint); font-size: 12px; }
+  svg text { font-family: inherit; }
+  .chart-scroll { overflow-x: auto; overflow-y: hidden; }
+  .chart-scroll svg { min-width: 860px; }
+  .hint { font-size: 12px; color: var(--faint); margin: 10px 0 0; }
+  @media print {
+    body { background: #fff; }
+    .chip, .chips { display: none; }
+    section { break-inside: avoid; }
+    .panel, .card, .table-wrap { box-shadow: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <div class="eyebrow">crush 对照 · 基线 2.2.0-fork.11 @ 51201b6445 · 对象 crush main @ 7f418090 · 2026-11-01</div>
+  <h1>crush 对照 12 项：收益、成本与先后</h1>
+  <p class="lede">
+    把 <strong>crush-借鉴清单</strong> 的 6 个借鉴项拆成 12 行，再和对照时照出的 3 条本仓事实放在同一张账上：收益按五个维度打分
+    （可靠性、成本/延迟、安全、可审计性、用户可见体验），成本取清单里的工程日估算，证据强度沿用清单的四级标注。
+    目的不是给每项贴"好/坏"，而是回答 <strong>先做哪些、哪些必须做但不便宜、哪些要先量再决定</strong>。
+    本页默认按 <strong>速度优先 · 花钱不计</strong> 打开（与 16 项 L 账、OpenHands 账同口径，可横比）；
+    但本轮增量集中在权限与验证面，这套预设天然让它们吃亏 —— 请换「安全可控」或「均衡」再看一遍。
+  </p>
+  <div class="kpis">
+    <div class="kpi"><div class="v">12</div><div class="k">条目（6 借鉴项拆 9 行 + 3 本仓事实）</div></div>
+    <div class="kpi"><div class="v">4</div><div class="k">先做集合（含 1 个 P0 拆两行）</div></div>
+    <div class="kpi"><div class="v">1.75<span style="font-size:14px;font-weight:600"> 人日</span></div><div class="k">先做集合</div></div>
+    <div class="kpi"><div class="v">14.25<span style="font-size:14px;font-weight:600"> 人日</span></div><div class="k">全部（LSP 三行占 7.5）</div></div>
+  </div>
+</header>
+
+<main>
+
+<section id="scope">
+  <div class="sec-head"><h2>账的范围</h2><span class="tag gray">与 16 项 L 账、OpenHands 账不重复</span></div>
+  <p class="sec-note">
+    被对照的对象是 <span class="mono">github.com/charmbracelet/crush</span>（Go / Bubble Tea v2，早期 opencode 的 Go 重写后代）：
+    <span class="mono">internal/</span> 下 51 个一阶包、854 个 <span class="mono">.go</span>、非测试 116,461 行、测试 77,135 行、363 个 <span class="mono">.golden</span>。
+    <strong>它的多步循环内核在 <span class="mono">charm.land/fantasy</span> 里，仓库未 vendor，本轮读不到</strong> ——
+    所以本页没有任何"它的 loop 比我们好/差"的判断。能对照的是它的外围工程：命令与 flag 策略、LSP 运行时、终端渲染代价、进程与分发治理。
+  </p>
+  <div class="two-col">
+    <div class="panel pad">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:10px">本轮看到、但已归属既有轮次或本仓已有的东西（不在本页计分）</div>
+      <table class="weights">
+        <thead><tr><th>项</th><th>归属</th><th>为什么不在本页</th></tr></thead>
+        <tbody>
+          <tr><td>读过才准覆盖（<span class="mono">filetracker</span> mtime 门）</td><td>reasonix 第 1 项</td><td>他轮已立项；crush 只比 mtime、无内容指纹、不区分完整读</td></tr>
+          <tr><td>通用重复/空转熔断</td><td>L1（已落地）</td><td>本仓 <span class="mono">runner/loop.ts</span> 已实现四类判据且比 crush 细 → 转为 CR-8 的台账更正</td></tr>
+          <tr><td>prompt cache 断点与路由亲和</td><td>L17、L30</td><td>已有 <span class="mono">SessionAffinity</span> 与逐 provider 白名单；只补一条断点位置事实</td></tr>
+          <tr><td>输出溢出到文件、60s 自动转后台</td><td>本仓已有等价物</td><td><span class="mono">shell.ts</span> 的 <span class="mono">backgroundResult</span> 同形且更早</td></tr>
+          <tr><td>同版本二进制的判别（<span class="mono">deriveBuildID</span>）</td><td>OH-1</td><td>OH-1 已立版本纪律；本页只把 mtime/BuildID 作为可并入的事实</td></tr>
+          <tr><td>供应链、cassette 回放、<span class="mono">.golden</span>、cosign、SBOM</td><td>codex M2、OH-7、L16、L39</td><td>本仓已有 <span class="mono">check:generated</span> 与 SHA 固定的 actions</td></tr>
+          <tr><td>技能索引、来源标注、冲突披露</td><td>L32 + 本仓 <span class="mono">08aef689be</span></td><td>我们还能从远端 <span class="mono">index.json</span> 拉目录，更广</td></tr>
+          <tr><td>MCP 首条消息阻塞、终端 passphrase 接管</td><td>L16 / 本仓已有</td><td>我们初始连接已异步；<span class="mono">cli/ssh-askpass.ts</span> 已存在</td></tr>
+          <tr><td><span class="mono">crushrc</span> 配置即脚本、项目配置静默授权、审批只放内存、parts 存 JSON blob + 单连接</td><td>明确不学</td><td>见清单第四节：clone 即执行、比本仓更弱、倒退、与事件折叠相反</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="panel pad">
+      <div class="callout teal" style="margin-top:0">
+        <strong>两个不受预设影响的结论。</strong>
+        <strong>CR-1a</strong>（含 <span class="mono">-c</span> / <span class="mono">--ext-diff</span> / <span class="mono">-O</span> 的命令不再落盘成通配许可）不占任何运行时开销：
+        本轮实测里，批准一次 <span class="mono">git -c core.fsmonitor=… status</span> 会落盘 <span class="mono">git -c *</span>，
+        等于一次点击换来任意代码执行的永久许可，而审批头显示的文本长得像 <span class="mono">status</span>。
+        <strong>CR-8</strong>（更正 <span class="mono">优势对比清单.md</span> 的三条"无通用断路器"）是账目正确性，与快慢、与安全目标都无关。
+        无论切到哪套预设，这两项都该先做。
+      </div>
+      <p class="hint">
+        CR-5 与 CR-6 记为「先量」：机制在 crush 侧确认存在，但<strong>本仓的危害大小还没测</strong> —— 内联工具输出的 ANSI 走向、
+        每帧成本是否真的与列表长度相关，都不许直接开工。CR-9 是所有 <span class="mono">[转述]</span> 结论的收口，它决定 CR-1b 与 CR-3c 是否成立。
+      </p>
+      <p class="hint">本页<strong>唯一的 P0 是 CR-1</strong>（拆 1a/1b 两行，合计 1.25 人日）。CR-3a 分数不低，但它是本轮唯一"必须做且要大"的一块。</p>
+    </div>
+  </div>
+</section>
+
+<section id="model">
+  <div class="sec-head"><h2>评分模型</h2><span class="tag gray">工程判断，不是实测</span></div>
+  <p class="sec-note">
+    与 16 项那页、OpenHands 那页同口径：单个维度 1–5 分，加权后 ×20 映射到 100 分；唯一的实测数据是工期估算与证据等级。
+    这样做的理由是这批收益大多不是"功能有没有"，而是"一次点击会不会变成永久许可、失败时模型和用户能不能自救"。
+    <strong>切换预设，象限、ROI、热力表总分、对比表全部重算。</strong>
+  </p>
+  <div class="chips" id="presets" style="margin:0 0 10px"></div>
+  <p class="hint" id="weight-line" style="margin:0 0 8px"></p>
+  <div class="callout" id="preset-note" style="margin-top:0"></div>
+  <p class="hint" id="preset-top" style="margin:8px 0 18px"></p>
+  <div class="two-col">
+    <div class="panel pad">
+      <p class="hint" style="margin:0 0 10px">下表是「均衡」预设的权重定义；切换预设后，生效权重显示在页面顶部。</p>
+      <table class="weights">
+        <thead><tr><th>维度</th><th>看什么</th><th>权重</th></tr></thead>
+        <tbody>
+          <tr><td>运行可靠性</td><td>非终态工具调用、编辑后无验证回喂、LSP 缺位时的静默、失败不可见</td><td>30%</td></tr>
+          <tr><td>成本 / 延迟</td><td>无效重试与空转、上下文体积（诊断与日志回灌）、每帧渲染成本、返工</td><td>25%</td></tr>
+          <tr><td>安全 / 权限</td><td>持久许可的形状、档位豁免范围、配置即执行、任意代码执行面</td><td>20%</td></tr>
+          <tr><td>可审计性</td><td>死配置、台账与代码是否一致、审批可交代性、档位可区分</td><td>15%</td></tr>
+          <tr><td>用户可见体验</td><td>浅色主题可读性、错误文案可执行性、进度与首屏延迟</td><td>10%</td></tr>
+        </tbody>
+      </table>
+      <div class="callout" style="margin-bottom:0">
+        <strong>读法：</strong>分数高不等于先做。<strong>CR-1a</strong> 是唯一又高又便宜的；<strong>CR-2 / CR-7 / CR-8</strong> 是"半天以内换确定收益"；
+        <strong>CR-3a / CR-3b</strong> 分数不低但必须排队（整块 7.5 人日）；<strong>CR-3c</strong> 战略价值存疑、短期 ROI 最低；
+        <strong>CR-5 / CR-6</strong> 的收益栏在实测前只能算假设。
+      </div>
+    </div>
+    <div class="panel pad">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:10px">状态分组</div>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--teal)"></span>先做（含前置断言）</span>
+        <span><span class="dot" style="background:var(--blue)"></span>规划（随后）</span>
+        <span><span class="dot" style="background:var(--purple)"></span>战略（新能力面）</span>
+        <span><span class="dot" style="background:var(--amber)"></span>先量（不测不开）</span>
+        <span><span class="dot" style="background:var(--gray)"></span>条件立项</span>
+      </div>
+      <div style="font-size:13px;color:var(--muted);margin:18px 0 8px">证据分级</div>
+      <table class="weights">
+        <tbody>
+          <tr><td><span class="tag teal">本轮实测</span></td><td>本次直接打开文件核对，或在本仓跑出结果（含对方仓）</td></tr>
+          <tr><td><span class="tag blue">摘要实测</span></td><td>子代理报告，动手前必须复核</td></tr>
+          <tr><td><span class="tag amber">待验证</span></td><td>机制存在、危害未测，先定生死</td></tr>
+        </tbody>
+      </table>
+      <p class="hint">分级与「复核命令」见 <span class="mono">crush-借鉴清单.md</span> 第六节；<span class="mono">[转述]</span> 与 <span class="mono">[UNVERIFIED]</span> 的收口清单在其 §五.4。</p>
+    </div>
+  </div>
+</section>
+
+<section id="quadrant">
+  <div class="sec-head"><h2>投入产出象限</h2><span class="tag gray">横轴 = 人日 · 纵轴 = 收益分</span></div>
+  <p class="sec-note">    左上"低投入 · 高收益"是先做集合 —— <span class="mono">CR-1a / CR-7 / CR-8</span> 全挤在 0.25–0.75 人日这条边界上。
+    <strong>CR-3c 落在右下不是坏位置</strong>：它是本轮唯一"可以长期搁置"的条件项，4 人日换的是每语言服务器的安装差异，不是确定性收益。
+    <strong>CR-5 / CR-6 / CR-9 用虚线圈</strong>：收益是假设，机制在对方侧确认存在、在本仓侧没测。同坐标的点做了微小水平偏移以便区分。</p>
+  <div class="panel pad">
+    <div class="chart-scroll">
+      <svg id="scatter" viewBox="0 0 980 500" role="img" aria-label="crush 对照 12 项的工期与收益分散点图" style="width:100%;height:auto;display:block"></svg>
+    </div>
+    <div class="legend" id="scatter-legend"></div>
+    <p class="hint">窄窗口下图表可横向滚动；桌面宽度一次显示全部。</p>
+  </div>
+</section>
+
+<section id="rank">
+  <div class="sec-head"><h2>按投入产出比排序</h2><span class="tag gray">收益分 ÷ 人日</span></div>
+  <p class="sec-note">    ROI 只回答"同样的时间先花在哪"。三处会误导：<strong>CR-8</strong> 的 ROI 在四套预设下都靠前，因为它是 0.25 人日的台账更正 ——
+    它让下一轮不重复立项，但它不是一个功能；<strong>CR-5</strong> 容易进前五，纯粹因为 0.75 人日 + 危害还没实测，它是这批里最便宜的假设，不是最划算的活；
+    <strong>CR-3a / CR-3b</strong> 的 ROI 低，但它们是本轮唯一让产品能力面变宽的一项（编辑后拿到真实诊断），ROI 排序不该决定它的生死。</p>
+  <div class="panel pad">
+    <div class="bar-list" id="rank-bars"></div>
+  </div>
+</section>
+
+<section id="matrix">
+  <div class="sec-head"><h2>收益结构热力表</h2><span class="tag gray">1–5 分 · 颜色越深收益越大</span></div>
+    <p class="sec-note">同一总分可能来自完全不同的结构：<span class="mono">CR-1a</span> 靠安全与可审计（它不占运行时开销），
+  <span class="mono">CR-3a</span> 靠可靠性与体验（编辑后立刻知道有没有写坏），<span class="mono">CR-6</span> 只有成本与体验两项撑分，
+  <span class="mono">CR-8</span> 只有可审计一项。决定"先做什么"要看条形的形状，不是看最右那个数字。</p>
+  <div class="table-wrap">
+    <table class="grid heat" id="heat-table" style="min-width:760px">
+      <thead>
+        <tr>
+          <th>项</th><th>一句话</th>
+          <th style="text-align:center">可靠性<br><span style="font-weight:400;text-transform:none;letter-spacing:0">30%</span></th>
+          <th style="text-align:center">成本/延迟<br><span style="font-weight:400;text-transform:none;letter-spacing:0">25%</span></th>
+          <th style="text-align:center">安全<br><span style="font-weight:400;text-transform:none;letter-spacing:0">20%</span></th>
+          <th style="text-align:center">可审计<br><span style="font-weight:400;text-transform:none;letter-spacing:0">15%</span></th>
+          <th style="text-align:center">体验<br><span style="font-weight:400;text-transform:none;letter-spacing:0">10%</span></th>
+          <th style="text-align:right">总分</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<section id="table">
+  <div class="sec-head"><h2>完整对比表</h2><span class="tag gray">点表头排序 · 上方筛选</span></div>
+  <div class="chips" id="filters"></div>
+  <div class="table-wrap">
+    <table class="grid" id="main-table">
+      <thead>
+        <tr>
+          <th data-sort="id">项</th>
+          <th data-sort="axis">轴</th>
+          <th data-sort="status">状态</th>
+          <th data-sort="evidence">证据</th>
+          <th data-sort="days" style="text-align:right">工期</th>
+          <th data-sort="score" style="text-align:right">收益分</th>
+          <th data-sort="roi" style="text-align:right">ROI</th>
+          <th data-sort="deps">依赖 / 前置</th>
+          <th>一句话</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<section id="notes">
+  <div class="sec-head"><h2>重点项解读</h2><span class="tag gray">为什么这样排</span></div>
+  <p class="sec-note">解读卡上标的是<strong>状态与工期</strong>，不标分数（分数随预设变，见上方四套实算排序）。对方机制一律标注来源文件与符号，本方现状一律标注符号名并注明是否复核。</p>
+  <div class="cards">
+    <div class="card">
+      <h3>CR-1 持久许可的 key 不看 flag <span class="tag teal">先做 · 1.25d（拆 1a/1b）</span></h3>
+      <p class="one">本轮唯一 P0：一次普通批准换来对整个 flag 维度的永久许可，其中 <span class="mono">git -c *</span> 等于任意代码执行。</p>
+      <ul>
+        <li><strong>我方实测（本轮跑出）：</strong><span class="mono">shell/parse.ts</span> 的 <span class="mono">prefix()</span> + <span class="mono">ARITY</span>（<span class="mono">git: 2</span>）产出 <span class="mono">save: "&lt;前缀&gt; *"</span>；<span class="mono">ShellDanger.classify()</span> 对全部下列输入返回 <span class="mono">safe</span>，<span class="mono">rememberable()</span> 返回 <span class="mono">true</span>：<span class="mono">git push origin main</span> → <span class="mono">git push *</span>、<span class="mono">git push --force origin main</span> → <span class="mono">git push *</span>、<span class="mono">git -c core.fsmonitor=/tmp/evil status</span> → <span class="mono">git -c *</span>、<span class="mono">docker rm --force x</span> → <span class="mono">docker rm *</span>、<span class="mono">kubectl delete pod x --grace-period=0</span> → <span class="mono">kubectl delete *</span>。对照组 <span class="mono">rm -rf /</span>、<span class="mono">curl x | sh</span> 正常升级，证明不是探针误用。</li>
+        <li><strong>对方机制：</strong><span class="mono">tools/safe.go</span> 的 <span class="mono">entry{restrictFlags, allowFlags, denyFlags, requireFlag, allowOperands}</span>，加 <span class="mono">gitCodeExecFlags</span>（<span class="mono">--ext-diff --textconv --open-files-in-pager -O --output --upload-pack --receive-pack --exec</span>），注释原文："a repository the user cloned but does not control chooses what executes"。</li>
+        <li><strong>边界：</strong>只改 <span class="mono">save</span> 字符串的形状，<strong>不碰 <span class="mono">findLast</span> 折叠、不碰事件词汇</strong>（C14/C23 已否决）。key 形状要按「flag 集相同即命中」，不要退化成逐字符命令串——对方把 grant 钉到 exact command 的代价是换参数就问。</li>
+        <li><strong>未证：</strong>端到端（批准 → 第二次是否真不问）本轮没跑，它决定 CR-1b 降级还是成立；<span class="mono">GrantKey</span> 细节是 <span class="mono">[转述]</span>，见 CR-9。</li>
+      </ul>
+      <div class="foot"><span>轴：权限</span><span>证据：本轮实测（本仓探针 + 对方源码）</span></div>
+    </div>
+
+    <div class="card">
+      <h3>CR-2 「不问但仍拦」的第四档 <span class="tag blue">规划 · 1.5d</span></h3>
+      <p class="one">想无人值守但又不想 <span class="mono">rm -rf $TARGET</span> 静默执行的人，现在无路可走。</p>
+      <ul>
+        <li><strong>我方实测：</strong><span class="mono">composer/permission-mode.ts</span> 的 <span class="mono">MODES = ["ask","auto","full"]</span>；<span class="mono">ruleset("full")</span> 是单条 <span class="mono">{*,*,allow}</span>；<span class="mono">doc/permissions.md</span> 写死 "The only thing that clears it is a session that allowed everything outright"。</li>
+        <li><strong>对方机制：</strong><span class="mono">PermissionMode{Normal, Yolo, Sysadmin}</span>，<span class="mono">SkipsPrompts()</span> 只管问不问，执行时仍查 <span class="mono">resolveBlockedCommands</span>（条件是 <span class="mono">mode != Sysadmin</span>）。</li>
+        <li><strong>前置约束：</strong><span class="mono">same()</span> 用 <span class="mono">JSON.stringify</span> 逐条比较 ruleset 来反推档位 —— 新档必须带<strong>可区分的标记</strong>，否则会静默继承 full 的 escalation 豁免。</li>
+        <li><strong>禁止照搬：</strong>对方把 Sysadmin 放进 Shift+Tab 盲按环（<span class="mono">code → plan → YOLO → sysadmin → code</span>），四次按键里含一个"什么都不检查"的档位。借两轴，不借键位。</li>
+      </ul>
+      <div class="foot"><span>轴：权限</span><span>证据：本轮实测（双方）</span></div>
+    </div>
+
+    <div class="card">
+      <h3>CR-3 LSP 运行时（a 战略 / b 规划 / c 条件） <span class="tag purple">7.5d 整块</span></h3>
+      <p class="one">本轮唯一新方向：配置面与 UI 面都已就位，只有运行时缺席 —— 半条腿，不是没想过。</p>
+      <ul>
+        <li><strong>我方实测：</strong><span class="mono">schema/config/lsp.ts</span> 定义 <span class="mono">ConfigLSP.Server/Entry/Info</span>；<span class="mono">config/normalize.ts</span> 真的解码 <span class="mono">lsp</span> 键；<span class="mono">session-summary.spec.ts</span> 把 "LSP" 当服务分区在测（含 <span class="mono">toHaveCount(0)</span> 的状态点断言）；<span class="mono">file-mutation.ts</span> / <span class="mono">edit.ts</span> / <span class="mono">write.ts</span> 各留一条 "after LSP runtime exists"；<span class="mono">doc/</span> 七节里没有 LSP。</li>
+        <li><strong>对方机制：</strong>powernap 默认目录 + <span class="mono">Manager.Start(path)</span> 按被触碰文件惰性启动 + <span class="mono">skipAutoStartCommands</span> 拒绝清单；<span class="mono">notifyLSPs</span> 后把 <span class="mono">getDiagnostics()</span> 追加进 <span class="mono">edit</span>/<span class="mono">write</span> 的工具结果；7 个模型工具；header 错误徽标。</li>
+        <li><strong>顺序即成本：</strong>M-a 只做诊断回灌并<strong>终结死配置</strong>；M-b 只上两个工具（表面预算归 L18/L30，别在这一 PR 重开）；M-c 可长期搁置。</li>
+        <li><strong>两条禁止：</strong>失败必须可见（对方是 <span class="mono">slog.Error</span> + 删 client + "continuing anyway"）；首步延迟不得上升 —— 用 <span class="mono">script/session-efficiency.ts</span> 同 prompt/同模型前后各跑一次。</li>
+      </ul>
+      <div class="foot"><span>轴：验证 / 能力面 / 进程</span><span>证据：本轮实测（本仓）+ 摘要实测（对方）</span></div>
+    </div>
+
+    <div class="card">
+      <h3>CR-4 模型自诊断 <span class="tag blue">规划 · 0.75d</span></h3>
+      <p class="one">"我的 MCP 为什么连不上" 现在只能靠猜或跑 <span class="mono">ps</span>。</p>
+      <ul>
+        <li><strong>对方实测：</strong><span class="mono">tools/crush_info.go</span> 的 <span class="mono">buildCrushInfo()</span> 把配置来源、LSP 管理器状态、全部/启用/已加载技能拼给模型；<span class="mono">tools/crush_logs.go</span> 用 <span class="mono">crush_logs.md.tpl</span> 把 <span class="mono">defaultLines/maxLines</span> <strong>渲染进工具描述</strong>（描述与实现同源，不会漂）。</li>
+        <li><strong>我方实测：</strong><span class="mono">tool/plugin/opencode.ts</span> 已有 <span class="mono">models</span> / <span class="mono">session_rename</span> / <span class="mono">session_move</span> / <span class="mono">worktree_*</span>，但没有自诊断；人看的在 <span class="mono">devtools-bar.tsx</span>。</li>
+        <li><strong>落法：</strong>加<strong>动作</strong>不加工具名（避开 L18/L30）；日志脱敏复用 L37 的双策略，别另起。</li>
+      </ul>
+      <div class="foot"><span>轴：能力面</span><span>证据：本轮实测（双方）</span></div>
+    </div>
+
+    <div class="card">
+      <h3>CR-7 邻接没有局部守卫 <span class="tag teal">先做 · 0.25d</span></h3>
+      <p class="one">不是断言有 bug，是把"不会发生"从推理变成断言。</p>
+      <ul>
+        <li><strong>我方实测：</strong><span class="mono">to-llm-message.ts</span> 的 <span class="mono">toolResult()</span> 只对 <span class="mono">completed</span> 与 <span class="mono">error</span> 有分支，调用处 <span class="mono">return result ? [call, result] : [call]</span>，另一条管子还带 <span class="mono">.filter(m =&gt; m !== undefined)</span> —— 历史里若存在 <span class="mono">streaming</span>/<span class="mono">running</span> 态调用，请求里就会出现<strong>没有 result 的 tool call</strong>。</li>
+        <li><strong>现有兜底：</strong><span class="mono">runner/llm.ts</span> 的 <span class="mono">settleStaleToolCalls</span>（drain 起点，发 <span class="mono">Tool.Failed</span> + <span class="mono">type: "aborted"</span>）、<span class="mono">step.ts</span> 的 <span class="mono">failUnsettledTools</span> + <span class="mono">failIncompleteTools</span>、<span class="mono">history.ts</span> 的 <span class="mono">preview</span> 只取 settled 前缀。</li>
+        <li><strong>为什么值得记：</strong>对方注释里同样的形状被描述为"strict-adjacency providers (e.g. Kimi, DeepSeek) … permanently locking the session"。我们有三道防线但没有局部断言。</li>
+      </ul>
+      <div class="foot"><span>轴：循环</span><span>证据：本轮实测（本仓读码，未构造出该状态）</span></div>
+    </div>
+
+    <div class="card">
+      <h3>CR-8 台账过时 <span class="tag teal">先做 · 0.25d</span></h3>
+      <p class="one">对照时撞出来的 doc-sync 债务：缺口早被填掉，台账还当它是 P1。</p>
+      <ul>
+        <li><strong>我方实测：</strong><span class="mono">runner/loop.ts</span> 的 <span class="mono">decide()</span> 有四类判据（<span class="mono">repetition()</span> 的 <span class="mono">WINDOW=25 / MAX_PERIOD=5 / REPEAT_LIMIT=5</span>、<span class="mono">declinedRun()</span> 的 8、<span class="mono">REJECT_LIMIT=3</span>、<span class="mono">MALFORMED_LIMIT=3</span>），落地在 <span class="mono">08aef689be</span>；<span class="mono">doc/session-loop.md</span> 已有专节与 <span class="mono">session-runner-loop.test.ts</span>。</li>
+        <li><strong>过时处：</strong><span class="mono">优势对比清单.md</span> §3.2 的"命中为 0"、§4 缺口表的"无通用重复/空转断路器"、§六 复核命令的"空 = 无通用断路器"。今天该 grep 命中 5 条。</li>
+        <li><strong>顺带的对比结论：</strong>对方只检 period=1，且签名带<strong>原始输出文本</strong> —— 它自己的输出溢出会把每次不同的文件路径写进提示，于是同一超限搜索永不触发 <span class="mono">[转述]</span>；我们用 <span class="mono">CLIPPED</span> 正则把路径折叠成 <span class="mono">[clipped output]</span> 正是为了这一格。</li>
+      </ul>
+      <div class="foot"><span>轴：账目</span><span>证据：本轮实测（本仓）</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="caveats">
+  <div class="sec-head"><h2>口径与限制</h2></div>
+  <div class="panel pad">
+    <ul style="margin:0;padding-left:18px;color:var(--muted);font-size:13px">
+      <li><strong style="color:var(--ink)">收益分不是实测。</strong>它是 1–5 分的工程判断；本页唯一的实测数据是工期估算与证据等级。</li>
+      <li><strong style="color:var(--ink)">CR-1 的端到端未证。</strong>本轮实测的是 <span class="mono">classify()</span> 与 <span class="mono">save</span> 两层；「批准一次 → 第二次是否真不问」必须在真机跑一次（清单第七节第 1 条）。若那一跑被别处拦住，CR-1b 撤下、CR-1a 缩到只修 <span class="mono">git -c *</span>。</li>
+      <li><strong style="color:var(--ink)">CR-5 与 CR-6 的收益栏是假设。</strong>对方机制存在，但我方现状没测：内联工具输出的 ANSI 走向、每帧成本是否随列表长度增长。两项都记「先量」，不许直接开工。</li>
+      <li><strong style="color:var(--ink)">对方的循环内核不可见。</strong><span class="mono">fantasy</span> 未 vendor，本轮读不到工具并发上限、邻接处理与 finish 判定；本页不提供任何"谁的 loop 更强"的结论。CR-9 是这条边界的收口动作。</li>
+      <li><strong style="color:var(--ink)">三处对方结论仍挂在子代理级别。</strong><span class="mono">GrantKey</span> 的精确形状、<span class="mono">skipAutoStartCommands</span> 的 28 项内容、<span class="mono">hasRepeatedToolCalls</span> 的输出哈希触发条件 —— 动手前逐行复核 <span class="mono">crush-借鉴清单.md</span> §五.4。</li>
+      <li><strong style="color:var(--ink)">工期是工程日，不含 review 往返与共识讨论。</strong>CR-3a 的 2 天不含"诊断体积上限"的预算决策；CR-3c 的 4 天不含每语言服务器安装的长期维护；CR-1b 的 0.75 天不含"批准过 <span class="mono">docker rm</span> 是否等于批准过强删"的产品判断。</li>
+      <li><strong style="color:var(--ink)">依赖会改变实际顺序。</strong>CR-2 必须先解掉靠 ruleset 文本反推档位的老路；CR-3b 依赖 CR-3a；CR-3c 撞 L15（Windows 进程树）；CR-3a 的诊断体积接 L29 的预算纯函数；CR-4 的脱敏复用 L37。ROI 排序不等于开工顺序。</li>
+      <li><strong style="color:var(--ink)">所有结论对应基线 <span class="mono">51201b6445</span>（<span class="mono">2.2.0-fork.11</span>）与 crush <span class="mono">7f418090</span>。</strong>任一侧变化后，先重跑清单第六节的复核命令（含那个 9 条命令的 save 探针）。</li>
+      <li><strong style="color:var(--ink)">本页与 16 项 L 账、OpenHands 账共用同一评分模型与四套预设</strong>，分数可横比；但本轮增量集中在权限与验证面，在"速度优先"预设下天然吃亏 —— 这正是把 CR-1a 与 CR-8 标为不受预设影响的原因。</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  基于 <span class="mono">crush-借鉴清单.md</span> · 对象 <span class="mono">D:\code\github\crush</span> main @ <span class="mono">7f418090</span> · 对照 <span class="mono">loop-reliability-docs</span> @ <span class="mono">51201b6445</span>（<span class="mono">2.2.0-fork.11</span>） · 2026-11-01 · 单文件、无外部依赖，可直接打印或归档。
+</footer>
+
+</div>
+
+<script>
+const PRESETS = {
+  "均衡": { rel: 0.30, cost: 0.25, sec: 0.20, audit: 0.15, ux: 0.10 },
+  "速度优先 · 花钱无所谓": { rel: 0.40, cost: 0.35, sec: 0.05, audit: 0.05, ux: 0.15 },
+  "安全可控": { rel: 0.25, cost: 0.10, sec: 0.45, audit: 0.15, ux: 0.05 },
+  "审计交付": { rel: 0.20, cost: 0.10, sec: 0.20, audit: 0.40, ux: 0.10 }
+};
+const PRESET_NOTE = {
+  "均衡": "默认视角：可靠性与成本各占一半权重，安全与审计保留下限。本轮在均衡视角下已经能看出 CR-1a 排在最前 —— 它的 rel/sec/audit 三项都不低。",
+  "速度优先 · 花钱无所谓": "目标＝工具执行快、完成效率高，钱不计。<strong>CR-6 与 CR-5 上升</strong>（渲染成本与可读性直接吃体验），CR-3b/CR-4 因「少一轮无效往返」上升；<strong>CR-1a/CR-1b/CR-2 这套权限面会掉到后面</strong> —— 这是预设的取舍，不是它们不重要。<strong>建议无视预设保留 CR-1a</strong>：它不占运行时开销，且是唯一一条「一次点击换来永久代码执行许可」的实测洞。",
+  "安全可控": "目标＝不出事故。CR-1a、CR-1b、CR-2 成为主线，CR-9（收口 crush 侧 <span class=\"mono\">[转述]</span>）跟着上升；纯性能与体验项退居其次。",
+  "审计交付": "目标＝能向别人交代「谁批准的、记住了什么」。CR-1a/CR-1b（持久许可的形状）、CR-8（台账与代码一致）、CR-3a（死配置终结）上升；<span class=\"mono\">lsp</span> 配置从「能写但无效」变成可交代状态。"
+};
+let WEIGHTS = PRESETS["速度优先 · 花钱无所谓"];
+let PRESET = "速度优先 · 花钱无所谓";
+
+// scores: 1–5 engineering judgement; days: estimated person-days (不含返工).
+const DATA = [
+  { id: "CR-1a", name: "flag 参与持久许可 key（代码执行类）", axis: "权限", status: "先做", evidence: "本轮实测", days: 0.5,  scores: { rel: 3, cost: 1, sec: 5, audit: 4, ux: 2 }, deps: "与 CR-1b 同 PR 可拆；不碰折叠（C14）", what: "含 <span class=\"mono\">-c</span> / <span class=\"mono\">--ext-diff</span> / <span class=\"mono\">-O</span> / <span class=\"mono\">--exec</span> 的命令不产出通配 save；<span class=\"mono\">rememberable()</span> 从只看首 token 扩到看 flag" },
+  { id: "CR-1b", name: "破坏性 flag（--force 类）", axis: "权限", status: "先做", evidence: "本轮实测", days: 0.75, scores: { rel: 2, cost: 1, sec: 4, audit: 3, ux: 2 }, deps: "需一条产品判断 + CR-9 复核 GrantKey", what: "<span class=\"mono\">git push *</span> 是否该覆盖 <span class=\"mono\">--force</span>；把 9 条探针固化成 <span class=\"mono\">packages/core</span> 测试" },
+  { id: "CR-2",  name: "「不问但仍拦」的第四档", axis: "权限", status: "规划", evidence: "本轮实测", days: 1.5,  scores: { rel: 3, cost: 1, sec: 5, audit: 3, ux: 3 }, deps: "先解 <span class=\"mono\">same()</span> 文本识别：新档必须带可区分标记", what: "免提问但 escalation 仍生效；<span class=\"mono\">full</span> 仍是唯一豁免，三端入口一致" },
+  { id: "CR-3a", name: "LSP 诊断回灌进 edit / write", axis: "验证", status: "战略", evidence: "本轮实测", days: 2.0,  scores: { rel: 4, cost: 2, sec: 2, audit: 3, ux: 4 }, deps: "终结 <span class=\"mono\">lsp</span> 死配置；诊断体积接 L29；与 §五.1 同批", what: "Location 作用域服务，落地三条 <span class=\"mono\">TODO: … after LSP runtime exists</span>，失败必须可见" },
+  { id: "CR-3b", name: "lsp_diagnostics + lsp_references", axis: "能力面", status: "规划", evidence: "摘要实测", days: 1.5,  scores: { rel: 3, cost: 2, sec: 1, audit: 2, ux: 4 }, deps: "依赖 CR-3a；工具表面预算归 L18/L30", what: "只上两个工具，不照抄对方一次上七个" },
+  { id: "CR-3c", name: "默认服务器目录 + 惰性按文件启动", axis: "进程", status: "条件", evidence: "摘要实测", days: 4.0,  scores: { rel: 2, cost: 1, sec: 3, audit: 2, ux: 3 }, deps: "需 <span class=\"mono\">skipAutoStartCommands</span> 式拒绝清单；Windows 进程树归 L15", what: "可长期搁置；照搬对方「continuing anyway」的静默失败是禁止项" },
+  { id: "CR-4",  name: "模型自诊断：<span class=\"mono\">info</span> / <span class=\"mono\">logs</span> 只读动作", axis: "能力面", status: "规划", evidence: "本轮实测", days: 0.75, scores: { rel: 3, cost: 1, sec: 2, audit: 3, ux: 3 }, deps: "脱敏复用 L37；不新开工具名（避开 L18/L30）", what: "配置来源 + MCP 状态 + 技能启用/已加载 + 日志尾部；行数常量渲染进工具描述" },
+  { id: "CR-5",  name: "子进程 16 色重映射（现为抹平）", axis: "主题", status: "先量", evidence: "待验证", days: 0.75, scores: { rel: 1, cost: 1, sec: 1, audit: 1, ux: 4 }, deps: "先扩主题语义角色（agents.md 纪律），穷举守卫归 OH-5", what: "先用 story 测内联工具输出的 ANSI 走向；浅/深主题都要可读" },
+  { id: "CR-6",  name: "帧缓存 / 冻结条目 / 输入合并", axis: "渲染", status: "先量", evidence: "待验证", days: 1.5,  scores: { rel: 2, cost: 3, sec: 1, audit: 1, ux: 4 }, deps: "前置＝renderer 侧计时；markdown 增量我们已有更强形式", what: "量出「滚动/resize 触发整列表重算」才立项，否则撤；不得牺牲 tok/s 与缓存命中显示" },
+  { id: "CR-7",  name: "非终态工具调用的邻接断言（本仓事实）", axis: "循环", status: "先做", evidence: "本轮实测", days: 0.25, scores: { rel: 4, cost: 1, sec: 1, audit: 3, ux: 1 }, deps: "无", what: "<span class=\"mono\">toolResult()</span> 只分支 completed/error；喂一条 <span class=\"mono\">running</span> 态必须被拒或合成 result，把「不会发生」变成断言" },
+  { id: "CR-8",  name: "更正台账的「无通用断路器」三处（本仓事实）", axis: "账目", status: "先做", evidence: "本轮实测", days: 0.25, scores: { rel: 1, cost: 1, sec: 1, audit: 5, ux: 1 }, deps: "无；与 doc-sync 纪律同批", what: "<span class=\"mono\">runner/loop.ts</span> 在 <span class=\"mono\">08aef689be</span> 已落地，<span class=\"mono\">优势对比清单.md</span> §3.2/§4/§六 仍记为零命中" },
+  { id: "CR-9",  name: "crush 侧 <span class=\"mono\">[转述]</span> 收口", axis: "账目", status: "先量", evidence: "待验证", days: 0.5,  scores: { rel: 2, cost: 1, sec: 3, audit: 3, ux: 1 }, deps: "决定 CR-1b 与 CR-3c 成立与否", what: "复核 <span class=\"mono\">GrantKey</span> 形状、<span class=\"mono\">skipAutoStartCommands</span> 28 项、<span class=\"mono\">fantasy</span> 是否有工具并发上限与邻接修复" }
+];
+
+const STATUS_COLOR = {
+  "先做": "var(--teal)",
+  "规划": "var(--blue)",
+  "战略": "var(--purple)",
+  "先量": "var(--amber)",
+  "条件": "var(--gray)"
+};
+const STATUS_TAG = { "先做": "teal", "规划": "blue", "战略": "purple", "先量": "amber", "条件": "gray" };
+
+function recompute() {
+  for (const d of DATA) {
+    d.score = Math.round(20 * (d.scores.rel * WEIGHTS.rel + d.scores.cost * WEIGHTS.cost + d.scores.sec * WEIGHTS.sec + d.scores.audit * WEIGHTS.audit + d.scores.ux * WEIGHTS.ux));
+    d.roi = d.score / d.days;
+  }
+}
+
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
+const fmt = (n) => (Math.round(n * 10) / 10).toString();
+const fmtDays = (n) => (Math.round(n * 100) / 100).toString();
+
+/* ---------- scatter ---------- */
+function renderScatter() {
+  const svg = document.getElementById("scatter");
+  svg.innerHTML = "";
+  const W = 980, H = 500, m = { l: 64, r: 26, t: 26, b: 58 };
+  const x0 = 0, x1 = 4.4, X_SPLIT = 1.0;
+  const Y_BOT = 20, Y_MID = 60, Y_TOP = 90;
+  const px = (v) => m.l + ((v - x0) / (x1 - x0)) * (W - m.l - m.r);
+  const py = (v) => H - m.b - ((v - Y_BOT) / (Y_TOP - Y_BOT)) * (H - m.t - m.b);
+  const ns = "http://www.w3.org/2000/svg";
+  const el = (tag, attrs, text) => {
+    const n = document.createElementNS(ns, tag);
+    for (const [k, v] of Object.entries(attrs || {})) n.setAttribute(k, v);
+    if (text !== undefined) n.textContent = text;
+    svg.appendChild(n);
+    return n;
+  };
+
+  // quadrant bands
+  el("rect", { x: px(x0), y: py(Y_TOP), width: px(X_SPLIT) - px(x0), height: py(Y_MID) - py(Y_TOP), fill: "var(--teal)", "fill-opacity": 0.07 });
+  el("rect", { x: px(X_SPLIT), y: py(Y_TOP), width: px(x1) - px(X_SPLIT), height: py(Y_MID) - py(Y_TOP), fill: "var(--blue)", "fill-opacity": 0.05 });
+  el("rect", { x: px(x0), y: py(Y_MID), width: px(X_SPLIT) - px(x0), height: py(Y_BOT) - py(Y_MID), fill: "var(--gray)", "fill-opacity": 0.05 });
+  el("rect", { x: px(X_SPLIT), y: py(Y_MID), width: px(x1) - px(X_SPLIT), height: py(Y_BOT) - py(Y_MID), fill: "var(--amber)", "fill-opacity": 0.05 });
+
+  for (let v = x0; v <= x1 + 0.001; v += 0.5) {
+    el("line", { x1: px(v), x2: px(v), y1: py(Y_TOP), y2: py(Y_BOT), stroke: "var(--line)", "stroke-width": 1 });
+    el("text", { x: px(v), y: H - m.b + 22, "text-anchor": "middle", "font-size": 11, fill: "var(--faint)" }, (v === 0 ? "0" : fmt(v)) + " 天");
+  }
+  for (let v = Y_BOT; v <= Y_TOP; v += 20) {
+    el("line", { x1: px(x0), x2: px(x1), y1: py(v), y2: py(v), stroke: v === Y_MID ? "var(--line-strong)" : "var(--line)", "stroke-dasharray": v === Y_MID ? "4 4" : "none", "stroke-width": 1 });
+    el("text", { x: px(x0) - 10, y: py(v) + 4, "text-anchor": "end", "font-size": 11, fill: "var(--faint)" }, String(v));
+  }
+  el("text", { x: px(0.5), y: py(Y_TOP) + 2, "text-anchor": "middle", "font-size": 11, fill: "var(--teal)", "font-weight": 700 }, "低投入 · 高收益");
+  el("text", { x: px(2.7), y: py(Y_TOP) + 2, "text-anchor": "middle", "font-size": 11, fill: "var(--blue)", "font-weight": 700 }, "高投入 · 高收益");
+  el("text", { x: px(0.5), y: py(Y_BOT) - 8, "text-anchor": "middle", "font-size": 11, fill: "var(--faint)", "font-weight": 700 }, "低投入 · 低收益");
+  el("text", { x: px(2.7), y: py(Y_BOT) - 8, "text-anchor": "middle", "font-size": 11, fill: "var(--amber)", "font-weight": 700 }, "高投入 · 战略 / 待验证");
+  el("text", { x: W - m.r, y: H - 10, "text-anchor": "end", "font-size": 11, fill: "var(--faint)" }, "← 工期（人日）");
+  el("text", { x: px(x0) - 48, y: m.t + 2, "font-size": 11, fill: "var(--faint)" }, "收益分 ↑");
+
+  // deterministic jitter for overlapping points
+  const seen = new Map();
+  for (const d of DATA) {
+    const base = d.days + "|" + d.score;
+    const n = seen.get(base) || 0;
+    seen.set(base, n + 1);
+    d._jx = n * 0.07 * (n % 2 ? -1 : 1);
+  }
+
+  const ordered = [...DATA].sort((a, b) => b.score - a.score);
+  for (const d of ordered) {
+    const cx = px(Math.min(d.days + (d._jx || 0), x1 - 0.02));
+    const cy = py(Math.max(Math.min(d.score, Y_TOP), Y_BOT));
+    const color = STATUS_COLOR[d.status];
+    const g = el("g", {});
+    const t = el("title", {}, `${d.id} ${d.name}｜${d.score} 分｜${fmtDays(d.days)} 人日｜ROI ${fmt(d.roi)}｜${d.evidence}`);
+    g.appendChild(t);
+    if (d.status === "先量" || d.status === "条件") {
+      el("circle", { cx, cy, r: 8, fill: "var(--panel)", stroke: color, "stroke-width": 2, "stroke-dasharray": "3 2" });
+    } else {
+      el("circle", { cx, cy, r: 7, fill: color, "fill-opacity": .9 });
+    }
+    const side = d.labelSide ?? (d._jx && d._jx < 0 ? -1 : 1);
+    el("text", { x: cx + side * 11, y: cy + 4, "text-anchor": side < 0 ? "end" : "start", "font-size": 11, "font-weight": 700, fill: "var(--ink)" }, d.id);
+  }
+
+  const legend = document.getElementById("scatter-legend");
+  legend.innerHTML = "";
+  for (const [label, color] of Object.entries(STATUS_COLOR)) {
+    const s = document.createElement("span");
+    s.innerHTML = `<span class="dot" style="background:${color}"></span>${label}`;
+    legend.appendChild(s);
+  }
+  const s = document.createElement("span");
+  s.innerHTML = `<span class="dot" style="background:var(--panel);border:2px dashed var(--amber)"></span>虚线 = 先量 / 条件（收益为假设）`;
+  legend.appendChild(s);
+}
+
+/* ---------- rank bars ---------- */
+function renderRank() {
+  const box = document.getElementById("rank-bars");
+  box.innerHTML = "";
+  const sorted = [...DATA].sort((a, b) => b.roi - a.roi);
+  const max = Math.max(...sorted.map((d) => d.roi));
+  for (const d of sorted) {
+    const row = document.createElement("div");
+    row.className = "bar-row";
+    row.innerHTML = `
+      <div class="bar-id">${esc(d.id)}</div>
+      <div class="track" title="${esc(d.name)}"><div class="fill" style="width:${(d.roi / max) * 100}%;background:${STATUS_COLOR[d.status]}"></div></div>
+      <div class="bar-meta">${d.score} 分 · ${fmtDays(d.days)}d · ROI ${fmt(d.roi)}</div>`;
+    box.appendChild(row);
+  }
+}
+
+/* ---------- heat map ---------- */
+function renderHeat() {
+  const tbody = document.querySelector("#heat-table tbody");
+  tbody.innerHTML = "";
+  const cols = ["rel", "cost", "sec", "audit", "ux"];
+  const sorted = [...DATA].sort((a, b) => b.score - a.score);
+  for (const d of sorted) {
+    const tr = document.createElement("tr");
+    const cells = cols.map((key) => `<td class="cell h${d.scores[key]}">${d.scores[key]}</td>`).join("");
+    tr.innerHTML = `<td><strong>${esc(d.id)}</strong></td><td class="what">${esc(d.what)}</td>${cells}<td class="num" style="text-align:right"><strong>${d.score}</strong></td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+/* ---------- main table ---------- */
+let activeAxis = "全部";
+let sortKey = "score";
+let sortDir = -1;
+
+function drawTable() {
+  const tbody = document.querySelector("#main-table tbody");
+  const rows = DATA.filter((d) => activeAxis === "全部" || d.axis === activeAxis);
+  rows.sort((a, b) => {
+    const av = a[sortKey], bv = b[sortKey];
+    if (typeof av === "string") return av.localeCompare(bv, "zh-Hans-CN", { numeric: true }) * sortDir;
+    return (av - bv) * sortDir;
+  });
+  tbody.innerHTML = rows.map((d) => `
+    <tr>
+      <td><strong>${esc(d.id)}</strong><br><span style="color:var(--faint);font-size:12px">${esc(d.name)}</span></td>
+      <td>${esc(d.axis)}</td>
+      <td><span class="tag ${STATUS_TAG[d.status]}">${esc(d.status)}</span></td>
+      <td><span class="tag ${d.evidence === "本轮实测" ? "teal" : d.evidence === "待验证" ? "amber" : "blue"}">${esc(d.evidence)}</span></td>
+      <td class="num" style="text-align:right">${fmtDays(d.days)}</td>
+      <td class="num" style="text-align:right"><strong>${d.score}</strong></td>
+      <td class="num" style="text-align:right">${fmt(d.roi)}</td>
+      <td style="color:var(--muted)">${esc(d.deps)}</td>
+      <td class="what">${esc(d.what)}</td>
+    </tr>`).join("");
+}
+
+function buildFilters() {
+  const chips = document.getElementById("filters");
+  chips.innerHTML = "";
+  for (const axis of ["全部", ...Array.from(new Set(DATA.map((d) => d.axis)))]) {
+    const b = document.createElement("button");
+    b.className = "chip";
+    b.textContent = axis;
+    b.setAttribute("aria-pressed", axis === activeAxis ? "true" : "false");
+    b.addEventListener("click", () => {
+      activeAxis = axis;
+      for (const c of chips.children) c.setAttribute("aria-pressed", c.textContent === axis ? "true" : "false");
+      drawTable();
+    });
+    chips.appendChild(b);
+  }
+}
+
+document.querySelectorAll("#main-table thead th[data-sort]").forEach((th) => {
+  th.addEventListener("click", () => {
+    const key = th.dataset.sort;
+    if (sortKey === key) sortDir *= -1;
+    else { sortKey = key; sortDir = key === "id" || key === "axis" || key === "status" || key === "evidence" || key === "deps" ? 1 : -1; }
+    drawTable();
+  });
+});
+
+/* ---------- presets ---------- */
+function renderAll() {
+  recompute();
+  renderScatter();
+  renderRank();
+  renderHeat();
+  drawTable();
+  const w = WEIGHTS;
+  document.getElementById("weight-line").textContent =
+    `当前预设：${PRESET} · 可靠性 ${(w.rel * 100).toFixed(0)}% / 成本·时间 ${(w.cost * 100).toFixed(0)}% / 安全 ${(w.sec * 100).toFixed(0)}% / 审计 ${(w.audit * 100).toFixed(0)}% / 体验 ${(w.ux * 100).toFixed(0)}%`;
+  document.getElementById("preset-note").innerHTML = PRESET_NOTE[PRESET];
+  const top = [...DATA].sort((a, b) => b.roi - a.roi).slice(0, 5).map((d) => d.id).join(" → ");
+  document.getElementById("preset-top").textContent = `按 ROI 前五：${top}`;
+}
+
+function buildPresets() {
+  const box = document.getElementById("presets");
+  box.innerHTML = "";
+  for (const name of Object.keys(PRESETS)) {
+    const b = document.createElement("button");
+    b.className = "chip";
+    b.textContent = name;
+    b.setAttribute("aria-pressed", name === PRESET ? "true" : "false");
+    b.addEventListener("click", () => {
+      PRESET = name;
+      WEIGHTS = PRESETS[name];
+      for (const c of box.children) c.setAttribute("aria-pressed", c.textContent === name ? "true" : "false");
+      renderAll();
+    });
+    box.appendChild(b);
+  }
+}
+
+buildFilters();
+buildPresets();
+renderAll();
+</script>
+</body>
+</html>
