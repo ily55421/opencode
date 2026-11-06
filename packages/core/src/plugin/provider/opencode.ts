@@ -466,7 +466,7 @@ export const OpencodePlugin = define<
     yield* discovery.transform((editor) => instructions.forEach((file) => editor.add(file)))
     yield* skills.transform((editor) => {
       if (librarySkills.owner !== owner(snapshot)) return
-      librarySkills.items.forEach((item) => editor.add(item.skill, item.files))
+      librarySkills.items.forEach((item) => editor.add(item.skill, undefined, item.files))
     })
 
     const apply = Effect.fn("OpencodePlugin.apply")(function* (next: typeof snapshot) {

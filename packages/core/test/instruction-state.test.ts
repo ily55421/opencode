@@ -300,7 +300,7 @@ describe("InstructionState", () => {
       const assembled = yield* preview(db, sessionID, instructions)
 
       expect(assembled).toEqual({
-        initial: [{ key: Instructions.Key.make("test/context"), text: "Changed context" }],
+        initial: [{ key: Instructions.Key.make("test/context"), scope: "global", text: "Changed context" }],
         update: "",
       })
       expect(yield* instructionEvents(db, sessionID)).toEqual(beforeEvents)
@@ -342,7 +342,7 @@ describe("InstructionState", () => {
 
       const assembled = yield* preview(db, sessionID, instructions)
 
-      expect(assembled.initial).toEqual([{ key: Instructions.Key.make("test/context"), text: "Initial context" }])
+      expect(assembled.initial).toEqual([{ key: Instructions.Key.make("test/context"), scope: "global", text: "Initial context" }])
       expect(assembled.update).toBe("Private update")
       expect(yield* instructionEvents(db, sessionID)).toEqual(beforeEvents)
       expect(yield* db.select().from(InstructionBlobTable).all().pipe(Effect.orDie)).toEqual(beforeBlobs)
@@ -373,8 +373,8 @@ describe("InstructionState", () => {
       const assembled = yield* preview(db, sessionID, instructions)
 
       expect(assembled.initial).toEqual([
-        { key: Instructions.Key.make("test/current"), text: "Initial context" },
-        { key: Instructions.Key.make("test/retired"), text: "Retired context" },
+        { key: Instructions.Key.make("test/current"), scope: "global", text: "Initial context" },
+        { key: Instructions.Key.make("test/retired"), scope: "global", text: "Retired context" },
       ])
       expect(assembled.update).toContain("Changed context")
       expect(assembled.update).toContain("Removed Retired context")
@@ -423,7 +423,7 @@ describe("InstructionState", () => {
       const instructions = source("test/context", Effect.succeed("Initial context"))
 
       expect(yield* preview(db, sessionID, instructions)).toEqual({
-        initial: [{ key: Instructions.Key.make("test/context"), text: "Initial context" }],
+        initial: [{ key: Instructions.Key.make("test/context"), scope: "global", text: "Initial context" }],
         update: "",
       })
       expect(yield* instructionEvents(db, sessionID)).toEqual([])
@@ -448,7 +448,7 @@ describe("InstructionState", () => {
       const beforeState = yield* db.select().from(InstructionStateTable).get().pipe(Effect.orDie)
 
       expect(yield* preview(db, sessionID, instructions)).toEqual({
-        initial: [{ key: Instructions.Key.make("test/context"), text: "Committed context" }],
+        initial: [{ key: Instructions.Key.make("test/context"), scope: "global", text: "Committed context" }],
         update: "",
       })
       expect(yield* instructionEvents(db, sessionID)).toEqual(beforeEvents)

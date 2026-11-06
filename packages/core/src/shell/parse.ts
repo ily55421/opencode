@@ -171,7 +171,7 @@ export function scan(command: string, shell: string, cwd: string): Effect.Effect
     const scanned = powershell
       ? ShellScan.scanPowerShell(command)
       : ShellScan.scan(command, shellName === "bash" || shellName === "zsh" ? shellName : "posix")
-    if (scanned.kind === "opaque") return { commands: [], directories: [], opaque: scanned.reason }
+    if (scanned.kind === "opaque") return Effect.succeed({ commands: [], directories: [], opaque: scanned.reason })
 
     const output: Result = { commands: [], directories: [] }
     for (const item of scanned.commands) {

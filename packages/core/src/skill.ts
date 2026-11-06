@@ -114,8 +114,8 @@ export type Data = {
 export type Editor = {
   list: () => readonly Types.DeepMutable<Info>[]
   get: (id: string) => Types.DeepMutable<Info> | undefined
-  /** `files` carries the skill's extra files; `shadowed` names paths this skill displaced across sources. */
-  add: (skill: Info, files?: Readonly<Record<string, string>>, shadowed?: ReadonlyArray<AbsolutePath>) => void
+  /** `shadowed` names paths this skill displaced across sources; `files` carries the skill's extra files. */
+  add: (skill: Info, shadowed?: ReadonlyArray<AbsolutePath>, files?: Readonly<Record<string, string>>) => void
   update: (id: string, update: (skill: Types.DeepMutable<Info>) => void) => void
   remove: (id: string) => void
 }
@@ -140,7 +140,7 @@ const layer = Layer.effect(
       editor: (editor) => ({
         list: () => Array.from(editor.skills.values()),
         get: (id) => editor.skills.get(ID.make(id)),
-        add: (skill, files, shadowed) => {
+        add: (skill, shadowed, files) => {
           const previous = editor.skills.get(skill.id)
           // A rebuild replays every transform from empty, so a shadowing overwrite can be recorded
           // directly: nothing stale survives into the next rebuild. The incoming skill wins, and the

@@ -134,7 +134,8 @@ const skillProgram = Effect.gen(function* () {
   const plain = time(() => skills.list(), 50) // one full state rebuild per read
 
   yield* skills.transform((editor) => {
-    for (let i = 0; i < 20; i++) editor.add(info(`skill-${i}`, `/overlap/skill-${i}/SKILL.md`), [(`/shadowed/skill-${i}/SKILL.md`) as AbsolutePath])
+    for (let i = 0; i < 20; i++)
+      editor.add(info(`skill-${i}`, `/overlap/skill-${i}/SKILL.md`), [(`/shadowed/skill-${i}/SKILL.md`) as AbsolutePath])
   })
   const withConflicts = time(() => {
     skills.list()

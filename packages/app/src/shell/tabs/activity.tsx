@@ -61,7 +61,8 @@ export function TabActivityHost() {
 
     // A child session route belongs to the tab that opened it, the way the strip highlights its parent.
     const conn = global.servers.list().find((item) => ServerConnection.key(item) === value.server)
-    const root = conn ? global.ensureServerCtx(conn).data.session.root(value.sessionId) : value.sessionId
+    const root =
+      conn ? (global.serverCtx(ServerConnection.key(conn))?.data.session.root(value.sessionId) ?? value.sessionId) : value.sessionId
 
     return tabs.store.find((tab) => tab.type === "session" && tab.server === value.server && tab.sessionId === root)
   })

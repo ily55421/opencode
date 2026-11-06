@@ -410,7 +410,7 @@ it.effect("auto compaction estimates current content against the buffered prompt
         id: Agent.defaultID,
         info: { ...Agent.Info.default(Agent.defaultID), system: "You are a helpful assistant." },
       },
-      initial: [{ key: Instructions.Key.make("test/project"), text: "Project instructions." }],
+      initial: [{ key: Instructions.Key.make("test/project"), scope: "project" as const, text: "Project instructions." }],
       tools: {
         definitions: [
           ToolDefinition.make({ name: "read", description: "Read files", inputSchema: { type: "object" } }),
@@ -605,7 +605,7 @@ const oversized = (session: Session.Info, messages: readonly SessionMessage.Info
     id: Agent.defaultID,
     info: { ...Agent.Info.default(Agent.defaultID), system: "You are a helpful assistant." },
   },
-  initial: "Project instructions.",
+  initial: [{ key: Instructions.Key.make("test/project"), scope: "project" as const, text: "Project instructions." }],
   tools: { definitions: [], execute: () => Effect.die("unused") },
 })
 
@@ -643,7 +643,7 @@ const loaded = (session: Session.Info, messages: readonly SessionMessage.Info[])
   messages,
   model: resolved,
   agent: { id: Agent.defaultID, info: Agent.Info.default(Agent.defaultID) },
-  initial: [{ key: Instructions.Key.make("test/session"), text: "Session instructions" }],
+  initial: [{ key: Instructions.Key.make("test/session"), scope: "project" as const, text: "Session instructions" }],
   tools: { definitions: [], execute: () => Effect.die("Compaction must not execute tools") },
 })
 

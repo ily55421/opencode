@@ -489,6 +489,7 @@ export type ExperimentalSessionStatsOutput = {
   readonly subagents: number
   readonly prompts: number
   readonly steps: number
+  readonly messages: number
   readonly tokens: {
     readonly input: number
     readonly output: number
@@ -526,7 +527,9 @@ export type ExperimentalSessionStatsOutput = {
       }
   readonly activeDays: number
   readonly streak: number
-  readonly activity: ReadonlyArray<{ readonly date: string; readonly steps: number }>
+  readonly currentStreak: number
+  readonly longestSession?: { readonly sessionID: string; readonly duration: number } | undefined
+  readonly activity: ReadonlyArray<{ readonly date: string; readonly steps: number; readonly tokens: number }>
   readonly models: ReadonlyArray<{
     readonly model: Model.Ref
     readonly steps: number
@@ -2672,6 +2675,21 @@ export type VcsDiffInput = {
 export type VcsDiffOutput = { readonly location: Location.PublicRef; readonly data: ReadonlyArray<FileDiff.Info> }
 export type VcsDiffOperation<E = never> = (input: VcsDiffInput) => Effect.Effect<VcsDiffOutput, E>
 
+export type VcsCommitInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly message: string
+  readonly files: ReadonlyArray<string>
+}
+export type VcsCommitOutput = { readonly location: Location.PublicRef; readonly data: Vcs.CommitResult }
+export type VcsCommitOperation<E = never> = (input: VcsCommitInput) => Effect.Effect<VcsCommitOutput, E>
+
+export type VcsPushInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly remote?: string | undefined
+}
+export type VcsPushOutput = { readonly location: Location.PublicRef; readonly data: Vcs.PushResult }
+export type VcsPushOperation<E = never> = (input?: VcsPushInput) => Effect.Effect<VcsPushOutput, E>
+
 export interface VcsApi<E = never> {
   readonly init: VcsInitOperation<E>
   readonly get: VcsGetOperation<E>
@@ -2679,6 +2697,8 @@ export interface VcsApi<E = never> {
   readonly status: VcsStatusOperation<E>
   readonly branch: { readonly list: VcsBranchListOperation<E> }
   readonly diff: VcsDiffOperation<E>
+  readonly commit: VcsCommitOperation<E>
+  readonly push: VcsPushOperation<E>
 }
 
 export type DebugHeapDumpInput = { readonly directory?: string | undefined }

@@ -2226,8 +2226,8 @@ describe("SessionRunnerLLM", () => {
     expect(s.requests[0]?.system.at(-1)?.metadata?.experimental).toEqual({
       instructions: [
         expect.objectContaining({ key: "core/codemode" }),
-        { key: "test/context", text: "Initial context" },
-        { key: "api/deploy-target", text: '<context key="deploy-target">\nproduction\n</context>' },
+        { key: "test/context", scope: "global", text: "Initial context" },
+        { key: "api/deploy-target", scope: "project", text: '<context key="deploy-target">\nproduction\n</context>' },
       ],
     })
 
@@ -7070,7 +7070,7 @@ describe("SessionRunnerLLM", () => {
   scenario("treats a blank answer after a completed tool as a finished turn", function* (s) {
     yield* s.admit("Run the tool then stop")
 
-    yield* s.llm.push(TestLLM.tool("call-echo", "echo", { text: "hi" }), TestLLM.stop())
+    yield* s.llm.push(TestLLM.toolCall("call-echo", "echo", { text: "hi" }), TestLLM.stop())
     yield* s.resume
 
     expect(s.requests).toHaveLength(2)
@@ -7450,7 +7450,7 @@ describe("SessionRunnerLLM", () => {
   })
   const pendingTodo = { todos: [{ content: "Write the test", status: "pending" }] }
   const completedTodo = { todos: [{ content: "Write the test", status: "completed" }] }
-  const todoCall = (call: string, todos: typeof pendingTodo) => TestLLM.tool(call, TodoTool.name, todos)
+  const todoCall = (call: string, todos: typeof pendingTodo) => TestLLM.toolCall(call, TodoTool.name, todos)
   const residueNotices = (s: Scenario) =>
     Effect.map(s.context, (messages) =>
       messages.flatMap((message) =>
@@ -7499,12 +7499,12 @@ describe("SessionRunnerLLM", () => {
   // this is the assertion model→tool routing and any cache keepalive are gated on. Wire bytes are
   // compared with cache breakpoints off, because the final message moves its marker every step.
   const wirePrefix = Effect.fnUntraced(function* (request: LLMRequest) {
-    const compiled = yield* compileRequest(LLMRequest.update(request, { cache: "none" }))
+    const compiled = yield* compileRequest({ ...request, cache: "none" })
     return Schema.decodeUnknownSync(Schema.Array(Schema.Unknown))(compiled.body.messages)
   })
 
   scenario("keeps the cached prefix byte-identical between the steps of one turn", function* (s) {
-    yield* s.llm.push(TestLLM.tool("call-prefix-step", "echo", { text: "once" }), TestLLM.text("Done", "prefix-step-done"))
+    yield* s.llm.push(TestLLM.toolCall("call-prefix-step", "echo", { text: "once" }), TestLLM.text("Done", "prefix-step-done"))
     yield* s.runPrompt("Echo once")
 
     expect(s.requests).toHaveLength(2)
@@ -7521,20 +7521,21 @@ describe("SessionRunnerLLM", () => {
   })
 
   scenario("catches a step that moved the cached prefix", function* (s) {
-    yield* s.llm.push(TestLLM.tool("call-prefix-drift", "echo", { text: "once" }), TestLLM.text("Done", "prefix-drift-done"))
+    yield* s.llm.push(TestLLM.toolCall("call-prefix-drift", "echo", { text: "once" }), TestLLM.text("Done", "prefix-drift-done"))
     yield* s.runPrompt("Echo once")
 
     const first = s.requests[0]
-    const stamped = LLMRequest.update(s.requests[1], {
+    const stamped = {
+      ...s.requests[1],
       system: s.requests[1].system.map((part) => ({ ...part, text: `${part.text}#${new Date().toISOString()}` })),
-    })
+    }
     const before = yield* wirePrefix(first)
     const after = yield* wirePrefix(stamped)
     expect(after.slice(0, before.length)).not.toEqual([...before])
   })
 
   const loopCalls = (count: number) =>
-    Array.from({ length: count }, (_, index) => TestLLM.tool(`call-loop-${index}`, "echo", { text: "again" }))
+    Array.from({ length: count }, (_, index) => TestLLM.toolCall(`call-loop-${index}`, "echo", { text: "again" }))
 
   const loopGuardFailures = (s: Scenario) =>
     Effect.map(s.context, (messages) =>
@@ -7569,7 +7570,7 @@ describe("SessionRunnerLLM", () => {
 
   scenario("advises on cross-parameter failures and closes the turn at the streak limit", function* (s) {
     s.echoFailure = "Echo unavailable"
-    const varying = Array.from({ length: 6 }, (_, index) => TestLLM.tool(`call-fail-${index}`, "echo", { text: `v${index}` }))
+    const varying = Array.from({ length: 6 }, (_, index) => TestLLM.toolCall(`call-fail-${index}`, "echo", { text: `v${index}` }))
     yield* s.llm.push(...varying, TestLLM.text("Wrapped up", "failure-stop"))
     yield* s.runPrompt("Echo something")
 
@@ -7626,9 +7627,9 @@ describe("SessionRunnerLLM", () => {
     )
 
     yield* s.llm.push(
-      TestLLM.tool("call-blind", "beta", { path: "b" }),
-      TestLLM.tool("call-search", TOOL_SEARCH_NAME, { query: "alpha" }),
-      TestLLM.tool("call-alpha", "alpha", { path: "a" }),
+      TestLLM.toolCall("call-blind", "beta", { path: "b" }),
+      TestLLM.toolCall("call-search", TOOL_SEARCH_NAME, { query: "alpha" }),
+      TestLLM.toolCall("call-alpha", "alpha", { path: "a" }),
       TestLLM.text("Done", "defer-done"),
     )
     yield* s.runPrompt("Use alpha")

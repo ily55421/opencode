@@ -303,6 +303,7 @@ export async function session(snapshots: "on" | "off", ttft: number) {
           assistantMessageID: SessionMessage.ID.create(),
           agent: Agent.defaultID,
           model,
+          blocked: new Map(),
           prepared: {
             retry: () => Effect.void,
             request: ai.request({ model: model.model, prompt: "bench" }),

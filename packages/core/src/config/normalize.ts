@@ -465,3 +465,368 @@ function normalizeExperimental(
         const value = decodeEncoded(schema, experimental[key], ["experimental", key], diagnostics)
         if (value !== undefined) result[key] = value
       })
+    }
+  }
+  if (Object.keys(result).length || (isRecord(input.experimental) && !Object.keys(input.experimental).length))
+    encoded.experimental = result
+}
+
+function normalizeWatcher(input: Record<string, unknown>, encoded: Record<string, unknown>, diagnostics: Diagnostic[]) {
+  if (!own(input, "watcher")) return
+  if (!isRecord(input.watcher)) {
+    invalid(["watcher"], diagnostics)
+    return
+  }
+  const ignore = decodeList(input.watcher.ignore, Schema.String, ["watcher", "ignore"], diagnostics, decodeEncoded)
+  encoded.watcher = ignore.length || Array.isArray(input.watcher.ignore) ? { ignore } : {}
+}
+
+function normalizeFormatter(
+  input: Record<string, unknown>,
+  encoded: Record<string, unknown>,
+  diagnostics: Diagnostic[],
+) {
+  if (!own(input, "formatter")) return
+  if (typeof input.formatter === "boolean") {
+    const value = decodeEncoded(ConfigFormatter.Info, input.formatter, ["formatter"], diagnostics)
+    if (value !== undefined) encoded.formatter = value
+    return
+  }
+  const entries = decodeMap(input.formatter, ConfigFormatter.Entry, ["formatter"], diagnostics, decodeEncoded)
+  if (isRecord(input.formatter) && (!Object.keys(input.formatter).length || Object.keys(entries).length))
+    encoded.formatter = entries
+}
+
+function normalizeLsp(input: Record<string, unknown>, encoded: Record<string, unknown>, diagnostics: Diagnostic[]) {
+  if (!own(input, "lsp")) return
+  if (typeof input.lsp === "boolean") {
+    const value = decodeEncoded(ConfigLSP.Info, input.lsp, ["lsp"], diagnostics)
+    if (value !== undefined) encoded.lsp = value
+    return
+  }
+  const entries = decodeMap(input.lsp, ConfigLSP.Entry, ["lsp"], diagnostics, decodeEncoded)
+  if (isRecord(input.lsp) && (!Object.keys(input.lsp).length || Object.keys(entries).length)) encoded.lsp = entries
+}
+
+function migrateTools(value: unknown, diagnostics: Diagnostic[]) {
+  if (value === undefined) return []
+  if (!isRecord(value)) {
+    invalid(["tools"], diagnostics)
+    return []
+  }
+  return Object.entries(value).flatMap(([action, raw]) => {
+    const enabled = decodeValue(Schema.Boolean, raw, ["tools", action], diagnostics)
+    if (enabled === undefined) return []
+    return [{ action: ConfigMigrateV1.normalizeAction(action), resource: "*", effect: enabled ? "allow" : "deny" }]
+  })
+}
+
+function migratePermissions(value: unknown, diagnostics: Diagnostic[]) {
+  if (value === undefined) return []
+  if (typeof value === "string") {
+    const effect = decodeValue(ConfigPermissionV1.Action, value, ["permission"], diagnostics)
+    return effect === undefined ? [] : [{ action: "*", resource: "*", effect }]
+  }
+  if (!isRecord(value)) {
+    invalid(["permission"], diagnostics)
+    return []
+  }
+  return Object.entries(value).flatMap(([action, raw]) => {
+    if (typeof raw === "string") {
+      const effect = decodeValue(ConfigPermissionV1.Action, raw, ["permission", action], diagnostics)
+      return effect === undefined ? [] : [{ action: ConfigMigrateV1.normalizeAction(action), resource: "*", effect }]
+    }
+    if (!isRecord(raw)) {
+      invalid(["permission", action], diagnostics)
+      return []
+    }
+    return Object.entries(raw).flatMap(([resource, effect], index) => {
+      const decoded = decodeValue(ConfigPermissionV1.Action, effect, ["permission", action, String(index)], diagnostics)
+      return decoded === undefined
+        ? []
+        : [{ action: ConfigMigrateV1.normalizeAction(action), resource, effect: decoded }]
+    })
+  })
+}
+
+function migrateProviders(value: unknown, diagnostics: Diagnostic[]) {
+  if (value === undefined) return {}
+  if (!isRecord(value)) {
+    invalid(["provider"], diagnostics)
+    return {}
+  }
+  const candidates = Object.entries(value).flatMap(([name, raw]) => {
+    const path = ["provider", name]
+    diagnoseProviderUnsupported(raw, path, diagnostics)
+    if (invalidProviderOverlays(raw, path, diagnostics)) return []
+    const provider = decodeValue(ConfigProviderV1.Info, raw, path, diagnostics)
+    if (provider === undefined) return []
+    const destination = ConfigMigrateV1.providerID(name)
+    return [
+      {
+        name,
+        destination,
+        provider: canonical(ConfigProvider.Info, ConfigMigrateV1.migrateProvider(name, provider)),
+      },
+    ]
+  })
+  const current = new Set(candidates.filter((item) => item.name === item.destination).map((item) => item.destination))
+  const result: Record<string, unknown> = {}
+  candidates.forEach((item) => {
+    if (item.name !== item.destination && current.has(item.destination)) return
+    setOwn(result, item.destination, item.provider)
+  })
+  return result
+}
+
+function invalidProviderOverlays(value: unknown, path: string[], diagnostics: Diagnostic[]) {
+  if (!isRecord(value) || !isRecord(value.options)) return false
+  const headersInvalid =
+    own(value.options, "headers") &&
+    (!isPlainRecord(value.options.headers) ||
+      Object.values(value.options.headers).some((item) => typeof item !== "string"))
+  const bodyInvalid = own(value.options, "body") && !isPlainRecord(value.options.body)
+  if (headersInvalid) invalid([...path, "options", "headers"], diagnostics)
+  if (bodyInvalid) invalid([...path, "options", "body"], diagnostics)
+  return headersInvalid || bodyInvalid
+}
+
+function diagnoseProviderUnsupported(value: unknown, path: string[], diagnostics: Diagnostic[]) {
+  if (!isRecord(value)) return
+  unsupportedProvider.forEach((key) => unsupportedIfPresent(value, key, [...path, key], diagnostics))
+  if (!isRecord(value.models)) return
+  Object.entries(value.models).forEach(([name, model]) => {
+    if (!isRecord(model)) return
+    unsupportedModel.forEach((key) => unsupportedIfPresent(model, key, [...path, "models", name, key], diagnostics))
+    if (own(model, "status") && model.status !== "deprecated")
+      unsupportedIfPresent(model, "status", [...path, "models", name, "status"], diagnostics)
+    if (own(model, "interleaved") && typeof model.interleaved === "boolean")
+      unsupportedIfPresent(model, "interleaved", [...path, "models", name, "interleaved"], diagnostics)
+  })
+}
+
+function diagnoseAgentUnsupported(value: unknown, path: string[], diagnostics: Diagnostic[]) {
+  if (!isRecord(value)) return
+  Object.entries(value).forEach(([name, agent]) => {
+    if (!isRecord(agent)) return
+    unsupportedIfPresent(agent, "name", [...path, name, "name"], diagnostics)
+    diagnoseSelection(agent, [...path, name], diagnostics)
+  })
+}
+
+function diagnoseSelectionMap(value: unknown, path: string[], diagnostics: Diagnostic[]) {
+  if (!isRecord(value)) return
+  Object.entries(value).forEach(([name, entry]) => {
+    if (isRecord(entry)) diagnoseSelection(entry, [...path, name], diagnostics)
+  })
+}
+
+function diagnoseSelection(value: Record<string, unknown>, path: string[], diagnostics: Diagnostic[]) {
+  const modelValid = typeof value.model === "string" && /^[^/#]+\/[^#]+$/.test(value.model)
+  if (own(value, "model") && typeof value.model === "string" && !modelValid)
+    diagnostics.push({
+      kind: "unsupported",
+      path: [...path, "model"],
+      message: "omitted unsupported legacy model reference",
+    })
+  if (
+    own(value, "variant") &&
+    typeof value.variant === "string" &&
+    (!modelValid || value.variant.length === 0 || value.variant.includes("#"))
+  )
+    diagnostics.push({
+      kind: "unsupported",
+      path: [...path, "variant"],
+      message: "omitted unsupported legacy model variant",
+    })
+}
+
+function decodeProviderList(
+  input: Record<string, unknown>,
+  key: "enabled_providers" | "disabled_providers",
+  diagnostics: Diagnostic[],
+) {
+  if (!own(input, key)) return { present: false, nonEmpty: false, values: [] as string[] }
+  if (!Array.isArray(input[key])) {
+    invalid([key], diagnostics)
+    return { present: true, nonEmpty: true, values: [] as string[] }
+  }
+  return {
+    present: true,
+    nonEmpty: input[key].length > 0,
+    values: decodeList(input[key], Schema.String, [key], diagnostics, decodeValue),
+  }
+}
+
+function decodeMap<S extends Schema.Codec<unknown, unknown, never>, A>(
+  value: unknown,
+  schema: S,
+  path: string[],
+  diagnostics: Diagnostic[],
+  decode: (schema: S, value: unknown, path: string[], diagnostics: Diagnostic[]) => A | undefined,
+): Record<string, A> {
+  if (value === undefined) return {}
+  if (!isRecord(value)) {
+    invalid(path, diagnostics)
+    return {}
+  }
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([name, raw]): [string, A][] => {
+      const decoded = decode(schema, raw, [...path, name], diagnostics)
+      return decoded === undefined ? [] : [[name, decoded]]
+    }),
+  )
+}
+
+function decodeList<S extends Schema.Codec<unknown, unknown, never>, A>(
+  value: unknown,
+  schema: S,
+  path: string[],
+  diagnostics: Diagnostic[],
+  decode: (schema: S, value: unknown, path: string[], diagnostics: Diagnostic[]) => A | undefined,
+): A[] {
+  if (value === undefined) return []
+  if (!Array.isArray(value)) {
+    invalid(path, diagnostics)
+    return []
+  }
+  return value.flatMap((item, index) => {
+    const decoded = decode(schema, item, [...path, String(index)], diagnostics)
+    return decoded === undefined ? [] : [decoded]
+  })
+}
+
+function decodeValue<S extends Schema.Codec<unknown, unknown, never, never>>(
+  schema: S,
+  value: unknown,
+  path: string[],
+  diagnostics: Diagnostic[],
+) {
+  const decoded = Schema.decodeUnknownOption(schema, options)(value)
+  if (Option.isSome(decoded)) return decoded.value
+  invalid(path, diagnostics)
+  return undefined
+}
+
+function decodeEncoded<S extends Schema.Codec<unknown, unknown, never, never>>(
+  schema: S,
+  value: unknown,
+  path: string[],
+  diagnostics: Diagnostic[],
+) {
+  const decoded = Schema.decodeUnknownOption(schema, options)(value)
+  if (Option.isNone(decoded)) {
+    invalid(path, diagnostics)
+    return undefined
+  }
+  const encoded = Schema.encodeUnknownOption(schema, options)(decoded.value)
+  if (Option.isSome(encoded)) return plain(encoded.value)
+  invalid(path, diagnostics)
+  return undefined
+}
+
+function canonical<S extends Schema.Codec<unknown, unknown, never, never>>(schema: S, value: unknown) {
+  return plain(
+    Option.getOrThrow(
+      Schema.decodeUnknownOption(
+        schema,
+        options,
+      )(plain(value)).pipe(Option.flatMap((decoded) => Schema.encodeUnknownOption(schema, options)(decoded))),
+    ),
+  )
+}
+
+function plain(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(plain)
+  if (!isRecord(value)) return value
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([key, item]) => (item === undefined ? [] : [[key, plain(item)]])),
+  )
+}
+
+function mergeMap(
+  target: Record<string, unknown>,
+  key: string,
+  legacy: Readonly<Record<string, unknown>>,
+  native: Readonly<Record<string, unknown>>,
+  present: boolean,
+  diagnostics: Diagnostic[],
+) {
+  const merged = mergeMaps(legacy, native, [key], diagnostics)
+  if (present) target[key] = merged
+}
+
+function mergeMaps(
+  legacy: Readonly<Record<string, unknown>>,
+  native: Readonly<Record<string, unknown>>,
+  path: string[],
+  diagnostics: Diagnostic[],
+) {
+  const result = Object.fromEntries(Object.entries(legacy))
+  Object.entries(native).forEach(([name, value]) => {
+    if (own(result, name) && !isDeepStrictEqual(result[name], value)) conflict([...path, name], diagnostics)
+    setOwn(result, name, value)
+  })
+  return result
+}
+
+function mapValues<A>(input: Readonly<Record<string, A>>, map: (value: A) => unknown) {
+  return Object.fromEntries(
+    Object.entries(input).flatMap(([key, value]) => {
+      const mapped = map(value)
+      return mapped === undefined ? [] : [[key, mapped]]
+    }),
+  )
+}
+
+function overlay(
+  target: Record<string, unknown>,
+  key: string,
+  value: unknown,
+  path: string[],
+  diagnostics: Diagnostic[],
+) {
+  if (own(target, key) && !isDeepStrictEqual(target[key], value)) conflict(path, diagnostics)
+  target[key] = value
+}
+
+function prefer(legacy: unknown, native: unknown, path: string[], diagnostics: Diagnostic[]) {
+  if (native === undefined) return legacy
+  if (legacy !== undefined && !isDeepStrictEqual(legacy, native)) conflict(path, diagnostics)
+  return native
+}
+
+function unsupportedIfPresent(value: Record<string, unknown>, key: string, path: string[], diagnostics: Diagnostic[]) {
+  if (!own(value, key)) return
+  diagnostics.push({ kind: "unsupported", path, message: "omitted unsupported legacy setting" })
+}
+
+function invalid(path: string[], diagnostics: Diagnostic[]) {
+  diagnostics.push({ kind: "invalid", path, message: "skipped malformed recognized value" })
+}
+
+function conflict(path: string[], diagnostics: Diagnostic[]) {
+  diagnostics.push({ kind: "conflict", path, message: "retained native value over legacy value" })
+}
+
+function isDirectLegacyMcp(value: unknown) {
+  return isRecord(value) && (value.type === "local" || value.type === "remote")
+}
+
+function isEnabledOnlyMcp(value: unknown) {
+  return isRecord(value) && !own(value, "type") && typeof value.enabled === "boolean"
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  if (!isRecord(value)) return false
+  const prototype = Object.getPrototypeOf(value)
+  return prototype === Object.prototype || prototype === null
+}
+
+function own(value: Record<string, unknown>, key: string) {
+  return Object.hasOwn(value, key)
+}
+
+function setOwn(value: Record<string, unknown>, key: string, item: unknown) {
+  Object.defineProperty(value, key, { value: item, enumerable: true, configurable: true, writable: true })
+}

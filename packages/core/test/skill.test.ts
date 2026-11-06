@@ -234,7 +234,7 @@ describe("Skill", () => {
         })
         let extra: Record<string, string> = { "SKILL.md": "ignored", "references/b.md": "B", "references/a.md": "A" }
         yield* skill.transform((editor) => {
-          editor.add(virtual, extra)
+          editor.add(virtual, undefined, extra)
           editor.update("review", (draft) => {
             draft.description = "Updated"
           })

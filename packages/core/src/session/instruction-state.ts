@@ -172,9 +172,7 @@ export const initial = Effect.fn("InstructionState.initial")(function* (
   if (!state) return yield* Effect.die(new Error(`Instruction state not found during assembly: ${sessionID}`))
   const blobs = yield* loadBlobs(db, Object.values(state.initial_values))
   const parts = Instructions.parts(instructions, dereference(state.initial_values, blobs))
-  return budget === undefined
-    ? Instructions.render(parts.map((part) => part.text))
-    : InstructionBudget.fit(parts, budget)
+  return budget === undefined ? parts : InstructionBudget.fitParts(parts, budget)
 })
 
 /** The current instruction values, used to seed a fork's baseline. */

@@ -1074,6 +1074,7 @@ describe("ReadTool", () => {
                 path: AbsolutePath.make("skill://guide/SKILL.md"),
                 content: "# Guide\nRead references/style.md",
               }),
+              undefined,
               {
                 "references/style.md": "Line 1\nLine 2",
               },

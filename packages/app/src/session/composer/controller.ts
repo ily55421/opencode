@@ -62,7 +62,8 @@ export function createSessionComposerController(input: {
       if (!ready) return
 
       const frame = requestAnimationFrame(() => {
-        if (!editor?.isConnected || !region.showComposer() || region.child() || dialog.active) return
+        const target = editor()
+        if (!target?.isConnected || !region.showComposer() || region.child() || dialog.active) return
         const active = document.activeElement
 
         // A control chosen while the session was loading owns focus now. The switchers are exempt: a tab link or a
@@ -70,12 +71,12 @@ export function createSessionComposerController(input: {
         if (
           active &&
           active !== document.body &&
-          active !== editor &&
+          active !== target &&
           !active.matches("[data-titlebar-tab-link],[data-session-switch]")
         )
           return
-        editor.focus({ preventScroll: true })
-        setCursorPosition(editor, adapter.state.cursor() ?? promptLength(adapter.state.current()))
+        target.focus({ preventScroll: true })
+        setCursorPosition(target, adapter.state.cursor() ?? promptLength(adapter.state.current()))
       })
 
       onCleanup(() => cancelAnimationFrame(frame))

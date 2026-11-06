@@ -476,3 +476,33 @@ describe("SessionStats", () => {
     }),
   )
 })
+
+
+function assistant(
+  id: string,
+  created: number,
+  content: SessionMessage.AssistantContent[],
+  model = "sonnet",
+  scale = 1,
+) {
+  return SessionMessage.Assistant.make({
+    id: SessionMessage.ID.make(id),
+    type: "assistant",
+    agent: Agent.ID.make("build"),
+    model: { id: Model.ID.make(model), providerID: Provider.ID.make("anthropic") },
+    content,
+    cost: Money.USD.make(1.5 * scale),
+    tokens: { input: 10 * scale, output: 5 * scale, reasoning: 2 * scale, cache: { read: 4 * scale, write: scale } },
+    time: { created: DateTime.makeUnsafe(created), completed: DateTime.makeUnsafe(created + 2_000) },
+  })
+}
+
+function messageRow(
+  sessionID: Session.ID,
+  seq: number,
+  message: SessionMessage.Info,
+): typeof SessionMessageTable.$inferInsert {
+  const encoded = encodeMessage(message)
+  const { id, type, ...data } = encoded
+  return { id: SessionMessage.ID.make(id), session_id: sessionID, type, seq, time_created: encoded.time.created, data }
+}

@@ -1,6 +1,6 @@
 export * as InstructionBudget from "./budget.js"
 
-import type { Scope } from "./index.js"
+import { Key, type Rendered, type Scope } from "./index.js"
 import { Token } from "../util/token.js"
 
 /** Hard ceiling on one rendered instruction pool, however large the model's window is. */
@@ -68,4 +68,40 @@ export const fit = (parts: ReadonlyArray<Part>, pools: Pools) => {
     notes.push(`${part.key} trimmed ${size - tokens} tokens`)
   }
   return kept.join("\n\n") + (notes.length === 0 ? "" : `\n\n[instructions budget: ${notes.join(", ")}]`)
+}
+
+/**
+ * The rendered parts a request keeps under each scope's pool, with over-budget text trimmed: the
+ * budgeted baseline as parts, so a caller that joins parts itself still spends the same pools. The
+ * same disclosure rule as `fit` applies — cuts are named in a trailing part, never silent.
+ */
+export const fitParts = (parts: ReadonlyArray<Rendered>, pools: Pools): ReadonlyArray<Rendered> => {
+  const remaining = { ...pools }
+  const kept: Rendered[] = []
+  const notes: string[] = []
+  for (const part of parts) {
+    const size = Token.estimateWide(part.text)
+    const room = remaining[part.scope]
+    if (size <= room) {
+      remaining[part.scope] = room - size
+      kept.push(part)
+      continue
+    }
+    const trimmed = head(part.text, Math.max(0, room))
+    const tokens = Token.estimateWide(trimmed)
+    remaining[part.scope] = room - tokens
+    if (tokens === 0) {
+      notes.push(`${part.key} dropped`)
+      continue
+    }
+    kept.push({ ...part, text: trimmed })
+    notes.push(`${part.key} trimmed ${size - tokens} tokens`)
+  }
+  if (notes.length > 0)
+    kept.push({
+      key: Key.make("core/instructions-budget"),
+      scope: "global",
+      text: `[instructions budget: ${notes.join(", ")}]`,
+    })
+  return kept
 }
