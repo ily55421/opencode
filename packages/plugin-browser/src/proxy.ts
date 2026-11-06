@@ -59,8 +59,26 @@ export async function make(transport: Transport) {
       signal.removeEventListener("abort", cancel)
     }
   }
+  // One keep-alive agent for every forward. Pages load hundreds of resources; a per-request
+  // tunnel (open RPC, TCP connect, close RPC each time) stalled heavy pages and saturated the
+  // host's main process. The agent pools tunnel sockets per origin and reuses them.
+  const agent = new Agent({ keepAlive: true, maxSockets: 32 })
+  agent.createConnection = (options, oncreate) => {
+    const url = parseURL(`http://${String(options.host)}:${String(options.port ?? 80)}`)
+
+    if (!url) {
+      oncreate?.(new Error("Bad proxy target"), new Duplex())
+      return
+    }
+    const signal = new AbortController()
+    connect(target(url), signal.signal).then(
+      (socket) => oncreate?.(null, socket),
+      (error: unknown) => oncreate?.(asError(error), new Duplex()),
+    )
+  }
+
   const server = createServer({ maxHeaderSize: 64 * 1024 }, (incoming, response) => {
-    void forward(incoming, response, connect, authorized).catch(() => {
+    void forward(incoming, response, agent, authorized).catch(() => {
       if (!response.headersSent) {
         response.writeHead(502)
         response.end()
@@ -163,6 +181,7 @@ export async function make(transport: Transport) {
         pending.forEach((abort) => abort.abort())
         tunnels.forEach((socket) => socket.destroy())
         clients.forEach((socket) => socket.destroy())
+        agent.destroy()
         server.close(() => closed.resolve())
       })
       return closed.promise
@@ -173,7 +192,7 @@ export async function make(transport: Transport) {
 async function forward(
   incoming: IncomingMessage,
   response: ServerResponse,
-  connect: (target: Browser.TunnelTarget, signal: AbortSignal) => Promise<Duplex>,
+  agent: Agent,
   authorized: (value: string | undefined) => boolean,
 ) {
   if (!authorized(incoming.headers["proxy-authorization"])) {
@@ -191,16 +210,9 @@ async function forward(
   const cancel = () => abort.abort()
   incoming.once("aborted", cancel)
   response.once("close", cancel)
-  const agent = new Agent({ keepAlive: false, maxSockets: 1 })
-  // An abort before the request adopts the tunnel leaves it out of `agent.destroy()`.
-  let opened: Duplex | undefined
   try {
-    const tunnel = await connect(target(url), abort.signal)
-    opened = tunnel
-    agent.createConnection = () => tunnel
     const headers = forwardedHeaders(incoming.headers)
     headers.host = url.host
-    headers.connection = "close"
     await new Promise<void>((resolve, reject) => {
       const upstream = request(
         {
@@ -213,10 +225,7 @@ async function forward(
           signal: abort.signal,
         },
         (result) => {
-          response.writeHead(result.statusCode ?? 502, result.statusMessage, {
-            ...forwardedHeaders(result.headers),
-            connection: "close",
-          })
+          response.writeHead(result.statusCode ?? 502, result.statusMessage, forwardedHeaders(result.headers))
           result.once("error", reject)
           response.once("finish", resolve)
           result.pipe(response)
@@ -228,8 +237,6 @@ async function forward(
   } finally {
     incoming.off("aborted", cancel)
     response.off("close", cancel)
-    agent.destroy()
-    opened?.destroy()
   }
 }
 

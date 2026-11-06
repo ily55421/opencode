@@ -28,7 +28,7 @@ const read = (path: string) => readFileSync(join(import.meta.dir, "..", root, pa
 const literal = (file: string) => {
   const source = read(file)
   const match = source.match(/\n\s*description:\s*\n?\s("((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)')/)
-  if (match === undefined) throw new Error(`no literal description in ${file}`)
+  if (match === null) throw new Error(`no literal description in ${file}`)
   return JSON.parse(match[1].replaceAll("\n", "\\n"))
 }
 
@@ -76,7 +76,7 @@ for (const [name, fallback, input] of opencode) {
   const source = read("tool/plugin/opencode.ts")
   const block = source.match(new RegExp(`name: "${name}",\\s*description:\\s*\\n?\\s("((?:[^"\\\\]|\\\\.)*)")`))
   real.push(
-    single(`opencode_${name}`, block === undefined ? fallback : JSON.parse(block[1].replaceAll("\n", "\\n")), input),
+    single(`opencode_${name}`, block === null ? fallback : JSON.parse(block[1].replaceAll("\n", "\\n")), input),
   )
 }
 
