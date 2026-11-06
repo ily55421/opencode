@@ -23,7 +23,10 @@ const documents = [
   ...new Glob("doc/**/*.md", { cwd: root }).scanSync(),
   ...new Glob("**/AGENTS.md", { cwd: root }).scanSync(),
 ]
-  .filter((file) => !file.includes("node_modules"))
+  // doc/research holds point-in-time analyses of external codebases and borrowing plans. Their path
+  // mentions describe other repositories or files that intentionally do not exist here, so they are
+  // not part of the change-knowledge set this checker guards.
+  .filter((file) => !file.includes("node_modules") && !file.replaceAll(path.sep, "/").startsWith("doc/research/"))
   .toSorted()
   .map((file) => path.join(root, file))
 

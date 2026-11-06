@@ -43,6 +43,8 @@ anyone inserts a statement above it, and a stale anchor is worse than none becau
 `bun script/doc-refs.ts` enforces this: it fails on anchors that append a line number to a file path, on paths that no
 longer exist, and on `file#Symbol` references whose symbol is gone. Run it through `bun run lint`. Fix a real
 breakage by updating the reference; do not silence it by deleting the sentence that carried the knowledge.
+Research notes under `doc/research/` sit outside the checked set — they are point-in-time analyses of external
+codebases and plans, and the paths they name belong to other repositories or do not exist here by design.
 
 ## Change map
 

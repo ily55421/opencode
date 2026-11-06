@@ -134,7 +134,7 @@ the system prompt is likewise assembled from the pre-deferral snapshot names, so
 deferred tool, and the discovery tool's description carries the on-demand contract.
 
 Budget ownership sits here. The instruction pools above cap injected blocks and never touch tool schemas; model→tool
-routing is a plan (`P0-可执行技术方案.md` §3.12), not code, and would compose upstream of this threshold when it
+routing is a plan (`P0-可执行技术方案.md`, now under `doc/research/`, §3.12), not code, and would compose upstream of this threshold when it
 lands — one owner per axis, so two budgets cannot silently contradict each other.
 
 ## Prefix bytes
