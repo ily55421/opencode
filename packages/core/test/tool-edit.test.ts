@@ -38,14 +38,14 @@ const makeEditFixture = () => {
     denyAction?: string
     readAllowed: boolean
     afterRead: () => Effect.Effect<void>
-    formatFile: (target: string) => Effect.Effect<boolean>
+    formatFile: (target: string) => Effect.Effect<Formatter.Outcome>
   } = {
     assertions: [],
     writes: [],
     reads: 0,
     readAllowed: true,
     afterRead: () => Effect.void,
-    formatFile: () => Effect.succeed(false),
+    formatFile: () => Effect.succeed({ formatted: false }),
   }
 
   const permission = permissionLayer({
@@ -189,7 +189,7 @@ describe("EditTool", () => {
       edit.formatFile = (file) =>
         Effect.promise(async () => {
           await fs.writeFile(file, (await fs.readFile(file, "utf8")).replace("after", "AFTER"))
-          return true
+          return { formatted: true }
         })
       return Effect.promise(() => fs.writeFile(target, "before\n")).pipe(
         Effect.andThen(
@@ -624,7 +624,7 @@ describe("EditTool", () => {
       edit.formatFile = (file) =>
         Effect.promise(async () => {
           await fs.writeFile(file, (await fs.readFile(file, "utf8")).replace(/^\uFEFF/, ""))
-          return true
+          return { formatted: true }
         })
       return Effect.promise(() => fs.writeFile(target, "\uFEFFbefore\r\nrest\r\n")).pipe(
         Effect.andThen(

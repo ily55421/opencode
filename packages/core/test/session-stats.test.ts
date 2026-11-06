@@ -204,8 +204,10 @@ describe("SessionStats", () => {
       expect(stats.subagents).toBe(1)
       expect(stats.prompts).toBe(1)
       expect(stats.steps).toBe(3)
-      expect(stats.tokens).toEqual({ input: 42, output: 22, reasoning: 10, cache: { read: 18, write: 6 } })
-      expect(stats.cost).toBe(Money.USD.make(6.25))
+      // The title-generation event (1/1/1/1/1 at 0.5) is booked on top of the message totals and the
+      // compaction event: auxiliary spend is part of the bill, not a rounding error to hide.
+      expect(stats.tokens).toEqual({ input: 43, output: 23, reasoning: 11, cache: { read: 19, write: 7 } })
+      expect(stats.cost).toBe(Money.USD.make(6.75))
       expect(stats.tools).toMatchObject({
         mode: "detail",
         totals: { calls: 3, succeeded: 1, failed: 1, unfinished: 1 },
@@ -400,6 +402,56 @@ describe("SessionStats", () => {
         cache: { read: 120 * 4, write: 120 },
       })
       expect(stats.cost).toBe(Money.USD.make(120 * 1.5 + 1))
+    }),
+  )
+
+  durableIt.effect("books title-generation usage into the totals", () =>
+    Effect.gen(function* () {
+      const db = (yield* Database.Service).db
+      const bus = yield* Bus.Service
+      yield* db
+        .insert(ProjectTable)
+        .values({ id: projectID, worktree: AbsolutePath.make("/stats"), name: "stats", sandboxes: [] })
+        .run()
+        .pipe(Effect.orDie)
+
+      // Title generation spends tokens without writing an assistant message, so the only durable
+      // trace is the UsageRecorded event; the report must read it or the spend is invisible.
+      const id = Session.ID.make("ses_stats_titled")
+      const created = Date.UTC(2026, 0, 2, 10)
+      yield* db
+        .insert(SessionTable)
+        .values({ id, project_id: projectID, slug: "titled", directory: "/stats", version: "test" })
+        .run()
+        .pipe(Effect.orDie)
+      yield* Effect.forEach(
+        DatabaseBatch.insertBatches(
+          SessionMessageTable,
+          [messageRow(id, 1, assistant(`msg_stats_titled`, created, []))],
+        ),
+        (batch) => db.insert(SessionMessageTable).values(batch).run().pipe(Effect.orDie),
+        { discard: true },
+      )
+
+      yield* TestClock.setTime(created + 1_000)
+      yield* bus.publish(SessionEvent.UsageRecorded, {
+        sessionID: id,
+        source: "title",
+        cost: Money.USD.make(0.02),
+        tokens: { input: 900, output: 20, reasoning: 0, cache: { read: 0, write: 0 } },
+      })
+      const stats = yield* SessionStats.get({
+        from: Date.UTC(2026, 0, 1),
+        to: Date.UTC(2026, 1, 1),
+        projectID,
+        timezone: "UTC",
+        tools: "none",
+      })
+      // The fixture message row carries 10/5/2/4/1 tokens at a 1.5 cost; the title spend rides on top.
+      expect(stats.tokens.input).toBe(10 + 900)
+      expect(stats.tokens.output).toBe(5 + 20)
+      expect(stats.tokens.reasoning).toBe(2)
+      expect(stats.cost).toBe(Money.USD.make(1.5 + 0.02))
     }),
   )
 

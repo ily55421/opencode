@@ -20,6 +20,8 @@ export interface WriteInput {
 export interface Written extends FileMutation.TextWriteResult {
   /** The file text after a formatter ran on it. */
   readonly formatted?: string
+  /** Set when a configured formatter ran and failed: the file is saved unformatted and the model is told. */
+  readonly formatFailure?: Formatter.Failure
 }
 
 export interface Interface {
@@ -50,6 +52,12 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/FileWrite") {}
+
+/** The model-facing notice for a formatter failure: the write landed, the style pass did not. */
+export const formatFailureNotice = (failure: Formatter.Failure | undefined) =>
+  failure === undefined
+    ? ""
+    : ` Formatter "${failure.formatter}" failed, so the file is saved unformatted: ${failure.message}`
 
 const layer = Layer.effect(
   Service,
@@ -82,7 +90,9 @@ const layer = Layer.effect(
 
     const commit = Effect.fn("FileWrite.commit")(function* (target: FileAccess.Target, content: string) {
       const written = yield* fileMutation.writeTextPreservingBom({ target, content })
-      if (!(yield* formatter.file(target.absolute))) return written
+      const outcome = yield* formatter.file(target.absolute)
+      if (!outcome.formatted)
+        return outcome.failure === undefined ? written : { ...written, formatFailure: outcome.failure }
       return {
         ...written,
         formatted: yield* FileMutation.syncTextBom(environment.files, target.absolute, written.bom),

@@ -18,8 +18,21 @@ export type Editor = {
   remove: (name: string) => void
 }
 
+/** A configured formatter was selected but did not run clean, so the file is left as written. */
+export type Failure = {
+  readonly formatter: string
+  readonly message: string
+}
+
+export type Outcome = {
+  /** A formatter ran and exited 0, so the file on disk is the formatted text. */
+  readonly formatted: boolean
+  /** Set when a configured formatter failed; absent when none matched or all were disabled. */
+  readonly failure?: Failure
+}
+
 export interface Interface extends State.Transformable<Editor> {
-  readonly file: (filepath: string) => Effect.Effect<boolean>
+  readonly file: (filepath: string) => Effect.Effect<Outcome>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/v2/Formatter") {}
@@ -57,6 +70,7 @@ const layer = Layer.effect(
       const extension = path.extname(filepath)
       const matching = state.get().formatters.filter((formatter) => formatter.extensions.includes(extension))
 
+      let failure: Failure | undefined
       for (const formatter of matching) {
         const enabled = yield* command(formatter)
         if (enabled === false) continue
@@ -74,23 +88,25 @@ const layer = Layer.effect(
             }),
           )
           .pipe(
-            Effect.catch((error) =>
-              Effect.logError("failed to format file", {
+            Effect.catch((error) => {
+              failure = failure ?? { formatter: formatter.name, message: error.message }
+              return Effect.logError("failed to format file", {
                 file: filepath,
                 command: cmd,
                 error: error.message,
-              }).pipe(Effect.as(undefined)),
-            ),
+              }).pipe(Effect.as(undefined))
+            }),
           )
         if (!result) continue
-        if (result.exitCode === 0) return true
+        if (result.exitCode === 0) return { formatted: true }
+        failure = failure ?? { formatter: formatter.name, message: `exited with code ${result.exitCode}` }
         yield* Effect.logError("formatter exited unsuccessfully", {
           file: filepath,
           command: cmd,
           exitCode: result.exitCode,
         })
       }
-      return false
+      return { formatted: false, failure }
     })
 
     return Service.of({ transform: state.transform, reload: state.reload, file })

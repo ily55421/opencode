@@ -36,6 +36,12 @@ export const Input = Schema.Struct({
 export const Output = Schema.Struct({
   files: Schema.Array(FileDiff.Info),
   replacements: Schema.Number,
+  formatFailure: Schema.optional(
+    Schema.Struct({
+      formatter: Schema.String,
+      message: Schema.String,
+    }),
+  ),
 })
 export type Output = typeof Output.Type
 
@@ -350,12 +356,13 @@ export const Plugin = {
               return {
                 files: [fileDiff(result.resource, source, formatted)],
                 replacements,
+                formatFailure: result.formatFailure,
               } satisfies Output
             }).pipe(
               fileMutation.withLock([FileAccess.resolvePath(location.directory, input.path)]),
               Effect.map((output) => ({
                 output,
-                content: `Edited ${output.files[0]?.file} (${output.replacements} replacement${output.replacements === 1 ? "" : "s"})`,
+                content: `Edited ${output.files[0]?.file} (${output.replacements} replacement${output.replacements === 1 ? "" : "s"})${FileWrite.formatFailureNotice(output.formatFailure)}`,
                 metadata: { files: output.files },
               })),
               Effect.mapError(toolFailure(`Unable to edit ${input.path}`)),

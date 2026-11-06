@@ -340,7 +340,7 @@ export const get = Effect.fn("SessionStats.get")(function* (input: Input = {}) {
               EventTable.type,
               Event.versionedType(SessionEvent.UsageRecorded.type, SessionEvent.UsageRecorded.durable.version),
             ),
-            sql`json_extract(${EventTable.data}, '$.source') = 'compaction'`,
+            sql`json_extract(${EventTable.data}, '$.source') IN ('compaction', 'title')`,
             gte(EventTable.created, from),
             lt(EventTable.created, to),
           ),
@@ -349,6 +349,9 @@ export const get = Effect.fn("SessionStats.get")(function* (input: Input = {}) {
         .pipe(Effect.orDie),
     { concurrency: 4 },
   )).flat()
+  // Usage recorded as a durable event never lands in an assistant message — compaction summaries and
+  // title generation both spend tokens without a message row — so the event log is the only place a
+  // report can read them from. Leaving a source out here silently undercounts the totals.
   events.forEach((row) => {
     const decoded = decodeUsage(row.data)
     if (Option.isNone(decoded)) return

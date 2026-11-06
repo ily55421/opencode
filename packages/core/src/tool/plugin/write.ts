@@ -26,11 +26,20 @@ export const Output = Schema.Struct({
   target: Schema.String,
   resource: Schema.String,
   existed: Schema.Boolean,
+  formatFailure: Schema.optional(
+    Schema.Struct({
+      formatter: Schema.String,
+      message: Schema.String,
+    }),
+  ),
 })
 export type Output = typeof Output.Type
 
-export const toModelContent = (output: Output) =>
-  `${output.existed ? "Wrote" : "Created"} file successfully: ${output.resource}`
+export const toModelContent = (output: Output) => {
+  // A formatter failure is model-visible: the file is on disk unformatted, and silently claiming
+  // success would teach the model the write is done when the style pass it assumed never ran.
+  return `${output.existed ? "Wrote" : "Created"} file successfully: ${output.resource}${FileWrite.formatFailureNotice(output.formatFailure)}`
+}
 
 /** Deferred write UX integrations remain visible at the model-facing seam. */
 // TODO: Publish watcher/file-edit events after watcher integration exists.
@@ -59,6 +68,7 @@ export const Plugin = {
                 target: written.target,
                 resource: written.resource,
                 existed: written.existed,
+                formatFailure: written.formatFailure,
               }
             }).pipe(
               Effect.map((output) => ({ output, content: toModelContent(output) })),

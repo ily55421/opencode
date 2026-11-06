@@ -36,12 +36,12 @@ const makeWriteFixture = () => {
     reads: Array<{ target: string; length?: number }>
     writes: string[]
     denyAction?: string
-    formatFile: (target: string) => Effect.Effect<boolean>
+    formatFile: (target: string) => Effect.Effect<Formatter.Outcome>
   } = {
     assertions: [],
     reads: [],
     writes: [],
-    formatFile: () => Effect.succeed(false),
+    formatFile: () => Effect.succeed({ formatted: false }),
   }
 
   const permission = permissionLayer({
@@ -159,7 +159,7 @@ describe("WriteTool", () => {
       fixture.formatFile = (file) =>
         Effect.promise(async () => {
           await fs.writeFile(file, (await fs.readFile(file, "utf8")).toUpperCase())
-          return true
+          return { formatted: true }
         })
       return withTool(tmp.path, fixture, (registry) =>
         Effect.gen(function* () {
@@ -167,6 +167,34 @@ describe("WriteTool", () => {
             status: "completed",
           })
           expect(yield* Effect.promise(() => fs.readFile(target, "utf8"))).toBe("FORMAT ME")
+        }),
+      )
+    }),
+  )
+
+  it.live("tells the model when the formatter failed instead of claiming a clean write", () =>
+    withTempDir((tmp) => {
+      const fixture = makeWriteFixture()
+      fixture.formatFile = () =>
+        Effect.succeed({ formatted: false, failure: { formatter: "prettier", message: "exited with code 1" } })
+      return withTool(tmp.path, fixture, (registry) =>
+        Effect.gen(function* () {
+          const settled = yield* executeTool(registry, call({ path: "broken.txt", content: "unformattable" }))
+          expect(settled.status).toBe("completed")
+          expect(settled.output).toMatchObject({
+            formatFailure: { formatter: "prettier", message: "exited with code 1" },
+          })
+          expect(settled.content).toEqual([
+            {
+              type: "text",
+              text:
+                "Created file successfully: broken.txt Formatter \"prettier\" failed, so the file is saved unformatted: exited with code 1",
+            },
+          ])
+          // The write itself still landed: the formatter failure must not roll the mutation back.
+          expect(yield* Effect.promise(() => fs.readFile(path.join(tmp.path, "broken.txt"), "utf8"))).toBe(
+            "unformattable",
+          )
         }),
       )
     }),
@@ -214,7 +242,7 @@ describe("WriteTool", () => {
       fixture.formatFile = (target) =>
         Effect.promise(async () => {
           await fs.writeFile(target, `\uFEFF\uFEFF\uFEFF${(await fs.readFile(target, "utf8")).replace(/^\uFEFF+/, "")}`)
-          return true
+          return { formatted: true }
         })
       return Effect.promise(() =>
         Promise.all([fs.writeFile(preserved, "\uFEFFbefore"), fs.writeFile(deduplicated, "\uFEFFbefore")]),

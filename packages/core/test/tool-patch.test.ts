@@ -59,7 +59,7 @@ let failWriteTarget: string | undefined
 let readsBeforeEditApproval = 0
 let editApproved = false
 let afterEditApproval = (): Effect.Effect<void> => Effect.void
-let formatFile = (_target: string): Effect.Effect<boolean> => Effect.succeed(false)
+let formatFile = (_target: string): Effect.Effect<Formatter.Outcome> => Effect.succeed({ formatted: false })
 
 const permission = permissionLayer({
   assert: (input) =>
@@ -95,7 +95,7 @@ const reset = () => {
   readsBeforeEditApproval = 0
   editApproved = false
   afterEditApproval = () => Effect.void
-  formatFile = () => Effect.succeed(false)
+  formatFile = () => Effect.succeed({ formatted: false })
 }
 
 const withTool = <A, E, R>(
@@ -357,7 +357,7 @@ describe("PatchTool", () => {
       formatFile = (file) =>
         Effect.promise(async () => {
           await fs.writeFile(file, (await fs.readFile(file, "utf8")).replace("created", "FORMATTED"))
-          return true
+          return { formatted: true }
         })
       return Effect.gen(function* () {
         const settled = yield* executeTool(
@@ -734,7 +734,7 @@ describe("PatchTool", () => {
         formatFile = (file) =>
           Effect.promise(async () => {
             await fs.writeFile(file, (await fs.readFile(file, "utf8")).replace(/^\uFEFF/, ""))
-            return true
+            return { formatted: true }
           })
         const settled = yield* executeTool(
           registry,

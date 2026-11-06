@@ -160,7 +160,7 @@ describe("Formatter", () => {
             const file = path.join(directory, name)
             yield* Effect.promise(() => fs.writeFile(file, ""))
             const formatted = yield* formatter.file(file)
-            expect(formatted && (yield* Effect.promise(() => fs.readFile(file, "utf8")))).toBe(expected)
+            expect(formatted.formatted && (yield* Effect.promise(() => fs.readFile(file, "utf8")))).toBe(expected)
           }),
         ),
       ),
@@ -188,7 +188,7 @@ describe("Formatter", () => {
         },
         (formatter, directory) =>
           Effect.gen(function* () {
-            expect(yield* formatter.file(path.join(directory, entry.file))).toBe(entry.matches)
+            expect(yield* formatter.file(path.join(directory, entry.file))).toMatchObject({ formatted: entry.matches })
           }),
       ),
     ),
@@ -206,7 +206,7 @@ describe("Formatter", () => {
       (formatter, directory) =>
         Effect.gen(function* () {
           const file = path.join(directory, "test.disabled")
-          expect(yield* formatter.file(file)).toBe(false)
+          expect(yield* formatter.file(file)).toMatchObject({ formatted: false })
         }),
     ),
   )
@@ -216,7 +216,7 @@ describe("Formatter", () => {
       Effect.gen(function* () {
         const file = path.join(directory, "test.txt")
         yield* Effect.promise(() => fs.writeFile(file, "x"))
-        expect(yield* formatter.file(file)).toBe(false)
+        expect(yield* formatter.file(file)).toMatchObject({ formatted: false })
       }),
     ),
   )
@@ -236,8 +236,8 @@ describe("Formatter", () => {
             const onFile = path.join(on, "test.isolated")
             const disabled = yield* disabledFormatter.file(offFile)
             const enabled = yield* enabledFormatter.file(onFile)
-            expect(disabled).toBe(false)
-            expect(enabled).toBe(true)
+            expect(disabled).toMatchObject({ formatted: false })
+            expect(enabled).toEqual({ formatted: true })
           }),
       ),
     ),
@@ -269,7 +269,7 @@ describe("Formatter", () => {
         Effect.gen(function* () {
           const file = path.join(directory, "test.seq")
           yield* Effect.promise(() => fs.writeFile(file, "x"))
-          expect(yield* formatter.file(file)).toBe(true)
+          expect(yield* formatter.file(file)).toEqual({ formatted: true })
           expect(yield* Effect.promise(() => fs.readFile(file, "utf8"))).toBe("xA")
         }),
     ),
@@ -296,7 +296,7 @@ describe("Formatter", () => {
         Effect.gen(function* () {
           const file = path.join(directory, "test.fallback")
           yield* Effect.promise(() => fs.writeFile(file, "x"))
-          expect(yield* formatter.file(file)).toBe(true)
+          expect(yield* formatter.file(file)).toEqual({ formatted: true })
           expect(yield* Effect.promise(() => fs.readFile(file, "utf8"))).toBe("xB")
         }),
     ),
@@ -321,12 +321,12 @@ describe("Formatter", () => {
         })
         const file = path.join(directory, "test.reload")
         yield* Effect.promise(() => fs.writeFile(file, "x"))
-        expect(yield* formatter.file(file)).toBe(true)
+        expect(yield* formatter.file(file)).toEqual({ formatted: true })
 
         command.suffix = "B"
         yield* formatter.reload()
 
-        expect(yield* formatter.file(file)).toBe(true)
+        expect(yield* formatter.file(file)).toEqual({ formatted: true })
         expect(yield* Effect.promise(() => fs.readFile(file, "utf8"))).toBe("xAB")
       }),
     ),
@@ -366,9 +366,9 @@ describe("Formatter", () => {
         command.suffix = "B"
         yield* formatter.reload()
         yield* Deferred.succeed(release, undefined)
-        expect(yield* Fiber.join(first)).toBe(true)
+        expect(yield* Fiber.join(first)).toEqual({ formatted: true })
 
-        expect(yield* formatter.file(file)).toBe(true)
+        expect(yield* formatter.file(file)).toEqual({ formatted: true })
         expect(yield* Effect.promise(() => fs.readFile(file, "utf8"))).toBe("xAB")
       }),
     ),
