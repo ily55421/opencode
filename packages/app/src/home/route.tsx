@@ -7,7 +7,7 @@ import { useLanguage } from "@/runtime/i18n/language"
 import { homeProjectDirectories } from "@/shell/layout/helpers"
 import { draftHref, useTabs } from "@/shell/tabs/tabs"
 import { useDirectoryPicker } from "@/workspaces/selection/picker"
-import { createHomeController, createHomeSelectionSync, type HomeController } from "./model"
+import { createHomeController, type HomeController } from "./model"
 import { createHomeProjectsController } from "./projects/controller"
 import { HomeUtilityNav } from "./projects/view"
 import { HomeProjects } from "./projects/region"
@@ -31,8 +31,6 @@ function HomeRedirect() {
   const tabs = useTabs()
   const navigate = useNavigate()
   const home = createHomeController()
-
-  createHomeSelectionSync(home)
 
   let started = false
 
@@ -105,8 +103,6 @@ function HomeNoWorkspace(props: { home: HomeController }) {
 function HomeView() {
   const mobile = createMediaQuery("(max-width: 767px)")
   const home = createHomeController()
-
-  createHomeSelectionSync(home)
 
   const projects = createHomeProjectsController(home)
   const sessions = createHomeSessionsController(home)
