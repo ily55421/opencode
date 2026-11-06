@@ -31,6 +31,7 @@ env:
 
 jobs:
   checks:
+    if: github.repository == 'anomalyco/opencode'
     runs-on: ubuntu-22.04
     outputs:
       protocol: ${{ steps.protocol.outputs.protocol }}
@@ -66,6 +67,7 @@ jobs:
       - run: cargo clippy --all-targets --all-features -- -D warnings
 
   build:
+    if: github.repository == 'anomalyco/opencode'
     needs: checks
     strategy:
       fail-fast: false
@@ -155,6 +157,7 @@ jobs:
           if-no-files-found: error
 
   build-windows:
+    if: github.repository == 'anomalyco/opencode'
     needs: checks
     strategy:
       fail-fast: false
@@ -247,6 +250,7 @@ jobs:
           if-no-files-found: error
 
   release:
+    if: github.repository == 'anomalyco/opencode'
     needs: [checks, build, build-windows]
     runs-on: ubuntu-22.04
     permissions:
