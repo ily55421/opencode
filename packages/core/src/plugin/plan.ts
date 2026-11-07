@@ -9,7 +9,9 @@ import { Effect, Stream } from "effect"
 import path from "path"
 import { Permission } from "../permission.js"
 
-const plan = Agent.ID.make("plan")
+/** The read-only Plan agent. The shell tool's hard backstop keys on this id. */
+export const planAgent = Agent.ID.make("plan")
+const plan = planAgent
 
 const enter = (directory: string) => `<system-reminder>
 You are in Plan mode. Discuss the plan with the user directly in the conversation. Do not create or update plan files unless the user explicitly asks you to; when they do, write them only in:

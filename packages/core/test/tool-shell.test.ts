@@ -44,6 +44,7 @@ import { offlineModels } from "./fixture/models"
 import { testEffect } from "./lib/effect"
 import { permissionLayer } from "./lib/permission"
 import { Expected } from "./lib/session-message"
+import { PlanPlugin } from "@opencode/core/plugin/plan"
 import { toolIdentity, executeTool, registerToolPlugin, toolDefinitions } from "./lib/tool"
 
 const sessionID = Session.ID.make("ses_shell_tool_test")
@@ -1633,6 +1634,48 @@ describe("ShellTool", () => {
           expect((yield* shell.get(id)).status).toBe("running")
           expect((yield* shell.list()).map((info) => info.id)).toContain(id)
           yield* shell.remove(id)
+        }),
+      )
+    }),
+  )
+
+  it.live("rejects an unanalyzable command outright under the plan agent", () =>
+    withTempDir((tmp) => {
+      reset()
+      const call = {
+        sessionID,
+        agent: PlanPlugin.planAgent,
+        messageID: toolIdentity.messageID,
+        call: { type: "tool-call" as const, id: "call-plan-opaque", name: "shell", input: { command: 'echo "' } },
+      }
+      return withSession(tmp.path, (registry) =>
+        Effect.gen(function* () {
+          const settled = yield* executeTool(registry, call)
+          expect(settled.status).toBe("error")
+          expect(settled.error?.message ?? settled.metadata).toContain(
+            "Plan mode cannot run shell commands the scanner cannot analyze",
+          )
+        }),
+      )
+    }),
+  )
+
+  it.live("keeps an analyzable plan-mode command on the ordinary permission path", () =>
+    withTempDir((tmp) => {
+      reset()
+      const call = {
+        sessionID,
+        agent: PlanPlugin.planAgent,
+        messageID: toolIdentity.messageID,
+        call: { type: "tool-call" as const, id: "call-plan-hello", name: "shell", input: { command: helloCommand } },
+      }
+      return withSession(tmp.path, (registry) =>
+        Effect.gen(function* () {
+          const settled = yield* executeTool(registry, call)
+          // The permission fixture has no standing allow for shell, so the command asks instead of
+          // running: the point is that it does not fail with the plan-mode rejection.
+          expect(settled.status).not.toBe("failed")
+          expect(JSON.stringify(settled)).not.toContain("Plan mode cannot run shell commands")
         }),
       )
     }),

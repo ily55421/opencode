@@ -7,7 +7,7 @@ import { emitIpcEvent } from "../ipc-events"
 import { getMainWindows } from "../windows"
 import { BackgroundServiceMachine } from "./background-service-machine"
 import { cleanStages } from "./cli-stages"
-import { keptStages, serviceVersion, shouldRetryEnsure } from "./cli-version"
+import { checkVersion, keptStages, serviceVersion, shouldRetryEnsure } from "./cli-version"
 import { DesktopCli } from "./desktop-cli"
 import { SidecarCredentials } from "./sidecar-credentials"
 import { takeSidecarProbe } from "./sidecar-probe"
@@ -140,12 +140,25 @@ const adopt = Effect.fn("BackgroundService.adopt")(function* (
     Effect.orElseSucceed(() => undefined),
   )
 
-  yield* Effect.logInfo("v2 CLI background service ready", {
-    version: setup.version,
-    runningVersion,
-    probed,
-    ...endpoint(url.origin),
-  })
+  // Both modes check: a reconnect adopts whatever is already listening, so it is exactly where a
+  // stale build survives an update and keeps answering with old behavior.
+  const check = checkVersion(setup.cli.version, runningVersion)
+
+  if (check.status === "mismatch") {
+    yield* Effect.logWarning("v2 CLI background service runs a different CLI version", {
+      expected: check.expected,
+      running: check.running,
+      ...endpoint(url.origin),
+    })
+  } else {
+    yield* Effect.logInfo("v2 CLI background service ready", {
+      expected: setup.cli.version,
+      version: setup.version,
+      runningVersion,
+      probed,
+      ...endpoint(url.origin),
+    })
+  }
 
   return {
     credentials: { url: url.origin, password: service.auth.password } satisfies SidecarCredentials.Data,

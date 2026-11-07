@@ -61,6 +61,11 @@ const CONTRACT_TOKENS: ReadonlyArray<{ token: string; file: string; why: string 
     why: "malformed stop notice",
   },
   { token: "Failure guard: ", file: "packages/core/src/session/runner/loop.ts", why: "failure streak advisory and stop" },
+  {
+    token: "Plan mode cannot run shell commands the scanner cannot analyze",
+    file: "packages/core/src/tool/plugin/shell.ts",
+    why: "plan-mode hard backstop for unanalyzable shell commands",
+  },
   { token: '"session.inbox.enqueued"', file: "packages/schema/src/session-event.ts", why: "durable event name" },
   { token: '"session.inbox.delivered"', file: "packages/schema/src/session-event.ts", why: "durable event name" },
   { token: '"session.usage.recorded"', file: "packages/schema/src/session-event.ts", why: "durable event name" },

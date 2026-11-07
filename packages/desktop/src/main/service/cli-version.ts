@@ -30,6 +30,25 @@ export function shouldRetryEnsure(version: string | undefined, message: string) 
   )
 }
 
+/** Whether the background service is running the CLI build this app resolved, or a different one. */
+export type VersionCheck =
+  | { readonly status: "match"; readonly version: string }
+  | { readonly status: "mismatch"; readonly expected: string; readonly running: string }
+  | { readonly status: "unknown"; readonly expected: string | undefined }
+
+/**
+ * The one place that compares the CLI build the app resolved against the build the background
+ * service reports. Both `initial` and `reconnect` connections run it: a reconnect adopts whatever
+ * service is already listening, and without this check a service left over from a previous app
+ * version would answer with old behavior while the log only ever noted the two versions side by side.
+ */
+export function checkVersion(expected: string | undefined, running: string | undefined): VersionCheck {
+  if (running === undefined || expected === undefined) return { status: "unknown", expected }
+  return expected === running
+    ? { status: "match", version: expected }
+    : { status: "mismatch", expected, running }
+}
+
 export function stageName(version: string, arch = process.arch) {
   return `${version}-${arch}`.replace(/[^a-zA-Z0-9._-]/g, "-")
 }

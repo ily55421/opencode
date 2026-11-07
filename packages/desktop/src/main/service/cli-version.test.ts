@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { keptStages, serviceVersion, shouldRetryEnsure } from "./cli-version"
+import { checkVersion, keptStages, serviceVersion, shouldRetryEnsure } from "./cli-version"
 
 describe("cli-version", () => {
   test.each([
@@ -29,5 +29,23 @@ describe("cli-version", () => {
     { version: "2.0.32", message: "Background service failed to start", expected: false },
   ])("shouldRetryEnsure($version, $message) -> $expected", (input) => {
     expect(shouldRetryEnsure(input.version, input.message)).toBe(input.expected)
+  })
+
+  test.each([
+    {
+      expected: "2.2.5",
+      running: "2.2.5",
+      check: { status: "match", version: "2.2.5" },
+    },
+    {
+      expected: "2.2.5",
+      running: "2.1.0-beta.1",
+      check: { status: "mismatch", expected: "2.2.5", running: "2.1.0-beta.1" },
+    },
+    // A reconnect adopts whatever is listening; without a running version there is nothing to pin.
+    { expected: "2.2.5", running: undefined, check: { status: "unknown", expected: "2.2.5" } },
+    { expected: undefined, running: "2.2.5", check: { status: "unknown", expected: undefined } },
+  ])("checkVersion($expected, $running)", (input) => {
+    expect(checkVersion(input.expected, input.running)).toEqual(input.check)
   })
 })

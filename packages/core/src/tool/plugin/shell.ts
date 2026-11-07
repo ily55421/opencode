@@ -7,6 +7,7 @@ import type { ShellCreateBefore } from "@opencode/plugin/effect/shell"
 import type { Tool } from "@opencode/schema/tool"
 import { Deferred, Effect, Schema, Scope } from "effect"
 import { Environment } from "../../environment/index.js"
+import { PlanPlugin } from "../../plugin/plan.js"
 import { Job } from "../../job.js"
 import { FileAccess } from "../../file-access.js"
 import { Permission } from "../../permission.js"
@@ -127,6 +128,14 @@ export const Plugin = {
       // Classification reads the command text, not the parse, so both scanners escalate identically and an unreadable
       // command cannot dodge it by producing no resources.
       const risk = parsed.opaque ? "unanalyzable" : ShellDanger.classify(invocation.command)
+      // Plan mode is read-only. An unanalyzable command could be a masked write, and asking the user to approve
+      // what the scanner cannot see through would let one click break the mode's guarantee, so Plan rejects the
+      // call outright instead of escalating it. The model is told to restate the command or leave Plan mode.
+      if (parsed.opaque && context.agent === PlanPlugin.planAgent)
+        return yield* new ToolFailure({
+          message:
+            "Plan mode cannot run shell commands the scanner cannot analyze. Restate the command with plain, readable arguments, or ask the user to switch agents before running it.",
+        })
       const fallback = [{ resource: invocation.command, save: invocation.command }]
       const commands = parsed.commands.length === 0 && risk !== "safe" ? fallback : parsed.commands
       if (commands.length > 0)
