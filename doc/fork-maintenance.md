@@ -13,10 +13,10 @@ merge surface.
 
 Runbook (clean tree, the fork's `dev` checked out):
 
-1. Refresh the mirror first: `git -C D:/code/origin/opencode fetch origin`, then `git fetch upstream`. A stale
-   mirror lies: on 2026-11-06 it read 72 commits behind while the true drift was 722, because the mirror itself
-   had not been fetched for over a week. When in doubt, measure against GitHub directly:
-   `git fetch https://github.com/anomalyco/opencode.git dev`.
+1. Refresh the reference: the `upstream` remote points straight at GitHub (`anomalyco/opencode`), so
+   `git fetch upstream` is always the truth. Until 2026-11-07 it pointed at a local mirror that went nine days
+   stale and lied — it read 72 commits behind while the true drift was 722. Run the benchmark suite's
+   `--rebaseline` after absorbing a sync, per `doc/benchmarks.md`.
 2. Count drift: `git rev-list --count HEAD..upstream/dev`, and date the merge base with
    `git merge-base HEAD upstream/dev | xargs git log -1 --format=%cs`.
 3. Merge on the fork's `dev`: `git merge upstream/dev`, resolve conflicts, then `bun run check` from the root, and
