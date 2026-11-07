@@ -159,9 +159,13 @@ describe("native shell syntax compatibility", () => {
       "echo *(:Q)",
       "a=(1); r='a[$(printf pwn)]'; echo ${(P)r}",
     ]) {
-      expect(await Effect.runPromise(Effect.result(ShellParse.scan(unsafe, "zsh", "/workspace")))).toMatchObject({
-        _tag: "Failure",
-        failure: { message: "Portable shell scanner cannot analyze command: dynamic-execution" },
+      // The fork's contract: an unanalyzable command succeeds with `opaque` and escalates to a
+      // person, instead of failing the tool call and teaching the model to retry.
+      expect(await Effect.runPromise(ShellParse.scan(unsafe, "zsh", "/workspace"))).toEqual(
+{
+        commands: [],
+        directories: [],
+        opaque: "dynamic-execution",
       })
     }
   })
@@ -173,9 +177,12 @@ describe("native shell syntax compatibility", () => {
     ["bash", "F='$HOME/bin'; SIZE=$(stat -f %z file); N=$(( (SIZE + 1023) / 1024 )); echo $N"],
     ["zsh", "r=\"a$(printf '\\x5b')\\$(touch pwn)]\"; echo ${(P)r}"],
   ])("%s rejects variable sinks when a substitution can build the subscript: %s", async (shell, command) => {
-    expect(await Effect.runPromise(Effect.result(ShellParse.scan(command, shell, "/workspace")))).toMatchObject({
-      _tag: "Failure",
-      failure: { message: "Portable shell scanner cannot analyze command: dynamic-execution" },
+    // Same contract as above: dynamic execution escalates through `opaque` rather than failing.
+    expect(await Effect.runPromise(ShellParse.scan(command, shell, "/workspace"))).toEqual(
+{
+      commands: [],
+      directories: [],
+      opaque: "dynamic-execution",
     })
   })
 

@@ -4516,7 +4516,7 @@ describe("SessionRunnerLLM", () => {
   scenario("promotes queued input after continuation ends", function* (s) {
     yield* s.admit("Start working")
 
-    yield* s.llm.push(TestLLM.toolCall("call-echo", "echo", { text: "hello" }), TestLLM.stop(), TestLLM.stop())
+    yield* s.llm.push(TestLLM.toolCall("call-echo", "echo", { text: "hello" }), closing(), closing())
 
     const first = yield* s.resumePaused
     yield* s.session.prompt({
@@ -5436,7 +5436,7 @@ describe("SessionRunnerLLM", () => {
     )
     yield* s.admit("Call blocked")
 
-    yield* s.llm.push(TestLLM.toolCall("call-blocked", "blocked", {}), TestLLM.stop())
+    yield* s.llm.push(TestLLM.toolCall("call-blocked", "blocked", {}), closing())
 
     yield* s.resume
 
@@ -5531,7 +5531,7 @@ describe("SessionRunnerLLM", () => {
     )
     yield* s.admit("Call corrected")
 
-    yield* s.llm.push(TestLLM.toolCall("call-corrected", "corrected", {}), TestLLM.stop())
+    yield* s.llm.push(TestLLM.toolCall("call-corrected", "corrected", {}), closing())
 
     yield* s.resume
 
@@ -5549,10 +5549,7 @@ describe("SessionRunnerLLM", () => {
     const registry = yield* Tool.Service
     yield* transformTools(registry, { permissionfail: permissionFail }, { codemode: false })
     yield* s.admit("Reject permission")
-    yield* s.llm.push(TestLLM.toolCall("call-permission", "permissionfail", {}), [
-      LLMEvent.stepStart({ index: 0 }),
-      LLMEvent.stepFinish({ index: 0, reason: { normalized: "stop" } }),
-    ])
+    yield* s.llm.push(TestLLM.toolCall("call-permission", "permissionfail", {}), closing())
 
     yield* s.resume
 

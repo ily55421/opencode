@@ -9,6 +9,7 @@ import { Location } from "@opencode/core/location"
 import { AbsolutePath, RelativePath } from "@opencode/core/schema"
 import { Workspace } from "@opencode/core/workspace"
 import { location } from "./fixture/location"
+import { canSymlink, SYMLINK_SKIP_REASON } from "./fixture/symlink-capability"
 import { tmpdirScoped } from "./fixture/tmpdir"
 import { it } from "./lib/effect"
 
@@ -187,6 +188,10 @@ describe("FileSystem", () => {
   it.live("canonicalizes local symlinked directories", () =>
     withTmp((directory) =>
       Effect.gen(function* () {
+        if (!canSymlink) {
+          console.log(`skipping symlink canonicalization: ${SYMLINK_SKIP_REASON}`)
+          return
+        }
         const real = path.join(directory, "real")
         yield* Effect.promise(() => fs.mkdir(real))
         yield* Effect.promise(() => fs.writeFile(path.join(real, "file.txt"), "linked"))

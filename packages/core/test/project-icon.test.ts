@@ -12,6 +12,7 @@ import { Database } from "@opencode/core/database/database"
 import { Bus } from "@opencode/core/bus"
 import { AbsolutePath } from "@opencode/core/schema"
 import { FSUtil } from "@opencode/util/fs-util"
+import { canSymlink, SYMLINK_SKIP_REASON } from "./fixture/symlink-capability"
 import { tmpdirScoped } from "./fixture/tmpdir"
 import { testEffect } from "./lib/effect"
 
@@ -33,6 +34,10 @@ for (const kind of ["ranked appiconset", "escaping symlink", "oversized file"] a
         yield* Effect.promise(() =>
           Bun.write(path.join(root, "Assets.xcassets/AppIcon.appiconset/icon256.svg"), svg + " "),
         )
+      }
+      if (kind === "escaping symlink" && !canSymlink) {
+        console.log(`skipping icon discovery via ${kind}: ${SYMLINK_SKIP_REASON}`)
+        return
       }
       if (kind === "escaping symlink") {
         yield* Effect.promise(() => Bun.write(path.join(tmp.path, "outside.svg"), "outside"))
@@ -162,6 +167,10 @@ it.live("Composer backgrounds stay inert and malformed, oversized or escaping ma
       ),
     )
     yield* Effect.promise(() => fs.rm(manifest))
+    if (!canSymlink) {
+      console.log(`skipping the escaping-manifest check: ${SYMLINK_SKIP_REASON}`)
+      return
+    }
     yield* Effect.promise(() => fs.symlink(path.join(outside.path, "icon.json"), manifest))
     expect(yield* ProjectIcon.discover(filesystem, tmp.path)).toBeUndefined()
   }),

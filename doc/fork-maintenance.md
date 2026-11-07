@@ -49,6 +49,21 @@ upstream edit to them would conflict; a one-line `if:` per job is trivially merg
   through `.git/info/exclude` — deliberately not the committed `.gitignore`, so both trees see the same committed
   ignore rules. Do not commit those notes, and do not move them into the committed ignore list.
 
+## Testing on this machine
+
+- Run core tests through the wrapper: `bun run test` from `packages/core` (`packages/core/script/test.ts` isolates HOME/XDG,
+  strips credential-bearing env vars and raises the per-test budget to 30s). A bare `bun test` bypasses the
+  isolation and the "Core test environment" tests fail by design.
+- Run the suite with `SHELL` unset (`env -u SHELL bun run test`) from a Git Bash session. The shell selector
+  prefers `process.env.SHELL`, so an inherited `SHELL=/bin/bash.exe` makes every ShellTool test drive real
+  PowerShell commands through bash and fail with exit 2. From PowerShell or without `SHELL` the selector picks
+  pwsh as designed.
+- This machine cannot create symlinks (Developer Mode off), so the symlink-based tests
+  (`location-filesystem`, `project-icon`) probe once via `test/fixture/symlink-capability.ts` and skip with a
+  logged reason; they run fully on CI and Developer-Mode machines.
+- The vcs folder-listing test writes 1100+ files through Windows git with on-access scanning; its runtime
+  swings between 6s and 20s, so it carries a 30s budget instead of the 5s default.
+
 Version numbers, release builds and update policy stay in `AGENTS.md` ("Version Numbers", "Local Release Builds");
 this doc does not duplicate them.
 

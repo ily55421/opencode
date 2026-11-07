@@ -653,8 +653,12 @@ describe("Vcs", () => {
     ),
   )
 
-  it.live("lists an untracked folder as one entry and its entries from inside it when asked for folders", () =>
-    withTmp((directory) =>
+  // Writes 1100+ files before several git passes; 5s is a Linux-CI calibration that a Windows
+  // checkout with on-access scanning cannot meet, so this one carries its own budget.
+  it.live(
+    "lists an untracked folder as one entry and its entries from inside it when asked for folders",
+    () =>
+      withTmp((directory) =>
       Effect.gen(function* () {
         yield* Effect.promise(async () => {
           await initGit(directory, "-b", "main")
@@ -733,6 +737,7 @@ describe("Vcs", () => {
         ])
       }),
     ),
+    30000,
   )
 
   it.live("stops listing an untracked folder after its scan budget and says more were not checked", () =>
