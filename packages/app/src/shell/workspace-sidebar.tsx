@@ -36,6 +36,11 @@ import { useCommand } from "@/shell/commands/command"
 import { homeProjectDirectories } from "@/shell/layout/helpers"
 import { draftHref, findSessionTab, useTabs } from "@/shell/tabs/tabs"
 import { useDirectoryPicker } from "@/workspaces/selection/picker"
+import { createProjectActions } from "@/home/projects/actions"
+import { fileManagerApp } from "@/home/projects/file-manager"
+import { Persist, persisted } from "@/runtime/persistence/storage"
+import { Persistence } from "@/runtime/persistence/schema"
+import { Schema } from "effect"
 
 type WorkspaceGroup = {
   key: string
@@ -51,6 +56,10 @@ const GROUP_LIMIT = 5
  * Settings page; a one-button quick switch has to name its two ends.
  */
 const TOGGLE_THEMES = { default: "oc-2", indigo: "indigo" } as const
+
+const PinnedWorkspaces = Schema.Struct({
+  pinned: Persistence.record(Persistence.fallback(Schema.Boolean, () => false)),
+})
 
 type SidebarLabel = Parameters<ReturnType<typeof useLanguage>["t"]>[0]
 
@@ -95,6 +104,15 @@ export function WorkspaceSidebar() {
   const theme = useTheme()
   const pickDirectory = useDirectoryPicker()
   const home = createHomeController()
+  const actions = createProjectActions()
+
+  // Pinned workspaces sort above the recency ordering; the pin is client-local by design: a project
+  // is already per-server server-side, and this ordering is this machine's preference.
+  const [pins, setPins] = persisted(Persist.global("workspace.sidebar.pins"), PinnedWorkspaces, { pinned: {} })
+  const pinnedKeys = () => Object.entries(pins.pinned).filter(([, pinned]) => pinned).map(([key]) => key)
+  const togglePin = (key: string) => setPins("pinned", key, !pinnedKeys().includes(key))
+
+  const focusedConn = () => home.server.focused()
 
   const [state, setState] = createStore<{ collapsed: Record<string, boolean>; showAll: Record<string, boolean> }>({
     collapsed: {},
@@ -201,6 +219,9 @@ export function WorkspaceSidebar() {
     }
 
     return [...result.values()].sort((a, b) => {
+      const pinned = Number(pinnedKeys().includes(b.key)) - Number(pinnedKeys().includes(a.key))
+      if (pinned !== 0) return pinned
+
       const latest = (group: WorkspaceGroup) => group.sessions[0]?.session.time.updated ?? 0
 
       return (
@@ -336,7 +357,12 @@ export function WorkspaceSidebar() {
 
                 return (
                   <div class="mb-1.5">
-                    <div class="group/workspace flex h-7 w-full min-w-0 items-center rounded-lg text-[12.5px] font-[530] text-v2-text-text-muted transition-colors hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base">
+                    <Menu.Context modal={false}>
+                    <Menu.Context.Trigger
+                      as="div"
+                      class="group/workspace flex h-7 w-full min-w-0 cursor-default items-center rounded-lg text-[12.5px] font-[530] text-v2-text-text-muted transition-colors hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base"
+                      data-pinned={pinnedKeys().includes(group.key) ? "" : undefined}
+                    >
                       <button
                         type="button"
                         class="flex h-full min-w-0 flex-1 items-center gap-1.5 ps-1.5 pe-1 text-start focus-visible:outline-none"
@@ -371,7 +397,93 @@ export function WorkspaceSidebar() {
                           }}
                         />
                       </Tooltip>
-                    </div>
+                    </Menu.Context.Trigger>
+                    <Menu.Context.Portal>
+                      <Show when={focusedConn()} keyed>
+                        {(conn) => (
+                          <Menu.Context.Content>
+                            <Menu.Item onSelect={() => openTask(group)}>
+                              {language.t("workspace.sidebar.newTask")}
+                            </Menu.Item>
+                            <Show when={actions.canReveal(conn)}>
+                              <Menu.Item onSelect={() => actions.reveal(conn, group.project)}>
+                                {language.t(
+                                  fileManagerApp(platform.platform === "desktop" ? (platform.os ?? "unknown") : "unknown")
+                                    .actionLabel,
+                                )}
+                              </Menu.Item>
+                            </Show>
+                            <Menu.Item onSelect={() => actions.edit(conn, group.project)}>
+                              {language.t("dialog.project.edit.title")}
+                            </Menu.Item>
+                            <Menu.Item onSelect={() => togglePin(group.key)}>
+                              {pinnedKeys().includes(group.key)
+                                ? language.t("workspace.sidebar.unpin")
+                                : language.t("workspace.sidebar.pin")}
+                            </Menu.Item>
+                            <Menu.Sub gutter={4} overlap>
+                              <Menu.SubTrigger>{language.t("workspace.sidebar.copyPath")}</Menu.SubTrigger>
+                              <Menu.Portal>
+                                <Menu.SubContent class="w-max min-w-[172px]">
+                                  <Menu.Item
+                                    onSelect={() =>
+                                      void navigator.clipboard.writeText(group.project.worktree).catch(() => undefined)
+                                    }
+                                  >
+                                    {language.t("workspace.sidebar.copyPath")}
+                                  </Menu.Item>
+                                  <Menu.Item
+                                    onSelect={() => void navigator.clipboard.writeText(group.name).catch(() => undefined)}
+                                  >
+                                    {language.t("workspace.sidebar.copyName")}
+                                  </Menu.Item>
+                                </Menu.SubContent>
+                              </Menu.Portal>
+                            </Menu.Sub>
+                            <Menu.Sub gutter={4} overlap>
+                              <Menu.SubTrigger>Git</Menu.SubTrigger>
+                              <Menu.Portal>
+                                <Menu.SubContent class="w-max min-w-[172px]">
+                                  <Menu.Item disabled>
+                                    {(() => {
+                                      const branch = home
+                                        .server.focusedContext()
+                                        ?.data.location.vcs.info({ directory: group.project.worktree })?.branch.current
+                                      return branch
+                                        ? language.t("workspace.sidebar.branch", { name: branch })
+                                        : language.t("workspace.sidebar.noBranch")
+                                    })()}
+                                  </Menu.Item>
+                                  <Menu.Item
+                                    disabled={
+                                      !home
+                                        .server.focusedContext()
+                                        ?.data.location.vcs.info({ directory: group.project.worktree })?.branch.current
+                                    }
+                                    onSelect={() => {
+                                      const branch = home
+                                        .server.focusedContext()
+                                        ?.data.location.vcs.info({ directory: group.project.worktree })?.branch.current
+                                      if (branch) void navigator.clipboard.writeText(branch).catch(() => undefined)
+                                    }}
+                                  >
+                                    {language.t("workspace.sidebar.copyBranch")}
+                                  </Menu.Item>
+                                </Menu.SubContent>
+                              </Menu.Portal>
+                            </Menu.Sub>
+                            <Menu.Separator />
+                            <Menu.Item
+                              data-variant="critical"
+                              onSelect={() => actions.hide(conn, group.project)}
+                            >
+                              {language.t("workspace.sidebar.archive")}
+                            </Menu.Item>
+                          </Menu.Context.Content>
+                        )}
+                      </Show>
+                    </Menu.Context.Portal>
+                  </Menu.Context>
                     <Show when={!state.collapsed[group.key]}>
                       <div class="mt-0.5 flex flex-col gap-px ps-6">
                         <For each={draftsFor(group)}>
