@@ -23,6 +23,12 @@ import { FSUtil } from "@opencode/util/fs-util"
 import * as TokenModule from "../../util/src/token"
 import { ToolOutput } from "../src/tool-output"
 
+// Billing-correctness invariants (not timing): the per-glyph estimator must keep the script-blind
+// estimate inside these ratios, or compaction budgets silently undercount again. The printed
+// ratio is estimate/estimateWide — below 1.0 means the script-blind rule undercounts Han text.
+const checks: Array<{ name: string; ok: boolean; detail: string }> = []
+const record = (name: string, ok: boolean, detail: string) => checks.push({ name, ok, detail })
+
 const kb = (bytes: number) => `${(bytes / 1024).toFixed(1)} KB`
 const tok = (bytes: number) => `≈${Math.round(bytes / 3.5)} tok`
 
@@ -44,8 +50,12 @@ for (const [label, text] of [
   const chars = text.length
   const hanGlyphs = (text.match(/[\u4e00-\u9fff]/g) ?? []).length
   const New = wide ? wide(text) : old
+  const ratio = old / New
+  if (label.startsWith("pure Han")) record("han.undercount", ratio <= 0.4, `ratio ${ratio.toFixed(2)}x (≤ 0.40 keeps the per-glyph correction honest)`)
+  if (label.startsWith("mixed")) record("mixed.undercount", ratio >= 0.5 && ratio <= 1.0, `ratio ${ratio.toFixed(2)}x (0.5–1.0)`)
+  if (label.startsWith("pure ASCII")) record("ascii.parity", Math.abs(ratio - 1) <= 0.02, `ratio ${ratio.toFixed(2)}x (±2% of 1.0)`)
   console.log(
-    `${label.padEnd(28)} chars ${String(chars).padStart(6)}  Han ${String(hanGlyphs).padStart(5)}  estimate ${String(old).padStart(6)}  estimateWide ${String(New).padStart(6)}  ratio ${(old / New).toFixed(2)}x`,
+    `${label.padEnd(28)} chars ${String(chars).padStart(6)}  Han ${String(hanGlyphs).padStart(5)}  estimate ${String(old).padStart(6)}  estimateWide ${String(New).padStart(6)}  ratio ${ratio.toFixed(2)}x`,
   )
 }
 console.log(
@@ -92,8 +102,25 @@ const program = Effect.acquireUseRelease(
       console.log(
         `build log 3000 lines (${kb(Buffer.byteLength(logText))}) → model sees ${kb(Buffer.byteLength(logOut))} ${tok(Buffer.byteLength(logOut))}, verdict tail:${logOut.includes("verdict line") ? "kept" : "LOST"}`,
       )
+  record(
+    "truncate.grep.bound",
+    Buffer.byteLength(grepOut) <= ToolOutput.MAX_BYTES + 200 && grepOut.includes("[showing"),
+    `model sees ${kb(Buffer.byteLength(grepOut))} with the overflow marker`,
+  )
+  record(
+    "truncate.log.verdict",
+    Buffer.byteLength(logOut) <= ToolOutput.MAX_BYTES + 200 && logOut.includes("verdict line"),
+    `model sees ${kb(Buffer.byteLength(logOut))} with the verdict tail kept`,
+  )
     }),
   () => Effect.void,
 )
 
 await Effect.runPromise(Effect.scoped(program))
+
+console.log("\n== invariants ==")
+for (const check of checks)
+  console.log(`   ${check.ok ? "PASS" : "FAIL"}  ${check.name.padEnd(22)} ${check.detail}`)
+const pass = checks.every((check) => check.ok)
+console.log(`\nverdict: ${pass ? "PASS" : "FAIL"}`)
+process.exit(pass ? 0 : 1)

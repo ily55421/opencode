@@ -11,6 +11,7 @@
 //
 // Run: bun script/benchmark-schema-determinism.ts
 
+import { BenchmarkBaseline } from "./benchmark-baseline"
 import { ToolSchemaCanonical } from "../src/tool/schema-canonical.js"
 
 // A seeded shuffle so every run measures the same permutations (LCG, not Math.random).
@@ -144,16 +145,17 @@ console.log("")
 console.log("2. idempotency")
 console.log(`   canonicalize twice is byte-identical: ${idempotent ? "PASS" : "FAIL"}`)
 console.log("")
-console.log("3. overhead")
+console.log("3. overhead (rolling baseline: ±200% band, re-pin after intentional changes)")
+const overhead = BenchmarkBaseline.check("schema.canonicalize.1.8k", perCallMicros, "µs/call", 2)
+BenchmarkBaseline.report([overhead])
 console.log(
-  `   canonicalize: ${perCallMicros.toFixed(1)} µs/call over ${ITERATIONS} runs` +
-    ` (${(baseline.length * (ITERATIONS / 1_000_000) / (totalMs / 1_000)).toFixed(1)} MB/s)`,
+  `   100 reconnects pay ${(perCallMicros * 100 / 1_000).toFixed(2)} ms total (sanity ceiling 100 ms)`,
 )
-console.log(
-  `   100 reconnects pay ${(perCallMicros * 100 / 1_000).toFixed(2)} ms total — standard PASS` +
-    ` if under 100 ms total`,
+const pass = Boolean(
+  canonicalForms.size === 1 && idempotent && overhead.status !== "fail" && perCallMicros * 100 < 100_000,
 )
-const pass = canonicalForms.size === 1 && idempotent && perCallMicros * 100 < 100_000
+if (BenchmarkBaseline.rebaselineRequested)
+  BenchmarkBaseline.pin({ "schema.canonicalize.1.8k": { value: perCallMicros, unit: "µs/call", tolerance: 2 } })
 console.log("")
-console.log(`verdict: ${pass ? "PASS" : "FAIL"}`)
+console.log(`verdict: ${pass ? "PASS" : "FAIL"}${BenchmarkBaseline.rebaselineRequested ? " (re-pinned)" : ""}`)
 process.exit(pass ? 0 : 1)

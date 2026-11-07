@@ -1,0 +1,156 @@
+{
+  "fit.full.2k": {
+    "value": 94.74399999999946,
+    "unit": "µs/call",
+    "tolerance": 2,
+    "updated": "2026-11-07",
+    "commit": "b4b4d86214"
+  },
+  "fit.trim.2k": {
+    "value": 256.73200000000065,
+    "unit": "µs/call",
+    "tolerance": 2,
+    "updated": "2026-11-07",
+    "commit": "b4b4d86214"
+  },
+  "fit.full.8k": {
+    "value": 270.46100000000024,
+    "unit": "µs/call",
+    "tolerance": 2,
+    "updated": "2026-11-07",
+    "commit": "b4b4d86214"
+  },
+  "fit.trim.8k": {
+    "value": 670.1760000000002,
+    "unit": "µs/call",
+    "tolerance": 2,
+    "updated": "2026-11-07",
+    "commit": "b4b4d86214"
+  },
+  "fit.full.32k": {
+    "value": 1100.9320000000002,
+    "unit": "µs/call",
+    "tolerance": 2,
+    "updated": "2026-11-07",
+    "commit": "b4b4d86214"
+  },
+  "fit.trim.32k": {
+    "value": 2498.2290000000003,
+    "unit": "µs/call",
+    "tolerance": 2,
+    "updated": "2026-11-07",
+    "commit": "b4b4d86214"
+  },
+  "fit.full.128k": {
+    "value": 21619.365999999998,
+    "unit": "µs/call",
+    "tolerance": 2,
+    "updated": "2026-11-07",
+    "commit": "b4b4d86214"
+  },
+  "fit.trim.128k": {
+    "value": 8695.312000000004,
+    "unit": "µs/call",
+    "tolerance": 2,
+    "updated": "2026-11-07",
+    "commit": "b4b4d86214"
+  },
+  "fit.untrimmed.identical": {
+    "value": 1,
+    "unit": "1=identical",
+    "tolerance": 0,
+    "updated": "2026-11-07",
+    "commit": "b4b4d86214"
+  },
+  "loop.decide.10": {
+    "value": 48.48599999999351,
+    "unit": "µs/call",
+    "tolerance": 2,
+    "updated": "2026-11-07",
+    "commit": "b4b4d86214"
+  },
+  "loop.decide.30": {
+    "value": 96.48000000000138,
+    "unit": "µs/call",
+    "tolerance": 2,
+    "updated": "2026-11-07",
+    "commit": "b4b4d86214"
+  },
+  "loop.decide.100": {
+    "value": 421.9710000000032,
+    "unit": "µs/call",
+    "tolerance": 2,
+    "updated": "2026-11-07",
+    "commit": "b4b4d86214"
+  },
+  "empty.decide.100": {
+    "value": 2.6490000000012515,
+    "unit": "µs/call",
+    "tolerance": 2,
+    "updated": "2026-11-07",
+    "commit": "b4b4d86214"
+  },
+  "unfinished.decide.100": {
+    "value": 2.434000000002925,
+    "unit": "µs/call",
+    "tolerance": 2,
+    "updated": "2026-11-07",
+    "commit": "b4b4d86214"
+  },
+  "loop.callKey": {
+    "value": 2.014999999999418,
+    "unit": "µs/call",
+    "tolerance": 2,
+    "updated": "2026-11-07",
+    "commit": "b4b4d86214"
+  },
+  "skill.rebuild.clean": {
+    "value": 2.1299999999973807,
+    "unit": "µs/call",
+    "tolerance": 2,
+    "updated": "2026-11-07",
+    "commit": "b4b4d86214"
+  },
+  "skill.rebuild.shadowed": {
+    "value": 2.574000000004162,
+    "unit": "µs/call",
+    "tolerance": 2,
+    "updated": "2026-11-07",
+    "commit": "b4b4d86214"
+  },
+  "canonicalize.30field": {
+    "value": 23.967799999998533,
+    "unit": "µs/call",
+    "tolerance": 2,
+    "updated": "2026-11-07",
+    "commit": "b4b4d86214"
+  },
+  "recoverToolName.miss": {
+    "value": 1.7445999999999913,
+    "unit": "µs/call",
+    "tolerance": 2,
+    "updated": "2026-11-07",
+    "commit": "b4b4d86214"
+  },
+  "recoverToolName.repair": {
+    "value": 1.5059999999994034,
+    "unit": "µs/call",
+    "tolerance": 2,
+    "updated": "2026-11-07",
+    "commit": "b4b4d86214"
+  },
+  "schema.canonicalize.1.8k": {
+    "value": 8.880675000000002,
+    "unit": "µs/call",
+    "tolerance": 2,
+    "updated": "2026-11-07",
+    "commit": "b4b4d86214"
+  },
+  "stats.aggregate.500": {
+    "value": 4.974099999999908,
+    "unit": "ms",
+    "tolerance": 3,
+    "updated": "2026-11-07",
+    "commit": "b4b4d86214"
+  }
+}

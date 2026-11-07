@@ -30,6 +30,7 @@ import { AppNodeBuilder } from "../src/effect/app-node-builder"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { DateTime, Effect, Schema } from "effect"
 import { performance } from "node:perf_hooks"
+import { BenchmarkBaseline } from "./benchmark-baseline"
 
 const SESSIONS = 500
 const ROUNDS = 5
@@ -154,14 +155,14 @@ const program = Effect.gen(function* () {
   console.log(`   totals include message + title + compaction sources: ${billed ? "PASS" : "FAIL"}`)
   console.log(`   input ${stats?.tokens.input}/${expected.input}, output ${stats?.tokens.output}/${expected.output}, cost ${stats?.cost}`)
   console.log("")
-  console.log("2. latency (the interactive standard: under 1000 ms)")
-  console.log(
-    `   median ${median.toFixed(1)} ms over ${ROUNDS} rounds (min ${timings[0].toFixed(1)}, max ${timings[timings.length - 1].toFixed(1)})` +
-      ` — ${median < 1000 ? "PASS" : "FAIL"}`,
-  )
-  const pass = Boolean(billed && median < 1000)
+  console.log("2. latency (rolling baseline: ±300% band for fs variance; sanity ceiling 1000 ms)")
+  const latency = BenchmarkBaseline.check("stats.aggregate.500", median, "ms", 3)
+  BenchmarkBaseline.report([latency])
+  const pass = Boolean(billed && latency.status !== "fail" && median < 1000)
+  if (BenchmarkBaseline.rebaselineRequested)
+    BenchmarkBaseline.pin({ "stats.aggregate.500": { value: median, unit: "ms", tolerance: 3 } })
   console.log("")
-  console.log(`verdict: ${pass ? "PASS" : "FAIL"}`)
+  console.log(`verdict: ${pass ? "PASS" : "FAIL"}${BenchmarkBaseline.rebaselineRequested ? " (re-pinned)" : ""}`)
   process.exit(pass ? 0 : 1)
 })
 

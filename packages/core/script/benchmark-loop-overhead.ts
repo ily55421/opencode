@@ -1,16 +1,19 @@
 /**
- * Scratch benchmark for the loop-reliability branch's changed surfaces:
- *   - baseline assembly: pre-branch `Instructions.render` (join) vs `InstructionBudget.fit` (scope pools)
- *   - per-step folds: SessionRunnerLoop.decide, SessionRunnerEmpty.decide, callKey
- *   - skill state with conflict bookkeeping (rebuild per read)
+ * Per-step hot-path benchmark for the loop-reliability surfaces, measured against the rolling
+ * baseline in benchmark-baselines.json (`--rebaseline` re-pins after an intentional change):
+ *   - baseline assembly: InstructionBudget.fit with and without trimming
+ *   - per-step folds: SessionRunnerLoop.decide, SessionRunnerEmpty.decide, SessionRunnerUnfinished.decide
+ *   - loop.callKey, skill state with conflict bookkeeping (rebuild per read)
  *   - ToolSchemaCanonical.canonicalize, recoverToolName
  *
- *   bun run script/benchmark-loop-overhead.ts [--rounds 200]
+ *   bun run script/benchmark-loop-overhead.ts [--rounds 200] [--rebaseline]
  *
- * Numbers are µs per call unless stated. Machine-noise dominates below ~10 µs;
- * the report compares these against a step's model-streaming wall time.
+ * Numbers are µs per call unless stated. Machine-noise dominates below ~10 µs, so every entry
+ * carries its own ratio band; the old pre-branch render comparison is gone — the fork absorbed
+ * that path, and the baseline only compares against the last pinned numbers.
  */
 import { performance } from "node:perf_hooks"
+import { BenchmarkBaseline } from "./benchmark-baseline"
 import { Effect } from "effect"
 import { AppNodeBuilder } from "../src/effect/app-node-builder"
 import { LayerNode } from "@opencode/util/effect/layer-node"
@@ -28,6 +31,7 @@ import { SessionMessage } from "../src/session/message"
 import { Token } from "../src/util/token"
 
 const args = process.argv.slice(2)
+const checks: BenchmarkBaseline.Check[] = []
 const rounds = Number(args[args.indexOf("--rounds") + 1] ?? 200)
 
 const time = (fn: () => void, n = rounds) => {
@@ -64,21 +68,24 @@ for (const [label, lines] of [["~2k tok", 120], ["~8k tok", 480], ["~32k tok", 1
   ]
   const texts = parts.map((part) => part.text)
   const totalTok = texts.reduce((sum, text) => sum + Token.estimateWide(text), 0)
-  const joined = time(() => Instructions.render(texts))
   const pools = { global: 100_000, project: 100_000 }
   const fitFull = time(() => InstructionBudget.fit(parts, pools))
   const fitTiny = time(() => InstructionBudget.fit(parts, { global: 1500, project: 1500 }))
   const output = InstructionBudget.fit(parts, { global: 1500, project: 1500 })
   const outTok = Token.estimateWide(output)
   const stable = output === InstructionBudget.fit(parts, { global: 1500, project: 1500 })
+  const size = label.replace("~", "").replace(" tok", "")
+  checks.push(BenchmarkBaseline.check(`fit.full.${size}`, fitFull, "µs/call"))
+  checks.push(BenchmarkBaseline.check(`fit.trim.${size}`, fitTiny, "µs/call"))
   console.log(
-    `${pad(`${label} (total ${totalTok} tok)`)} render ${us(joined)}  fit ${us(fitFull)}  fit+trim ${us(fitTiny)}  → ${outTok} tok  deterministic:${stable ? "yes" : "NO"}`,
+    `${pad(`${label} (total ${totalTok} tok)`)} fit ${us(fitFull)}  fit+trim ${us(fitTiny)}  → ${outTok} tok  deterministic:${stable ? "yes" : "NO"}`,
   )
 }
-// Under a full budget, fit must reproduce the pre-branch bytes exactly (cache-safe).
+// Under a full budget, fit must reproduce the untrimmed bytes exactly (cache-safe).
 {
   const parts = [{ key: "core/instructions", text: agentsBlock(120), scope: "project" as const }]
   const same = InstructionBudget.fit(parts, { global: 100_000, project: 100_000 }) === Instructions.render([parts[0].text])
+  checks.push(BenchmarkBaseline.check("fit.untrimmed.identical", same ? 1 : 0, "1=identical", 0))
   console.log(`${pad("fit(no trim) bytes == render bytes")}${same ? "identical" : "DIFFERENT"}`)
 }
 
@@ -100,19 +107,26 @@ const turn = (steps: number) => [
   })),
 ] as unknown as SessionMessage.Info[]
 
-console.log("\n== per-step folds (new on this branch; HEAD ran none of them) ==")
+console.log("\n== per-step folds (every Step boundary pays these) ==")
 for (const steps of [10, 30, 100]) {
   const messages = turn(steps)
   const loop = time(() => SessionRunnerLoop.decide(messages, true))
   const empty = time(() => SessionRunnerEmpty.decide(messages))
   const unfinished = time(() => SessionRunnerUnfinished.decide(messages))
+  checks.push(BenchmarkBaseline.check(`loop.decide.${steps}`, loop, "µs/call"))
+  if (steps === 100) {
+    checks.push(BenchmarkBaseline.check("empty.decide.100", empty, "µs/call"))
+    checks.push(BenchmarkBaseline.check("unfinished.decide.100", unfinished, "µs/call"))
+  }
   console.log(
     `${pad(`turn history of ${steps} steps`)} loop.decide ${us(loop)}  empty.decide ${us(empty)}  unfinished.decide ${us(unfinished)}`,
   )
 }
 {
   const key = () => SessionRunnerLoop.callKey("grep", { pattern: "SessionRunner", glob: "*.ts", outputMode: "content" })
-  console.log(`${pad("loop.callKey (per tool call)")}${us(time(key, rounds * 5))}`)
+  const keyed = time(key, rounds * 5)
+  checks.push(BenchmarkBaseline.check("loop.callKey", keyed, "µs/call"))
+  console.log(`${pad("loop.callKey (per tool call)")}${us(keyed)}`)
 }
 
 // ---- 3. skill state with conflict bookkeeping ----------------------------------------------
@@ -142,6 +156,8 @@ const skillProgram = Effect.gen(function* () {
     skills.conflicts()
   }, 50)
   const conflicts = yield* skills.conflicts()
+  checks.push(BenchmarkBaseline.check("skill.rebuild.clean", plain, "µs/call"))
+  checks.push(BenchmarkBaseline.check("skill.rebuild.shadowed", withConflicts, "µs/call"))
   console.log(`${pad("Skill state rebuild, 200 skills, no collisions")}${us(plain)}`)
   console.log(`${pad("Skill state rebuild, 200 skills + 20 shadow chains")}${us(withConflicts)}  conflicts:${conflicts.length}`)
 }).pipe(Effect.provide(AppNodeBuilder.build(LayerNode.group([Skill.node, Bus.node]))))
@@ -177,11 +193,25 @@ const scrambled = {
   const once = ToolSchemaCanonical.canonicalize(mcpSchema)
   const canonical = time(() => ToolSchemaCanonical.canonicalize(mcpSchema), rounds * 5)
   const same = JSON.stringify(ToolSchemaCanonical.canonicalize(scrambled)) === JSON.stringify(once)
+  checks.push(BenchmarkBaseline.check("canonicalize.30field", canonical, "µs/call"))
   console.log(`\n== registration-time (once per tool, not per request) ==`)
   console.log(`${pad("ToolSchemaCanonical.canonicalize (30-field MCP schema)")}${us(canonical)}  key-order stable:${same}`)
 
   const advertised = Array.from({ length: 30 }, (_, i) => `mcp_demo_tool_${i}`)
   advertised.push("developer_shell")
-  console.log(`${pad("recoverToolName, exact miss over 31 names")}${us(time(() => recoverToolName("no_such_tool_here", advertised), rounds * 5))}`)
-  console.log(`${pad("recoverToolName, repairable mcp.demo.tool_7")}${us(time(() => recoverToolName("mcp.demo.tool_7", advertised), rounds * 5))}`)
+  const miss = time(() => recoverToolName("no_such_tool_here", advertised), rounds * 5)
+  checks.push(BenchmarkBaseline.check("recoverToolName.miss", miss, "µs/call"))
+  console.log(`${pad("recoverToolName, exact miss over 31 names")}${us(miss)}`)
+  const repairable = "mcp.demo.tool_7"
+  const repair = time(() => recoverToolName(repairable, advertised), rounds * 5)
+  checks.push(BenchmarkBaseline.check("recoverToolName.repair", repair, "µs/call"))
+  console.log(`${pad("recoverToolName, repairable mcp.demo.tool_7")}${us(repair)}`)
 }
+
+// ---- rolling baseline -----------------------------------------------------------------------
+
+if (BenchmarkBaseline.rebaselineRequested)
+  BenchmarkBaseline.pin(Object.fromEntries(checks.map((check) => [check.key, { value: check.value, unit: check.unit, tolerance: check.tolerance }])))
+const baselined = BenchmarkBaseline.report(checks)
+console.log(`\nbaseline verdict: ${baselined ? "PASS" : "FAIL"}${BenchmarkBaseline.rebaselineRequested ? " (re-pinned)" : ""}`)
+if (!baselined) process.exitCode = 1
