@@ -21,7 +21,13 @@ export async function copyPlugin(name: string) {
   const directory = path.join(root.path, name)
   const entry = path.join(directory, "tui.tsx")
   await mkdir(directory)
-  await symlink(path.join(import.meta.dir, "../../node_modules"), path.join(directory, "node_modules"))
+  // A junction needs no privilege on Windows, where a plain symlink dies with EPERM unless the
+  // user has Developer Mode; the target is a directory, which is exactly what junctions are for.
+  await symlink(
+    path.join(import.meta.dir, "../../node_modules"),
+    path.join(directory, "node_modules"),
+    process.platform === "win32" ? "junction" : "dir",
+  )
   await Bun.write(entry, Bun.file(path.join(import.meta.dir, "plugin", name, "tui.tsx")))
   return { directory, entry, [Symbol.asyncDispose]: root[Symbol.asyncDispose] }
 }
