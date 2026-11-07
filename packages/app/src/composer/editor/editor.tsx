@@ -111,7 +111,11 @@ export function ComposerEditor(props: ComposerEditorProps) {
   // A history preview holds the composer at the height it had when the list opened.
   const historyHeight = createMemo(() => composerHistoryPreviewHeight(state))
   // Phones and tablets, whatever their width: a narrow desktop window keeps the desktop composer.
-  const touch = createMediaQuery("(hover: none) and (pointer: coarse)")
+  // Fork divergence from upstream: a Windows touchscreen all-in-one also reports its primary pointer
+  // as (hover:none) and (pointer:coarse), and on a desktop-sized window the docked full-width bar
+  // detaches the actions from the composer and strands them under the sidebar. The dock therefore
+  // also requires a compact viewport; a desktop-sized window keeps the inline composer.
+  const touch = createMediaQuery("(hover: none) and (pointer: coarse) and (max-width: 1023px)")
   // The shell's slot at the bottom of the screen; without one (a story), the touch bar stays under the composer.
   const [dock, setDock] = createSignal<HTMLElement>()
 

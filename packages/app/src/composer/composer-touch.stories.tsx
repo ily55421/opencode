@@ -225,7 +225,8 @@ function TouchComposer(props: { state: State }) {
 
 function TouchStates(props: { state: State }) {
   const [view, setView] = createStore({ state: props.state, generation: 0 })
-  const touch = matchMedia("(hover: none) and (pointer: coarse)")
+  // Mirrors the editor's touch query, including the fork's compact-viewport refinement.
+  const touch = matchMedia("(hover: none) and (pointer: coarse) and (max-width: 1023px)")
   const [device, setDevice] = createStore({ touch: touch.matches })
   const sync = () => setDevice("touch", touch.matches)
   touch.addEventListener("change", sync)
