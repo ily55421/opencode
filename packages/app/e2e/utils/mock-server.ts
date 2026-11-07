@@ -1405,6 +1405,8 @@ function mockHandlers(
                 archived: update.archived ? Date.now() : undefined,
               }
             }
+          }).pipe(Effect.andThen(noContent)),
+        sessionCommand: (ctx) => {
           const recordCommand = config.onCommand
 
           if (!recordCommand) return unsupported("run session commands", "onCommand")
@@ -1630,7 +1632,6 @@ const decodeSessionUpdate = Schema.decodeUnknownOption(
     archived: Schema.optionalKey(Schema.Boolean),
     permissions: Schema.optionalKey(Permission.Ruleset),
   }),
-)
 )
 
 const decodeRevertStage = Schema.decodeUnknownOption(Schema.Struct({ messageID: Schema.String }))
